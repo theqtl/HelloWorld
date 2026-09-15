@@ -1,0 +1,33 @@
+eq_id,name,unit_op,type,scale_basis,single_use_or_fixed,key_requirement,area_classification_driver,lead_time_risk,confidence,notes
+EQ-010,Deprotection vessel,UO-01,Jacketed reactor with reflux,Batch volume,Fixed,Amine compatible with scrubbed vent,Amine handling and local exhaust,Medium,SEED,
+EQ-011,Support filtration,UO-01,Filter,Support mass,Either,Retains support fines,,Low,SEED,
+EQ-020,Clarification skid,UO-02,Filtration,Filter area per mass,Single use,Vmax sized,,Low,SEED,
+EQ-021,Crude hold vessel,UO-02,Vessel,Batch volume,Fixed,,,Low,SEED,
+EQ-030,Initial TFF skid,UO-03,TFF,Membrane area per mass,Either,Retains 20mer reliably,,Medium,SEED,Confirm retention experimentally not from nominal cutoff
+EQ-031,TFF recirculation vessel,UO-03,Vessel,Batch volume,Fixed,,,Low,SEED,
+EQ-040,AEX chromatography skid,UO-04,Process chromatography,Column volume,Fixed,Low dispersion and accurate gradient,,HIGH,SEED,Long lead item. Order early
+EQ-041,AEX column,UO-04,Axial compression or packed,Diameter at resolution limited load,Fixed,Packing reproducibility at diameter,,HIGH,SEED,Diameter set by resolution not capacity
+EQ-042,AEX fraction vessels,UO-04,Vessels,Pool volume,Either,,,Low,SEED,
+EQ-050,IP-RP chromatography skid,UO-05,Process chromatography,Column volume,Fixed,Organic solvent rated and explosion protected,FLAMMABLE SOLVENT AREA,HIGH,SEED,Drives electrical classification HVAC drainage and fire protection
+EQ-051,IP-RP column,UO-05,Preparative column,Diameter at resolution limited load,Fixed,Temperature uniformity across bed,FLAMMABLE SOLVENT AREA,HIGH,SEED,
+EQ-052,IP-RP fraction vessels,UO-05,Vessels,Pool volume,Fixed,Solvent rated,FLAMMABLE SOLVENT AREA,Medium,SEED,
+EQ-060,Detritylation vessel,UO-06,Reactor with pH control,Batch volume,Fixed,Rapid mixing and fast quench,,Medium,SEED,Blend time is the scale up constraint
+EQ-061,Quench addition system,UO-06,Dosing,Flow,Fixed,Fast and accurate,,Low,SEED,
+EQ-070,Desalt TFF skid,UO-07,TFF,Membrane area per mass,Either,Tolerates residual organic,,Medium,SEED,
+EQ-071,TFF recirculation vessel,UO-07,Vessel,Batch volume,Fixed,,,Low,SEED,
+EQ-080,Annealing vessel,UO-08,Jacketed vessel,Heat transfer area per volume,Fixed,Programmable ramp and uniform temperature,,Medium,SEED,Temperature uniformity is the specification that matters
+EQ-081,Strand charge and weighing,UO-08,Dispensing,Accuracy,Fixed,Accuracy sufficient for strand ratio CPP,,Medium,SEED,
+EQ-090,Final TFF skid,UO-09,TFF,Membrane area per mass,Either,Below duplex melting temperature,,Medium,SEED,
+EQ-091,Formulation vessel,UO-09,Vessel,Batch volume,Fixed,,,Low,SEED,
+EQ-092,Concentration measurement,UO-09,Variable pathlength UV,,Fixed,In line capable,,Low,SEED,
+EQ-100,Sterile filtration assembly,UO-10,Filtration,Filter area per volume,Single use,Integrity testable,Classified area TBD,Low,SEED,
+EQ-101,DS receiving vessel,UO-10,Vessel,Batch volume,Either,,Classified area TBD,Low,SEED,
+EQ-102,Filter integrity tester,UO-10,Instrument,,Fixed,Pre and post use testing,,Low,SEED,
+EQ-110,Production lyophiliser,UO-11,Freeze dryer,Shelf area,Fixed,Uniform shelf temperature and in line endpoint,Classified area TBD,HIGH,SEED,Often the capacity bottleneck. Cycle in days
+EQ-111,Lyo load and unload isolation,UO-11,Isolator or RABS,,Fixed,,Classified area TBD,HIGH,SEED,
+EQ-120,DS dispensing station,UO-12,Dispensing,,Fixed,Humidity controlled,Classified area TBD,Medium,SEED,Lyophilised material is hygroscopic
+EQ-121,Container sealing,UO-12,Sealing,,Fixed,,Classified area TBD,Low,SEED,
+EQ-122,Controlled storage,UO-12,Cold storage,Batch volume and campaign,Fixed,Monitored alarmed and on backup power,,Medium,SEED,Specify backup power early
+EQ-200,Solid phase synthesiser,Synthesis,Synthesiser,Support mass per cycle,Fixed,Scale matched to batch size,FLAMMABLE SOLVENT AREA,HIGH,SEED,Longest lead item in the facility
+EQ-201,Solvent recovery still,Utility,Distillation,Solvent throughput,Fixed,,FLAMMABLE SOLVENT AREA,HIGH,SEED,Decide in concept design. Cannot be retrofitted cheaply
+EQ-202,Buffer preparation and hold,Utility,Vessels,Buffer volume per campaign,Fixed,In line dilution reduces footprint,,Medium,SEED,AEX buffer volume can dominate the tank farm

@@ -1,0 +1,25 @@
+oq_id,question,area,why_it_matters,blocking,owner,target_date,status,related
+OQ-001,What are the annual demand scenarios and the batch size,Product and facility,Sets synthesiser scale column diameter vessel volume and therefore most of the capital cost,YES blocks facility sizing,TBD,TBD,Open,QTPP RSK-301
+OQ-002,Does the target modification pattern leave any viable enzymatic ligation junction,Route,If not the chemoenzymatic route is closed and no further effort should be spent on it,YES blocks route decision,TBD,TBD,Open,RSK-200 DR-001
+OQ-003,What is the mass balance and step yield set,Process,Needed for equipment sizing and cost of goods,YES blocks sizing,TBD,TBD,Open,OQ-001
+OQ-004,Is block purification plus ligation actually cheaper than full length synthesis for this sequence set,Route,The economic case for the chemoenzymatic route rests on this and it is an empirical question,YES blocks route decision,TBD,TBD,Open,DR-001
+OQ-005,Where is the regulatory starting material boundary,Regulatory,Determines how much of synthesis is under full cGMP with large cost consequence,YES blocks facility scope,TBD,TBD,Open,ICH Q11
+OQ-006,Can GMP grade ligase and splint supply be secured at commercial scale,Route,Supply dependency for the chemoenzymatic route,No but informs route decision,TBD,TBD,Open,RSK-202
+OQ-007,What deprotection conditions optimise completeness against depurination,Process,Two CQAs trade directly against each other,No,TBD,TBD,Open,RSK-011
+OQ-008,What membrane retains a 20mer reliably at process conditions,Process,Nominal cutoff ratings are not reliable at this size,No,TBD,TBD,Open,RSK-031
+OQ-009,Is the facility single product or multi product,Facility,Determines resin dedication cleaning validation scope and floor area,YES blocks layout,TBD,TBD,Open,RSK-044
+OQ-010,What salt system for AEX elution,Process and environment,Selectivity versus corrosion and effluent obligations,No,TBD,TBD,Open,UO-04
+OQ-011,Can hexafluoroisopropanol supply be secured for the facility lifetime,Materials,Fluorochemical restrictions create medium term availability and compliance risk,YES informs purification design,TBD,TBD,Open,RSK-052
+OQ-012,Is acetonitrile recovery by distillation justified,Facility and environment,Changes operating cost environmental permit and layout. Cannot be retrofitted cheaply,YES blocks concept design,TBD,TBD,Open,EQ-201
+OQ-013,DMT on or DMT off purification strategy,Process,Determines whether UO-06 exists and changes both chromatography steps,YES blocks process definition,TBD,TBD,Open,UO-06
+OQ-014,What diavolumes clear ion pair reagent to specification,Process,Sets UO-07 duration and buffer volume,No,TBD,TBD,Open,RSK-070
+OQ-015,What annealing ramp and ionic strength give reproducible duplex content at scale,Process,Core CPP set for the step that creates the product,YES blocks process definition,TBD,TBD,Open,RSK-081
+OQ-016,Does the final formulation medium maintain duplex stability,Process,Diafiltering an annealed duplex into low ionic strength can dissociate it,No,TBD,TBD,Open,RSK-090
+OQ-017,Is drug substance handled as sterile or as low bioburden,Quality and facility,Highest leverage question in the facility design. Determines classified area scope and a large share of capital cost,YES blocks concept design,TBD,TBD,Open,UO-10 area classification
+OQ-018,Is drug substance a lyophilised solid or a frozen liquid,Product and facility,Determines whether lyophilisers are in the facility at all,YES blocks concept design,TBD,TBD,Open,UO-11
+OQ-019,What are the storage conditions and shelf life,Product,Drives cold storage capacity and backup power,No,TBD,TBD,Open,UO-12
+OQ-020,What nuclease control is proportionate for this modified construct,Process,Research protocol habits can impose unnecessary cost on a robust modified duplex,No,TBD,TBD,Open,Raw material strategy
+OQ-021,What is the realistic real time release ambition,Quality,Control strategy should be written to an achievable target,No,TBD,TBD,Open,PAT options
+OQ-022,Are the two strand trains segregated spatially or temporally,Facility,Duplicate trains cost capital but remove mix up risk and add throughput,YES blocks layout,TBD,TBD,Open,Area classification
+OQ-023,What is the impurity qualification approach for sequence related impurities,Regulatory,Individual qualification is impractical. Family based control must be agreed with regulators,YES blocks filing strategy,TBD,TBD,Open,Regulatory landscape
+OQ-024,Are single strands released as intermediates before annealing,Quality,Nothing after annealing removes a sequence impurity so discovering a failure post anneal loses both strands,YES blocks control strategy,TBD,TBD,Open,Control strategy

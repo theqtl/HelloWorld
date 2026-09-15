@@ -1,0 +1,8 @@
+assumption_id,assumption,area,basis,impact_if_wrong,validation_plan,owner,status,confidence
+AS-001,Drug product formulation is out of scope,Scope,Project charter,Scope expansion and facility rework,Confirm with programme,TBD,Open,ASSUMED
+AS-002,Drug substance is API GMP under ICH Q7 not sterile manufacture,Quality,Typical for oligonucleotide DS,Classified area scope increases substantially,Resolve OQ-017 with quality and regulatory,TBD,Open,ASSUMED
+AS-003,Synthesis and aqueous purification are controlled not classified,Facility,Closed systems early in process,Higher classification cost,Confirm in contamination control strategy,TBD,Open,ASSUMED
+AS-004,Two orthogonal chromatography steps are sufficient for purity,Process,Common industry practice,A third step adds cost and yield loss,Demonstrate on representative material,TBD,Open,ASSUMED
+AS-005,Stepwise solid phase synthesis is adequate at siRNA strand length,Route,Length is short enough that yield compounding is tolerable,Chemoenzymatic route becomes necessary,Compare routes empirically. OQ-004,TBD,Open,ASSUMED
+AS-006,Modified duplex is robust enough that research grade nuclease precautions are unnecessary,Process,Heavy modification confers nuclease resistance,Unnecessary cost or unexpected degradation,Stability study under process conditions. OQ-020,TBD,Open,ASSUMED
+AS-007,Review cadence of weekly for questions and stage gate for unit operations,Governance,Working assumption,Governance mismatch,Confirm with project leadership,TBD,Open,ASSUMED

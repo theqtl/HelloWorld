@@ -1,0 +1,12 @@
+buffer_id,name,unit_op,composition_seed,ph_target,purpose,grade,prep_method,hold_time,confidence,notes
+BF-030,Initial DF buffer,UO-03,Low ionic strength aqueous buffer,TBD,Condition crude for AEX binding,Compendial where available,Prepared batch,TBD,SEED,Composition must give conductivity below AEX binding threshold
+BF-040,AEX equilibration,UO-04,Buffer salt plus base salt,TBD,Column equilibration,Compendial where available,Prepared or in-line dilution,TBD,SEED,Large volume consumer
+BF-041,AEX elution,UO-04,Equilibration plus gradient salt,TBD,Gradient elution,Compendial where available,Prepared or in-line dilution,TBD,SEED,Salt choice drives selectivity and effluent load
+BF-042,AEX strip,UO-04,High salt,TBD,Remove strongly bound species,Technical,Prepared batch,TBD,SEED,
+BF-043,AEX regeneration,UO-04,Alkali,TBD,Clean in place,Technical,Prepared batch,TBD,SEED,Resin compatibility limit applies
+BF-044,AEX storage,UO-04,Preservative solution,TBD,Column storage,Technical,Prepared batch,TBD,SEED,
+BF-050,IP-RP aqueous phase,UO-05,Ion-pair reagent plus fluorinated modifier in water,TBD,Mobile phase A,HPLC grade,Prepared batch,TBD,SEED,Modifier supply risk RSK-052
+BF-070,Counterion exchange buffer,UO-07,Sodium salt solution,TBD,Convert to sodium form,Compendial,Prepared batch,TBD,SEED,Drives CQA-12
+BF-071,Final desalting medium,UO-07,Water for injection or dilute buffer,TBD,Remove excess salt,WFI,Point of use,TBD,SEED,
+BF-080,Annealing buffer,UO-08,Defined salt and buffer system,TBD,Support duplex formation,Compendial,Prepared batch,TBD,SEED,Ionic strength is a CPP
+BF-090,Final formulation medium,UO-09,TBD,TBD,Final drug substance matrix,Compendial,Prepared batch,TBD,SEED,Must not destabilise duplex
