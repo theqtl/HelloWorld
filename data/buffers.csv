@@ -1,0 +1,4 @@
+buffer_id,name,use,components,ph,storage,source_key,provenance,notes
+BUF-LIG,Ligation buffer,Enzymatic ligation reaction,"Tris-HCl; MgCl2; ATP; reductant (DTT/TCEP); monovalent salt; optional PEG — concentrations TBD",,"2-8 C prep; enzyme cold chain",,assumption,"GAP: real vendor/literature composition to be filled from stream G research. Do NOT invent concentrations."
+BUF-DF,Diafiltration exchange buffer,UF/DF buffer exchange,"Exchange from reaction salts toward final matrix — composition TBD",,"2-8 C or ambient",,assumption,"GAP pending research."
+BUF-FINAL,Final spray-dry matrix,Final DF target + dryer feed,"Glass-forming excipient (trehalose/sucrose?) + minimal/volatile buffer — TBD",,,"assumption",,assumption,"CRITICAL CONSTRAINT: must be spray-dry compatible so evaporation does not concentrate Tris/Mg/NaCl into the powder. GAP pending stream F/G."

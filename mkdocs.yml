@@ -1,0 +1,95 @@
+site_name: siRNA DS Process & cGMP Facility
+site_description: >-
+  Knowledge base for an enzymatic-ligation siRNA drug-substance process and its
+  greenfield cGMP facility. Filtration-led purification, evaporation, spray drying.
+docs_dir: docs
+site_dir: site
+
+theme:
+  name: material
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.top
+    - navigation.indexes
+    - toc.follow
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.tabs.link
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: teal
+      accent: teal
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: teal
+      accent: teal
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+
+markdown_extensions:
+  - abbr
+  - admonition
+  - attr_list
+  - md_in_html
+  - footnotes
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.arithmatex:
+      generic: true
+
+extra_javascript:
+  - javascripts/mathjax.js
+  - https://cdnjs.cloudflare.com/ajax/libs/mathjax/3.2.2/es5/tex-mml-chtml.min.js
+  - https://cdnjs.cloudflare.com/ajax/libs/tablesort/5.3.0/tablesort.min.js
+  - javascripts/tablesort.js
+
+extra_css:
+  - stylesheets/extra.css
+
+plugins:
+  - search
+
+nav:
+  - Home: index.md
+  - Findings:
+      - Does the filtration-led train close?: findings/filtration.md
+      - Does the duplex survive spray drying?: findings/spray-drying.md
+  - Process:
+      - Overview: process/index.md
+      - Stream table: process/streams.md
+      - Enzymatic ligation: process/ligation.md
+      - Block preparation (incoming): process/blocks.md
+      - Filtration & UF/DF: process/filtration.md
+      - Evaporation: process/evaporation.md
+      - Spray drying: process/spray-drying.md
+      - Microbial control: process/microbial.md
+  - Mass & energy balance:
+      - Method: balance/index.md
+      - Results: balance/results.md
+  - Equations: equations/index.md
+  - Diagrams: diagrams/index.md
+  - Facility concept: facility/index.md
+  - Process development: devel/index.md
+  - Tech transfer: techtransfer/index.md
+  - Registers:
+      - Parameters: registers/parameters.md
+      - Streams: registers/streams.md
+      - Equipment: registers/equipment.md
+      - Buffers & reagents: registers/buffers.md
+      - Utilities: registers/utilities.md
+      - Risks: registers/risks.md
+      - Open questions: registers/questions.md
+      - Sources: registers/sources.md
+  - Reading list: sources/reading-list.md

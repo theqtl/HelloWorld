@@ -1,0 +1,83 @@
+# Diagrams
+
+## Block flow diagram (BFD)
+
+Vector flowsheet. Stream numbers (S01…S12) tie to the [stream register](../registers/streams.md)
+and the [mass balance](../balance/results.md). Product path in teal, buffer/utility in purple
+(dashed), waste in red (dashed).
+
+<div markdown="0">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1040 460" class="bfd-svg" role="img" aria-label="Block flow diagram of the siRNA drug-substance process">
+  <style>
+    .box { fill: none; stroke: #00897b; stroke-width: 2; }
+    .util { fill: none; stroke: #8e24aa; stroke-width: 2; stroke-dasharray: 4 3; }
+    .lbl { fill: currentColor; font: 600 13px sans-serif; }
+    .sub { fill: currentColor; font: 400 10px sans-serif; opacity: 0.8; }
+    .sid { fill: #00897b; font: 700 10px sans-serif; }
+    .wid { fill: #c62828; font: 700 10px sans-serif; }
+    .flow { stroke: currentColor; stroke-width: 1.8; marker-end: url(#arrow); fill: none; }
+    .wflow { stroke: #c62828; stroke-width: 1.4; marker-end: url(#warr); fill: none; }
+    .uflow { stroke: #8e24aa; stroke-width: 1.4; stroke-dasharray: 4 3; marker-end: url(#uarr); fill: none; }
+  </style>
+  <defs>
+    <marker id="arrow" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="currentColor"/></marker>
+    <marker id="warr" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#c62828"/></marker>
+    <marker id="uarr" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#8e24aa"/></marker>
+  </defs>
+  <rect class="util" x="20" y="30" width="140" height="46"/>
+  <text class="lbl" x="90" y="50" text-anchor="middle">Buffer prep</text>
+  <text class="sub" x="90" y="66" text-anchor="middle">U00</text>
+  <rect class="box" x="20" y="180" width="120" height="60"/>
+  <text class="lbl" x="80" y="205" text-anchor="middle">Blocks</text>
+  <text class="sub" x="80" y="222" text-anchor="middle">received, 5'-P</text>
+  <rect class="box" x="185" y="180" width="120" height="60"/>
+  <text class="lbl" x="245" y="205" text-anchor="middle">Ligation</text>
+  <text class="sub" x="245" y="222" text-anchor="middle">U01</text>
+  <rect class="box" x="350" y="180" width="120" height="60"/>
+  <text class="lbl" x="410" y="202" text-anchor="middle">Clarify /</text>
+  <text class="lbl" x="410" y="217" text-anchor="middle">enzyme sep</text>
+  <text class="sub" x="410" y="231" text-anchor="middle">U02</text>
+  <rect class="box" x="515" y="180" width="120" height="60"/>
+  <text class="lbl" x="575" y="205" text-anchor="middle">UF / DF</text>
+  <text class="sub" x="575" y="222" text-anchor="middle">U03</text>
+  <rect class="box" x="680" y="180" width="120" height="60"/>
+  <text class="lbl" x="740" y="205" text-anchor="middle">Evaporation</text>
+  <text class="sub" x="740" y="222" text-anchor="middle">U04</text>
+  <rect class="box" x="845" y="180" width="120" height="60"/>
+  <text class="lbl" x="905" y="205" text-anchor="middle">Spray dry</text>
+  <text class="sub" x="905" y="222" text-anchor="middle">U05</text>
+  <rect class="box" x="845" y="380" width="120" height="52"/>
+  <text class="lbl" x="905" y="405" text-anchor="middle">DS powder</text>
+  <text class="sub" x="905" y="421" text-anchor="middle">S12</text>
+  <path class="flow" d="M140,210 L182,210"/><text class="sid" x="148" y="203">S01/02</text>
+  <path class="flow" d="M305,210 L347,210"/><text class="sid" x="312" y="203">S04</text>
+  <path class="flow" d="M470,210 L512,210"/><text class="sid" x="478" y="203">S05</text>
+  <path class="flow" d="M635,210 L677,210"/><text class="sid" x="643" y="203">S08</text>
+  <path class="flow" d="M800,210 L842,210"/><text class="sid" x="808" y="203">S10</text>
+  <path class="uflow" d="M90,76 L90,150 L245,150 L245,178"/><text class="sid" x="150" y="145">S03</text>
+  <path class="uflow" d="M160,53 L575,53 L575,178"/><text class="sid" x="500" y="48">S06</text>
+  <path class="wflow" d="M575,240 L575,300"/><text class="wid" x="580" y="285">S07 permeate</text>
+  <path class="wflow" d="M740,240 L740,300"/><text class="wid" x="745" y="285">S09 condensate</text>
+  <path class="wflow" d="M965,190 L1012,190"/><text class="wid" x="905" y="170" text-anchor="middle">S11 exhaust</text>
+  <text class="sub" x="20" y="452">Teal = product path · purple dashed = buffer/utility · red dashed = waste.</text>
+</svg>
+</div>
+
+[Download the SVG](bfd.svg)
+
+## Reading the flowsheet
+
+- **U00 Buffer prep** feeds the ligation buffer (S03) and the diafiltration/final-matrix buffer
+  (S06). The final diafiltration must exchange into a spray-dry-compatible matrix (risk R-005).
+- **U01 Ligation** receives blocks (S01/S02) and produces the reaction mass (S04): full-length
+  strand plus impurities.
+- **U02 Clarify / enzyme separation** removes particulates and, with an immobilised ligase, the
+  enzyme (see [filtration finding](../findings/filtration.md) §4).
+- **U03 UF/DF** desalts, exchanges buffer, and concentrates (S08); permeate S07 is the largest
+  aqueous waste.
+- **U04 Evaporation** concentrates further (condensate S09); duty depends on how far UF got.
+- **U05 Spray dry** produces the DS powder (S12); exhaust S11 carries humid gas and fines.
+
+!!! note "Not yet drawn"
+    A stream-numbered process flow diagram (PFD) with instrument tags and equipment layout is
+    Tier-2/Tier-3. This BFD is the hand-off skeleton.

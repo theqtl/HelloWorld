@@ -1,0 +1,6 @@
+utility_id,name,driven_by,scenario_dependent,provenance,notes
+UT-WFI,Water for injection / purified water,"Buffer prep + diafiltration (DV-driven)",yes,assumption,"Largest water consumer is diafiltration. GAP pending diavolumes."
+UT-STEAM,Clean/plant steam,"Evaporator duty + SIP",yes,assumption,"Evaporator heat duty from energy balance (Tier 2)."
+UT-DRYGAS,Drying gas + heating,"Spray dryer inlet air/N2 heating",yes,assumption,"Large thermal load; from dryer energy balance (Tier 2)."
+UT-CHILL,Chilled water / cooling,"Condensers, jacket cooling, cold holds",yes,assumption,"GAP."
+UT-CDA-N2,Compressed air / nitrogen,"Atomisation, inerting, transfers",yes,assumption,"N2 likely for low-oxygen drying of oligo."

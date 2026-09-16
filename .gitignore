@@ -1,0 +1,20 @@
+# MkDocs build output
+site/
+
+# Generated Markdown (produced by `python -m gen.build` from data/*.csv).
+# Source of truth is data/*.csv, not these files. CI regenerates them.
+docs/registers/parameters.md
+docs/registers/streams.md
+docs/registers/equipment.md
+docs/registers/buffers.md
+docs/registers/utilities.md
+docs/registers/risks.md
+docs/registers/questions.md
+docs/registers/sources.md
+docs/process/streams.md
+docs/balance/results.md
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/

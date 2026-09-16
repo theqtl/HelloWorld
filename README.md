@@ -1,3 +1,52 @@
-![picture](IMG-4313.jpg)
+# siRNA Drug Substance Process & Greenfield cGMP Facility
 
-# I LOVE YOU!!!!
+Knowledge base for an **enzymatic-ligation** siRNA drug-substance (DS) process and its greenfield
+cGMP facility: filtration-led purification, evaporation, spray drying, microbial control — fully
+aqueous, no solvents.
+
+The presentation layer is **generated from a single structured data layer**. Every parameter,
+stream, equipment item, buffer, risk, question, and citation lives once in `data/*.csv`. A Python
+layer (`gen/`) computes the mass and energy balance and emits the Markdown pages; a
+[MkDocs Material](https://squidfunk.github.io/mkdocs-material/) site publishes them to GitHub Pages.
+
+## Layout
+
+| Path | Contents |
+|---|---|
+| `data/*.csv` | Single source of truth: parameters, streams, equipment, buffers, utilities, risks, questions, sources, scenarios. |
+| `gen/` | Generation + executable mass/energy balance (`balance.py`) and tests (`test_balance.py`). Standard library only. |
+| `docs/` | Site sources: findings, process pages, equations, diagrams, facility, registers. |
+| `mkdocs.yml` | Site configuration. |
+| `.github/workflows/pages.yml` | CI: test, generate, build, deploy to Pages. |
+
+## Build locally
+
+```bash
+pip install -r requirements.txt
+python -m pytest gen -q      # data integrity + balance tests
+python -m gen.build          # generate register + balance pages from data/
+mkdocs serve                 # preview at http://127.0.0.1:8000
+```
+
+Generated Markdown (register pages, `balance/results.md`, `process/streams.md`) is git-ignored;
+`python -m gen.build` recreates it. Edit the CSVs, never the generated pages.
+
+## Publishing to GitHub Pages
+
+The workflow builds and deploys on push. Enable it once in **Settings → Pages → Build and
+deployment → Source: GitHub Actions**. Until then the site is buildable and previewable locally
+but not live.
+
+## Provenance discipline
+
+Every numeric value is flagged **fact** (cited), **inference** (our reasoning/arithmetic), or
+**assumption** (illustrative placeholder, registered as an open question). Unsourced values are
+left blank and recorded as gaps — never invented. The mass balance runs on flagged assumption
+inputs and refuses to run on a blank, so a gap cannot become a fabricated result.
+
+## Status
+
+Tier 1: architecture, data model, executable balance across illustrative scenarios, the two
+headline findings (filtration closure; duplex survival in spray drying), and seeded registers.
+Unit-op depth, full energy balance, CIP/SIP, and the facility capital concept are Tier 2/3, marked
+as stubs or registered gaps.

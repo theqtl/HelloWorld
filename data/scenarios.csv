@@ -1,0 +1,4 @@
+scenario_id,label,annual_ds_demand_kg_yr,campaigns_per_yr,provenance,notes
+S1,Low (illustrative),100,4,assumption,"Illustrative anchor only. Real annual DS demand is the governing open question (Q-001); all sizing re-runs when it is supplied."
+S2,Mid (illustrative),500,6,assumption,"Illustrative anchor only. See Q-001."
+S3,High (illustrative),1000,10,assumption,"Illustrative anchor only. See Q-001. Note: 1000 kg/yr is very large for a marketed siRNA; retained to stress-test capacity."

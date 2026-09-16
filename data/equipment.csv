@@ -1,0 +1,8 @@
+equip_id,name,unit_op,sizing_basis,moc_candidate,turndown,provenance,notes
+U00-BUF,Buffer preparation & hold suite,Utilities,"Total buffer volume/campaign (DF diavolumes dominate)",316L SS / single-use bags,,assumption,"Sized off diafiltration buffer demand. GAP pending diavolumes (Q-020)."
+U01-LIG,Ligation reactor,Enzymatic ligation,"Batch volume = product mass / reactor concentration (P-CONC-LIG)",316L SS or single-use,,assumption,"Jacketed, temperature-controlled, low-shear mixing. Sizing GAP pending P-CONC-LIG."
+U02-CF,Clarification / enzyme-separation filter,Filtration,"Throughput L/m2 for depth+clarifying; or centrifuge if immobilised enzyme",Single-use depth media,,assumption,"If immobilised ligase: enzyme removed here by filtration/centrifugation (see filtration finding)."
+U03-UFDF,UF/DF skid (TFF),Ultrafiltration/Diafiltration,"Membrane area from flux (LMH) and batch volume",PES/regenerated cellulose membrane; SS or single-use flow path,,assumption,"MWCO for ~7 kDa species. Area GAP pending flux (stream C/D)."
+U04-EVAP,Evaporator,Evaporation,"Heat duty Q=U*A*dTlm; area from duty and U",316L SS (product contact),,assumption,"Type selection pending stream E. Short-residence type favoured to protect duplex."
+U05-SD,Spray dryer,Spray drying,"Water evaporation rate; drying gas mass & heat duty",316L SS,,assumption,"Atomiser and inlet/outlet design pending stream F. Sizing GAP."
+U06-CIP,CIP/SIP system,Cleaning,"Circulation flow for largest vessel; evaporator & dryer are hard-to-clean",316L SS,,assumption,"Tier-2 detail. Spray-dryer CIP flagged as a design risk (R-...)."

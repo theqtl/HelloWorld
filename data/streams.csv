@@ -1,0 +1,13 @@
+stream_id,name,from_unit,to_unit,stream_class,phase,carries,notes
+S01,Received blocks (guide),SUPPLY,U01-LIG,product,solid_or_soln,"purified 5'-phosphorylated guide-strand blocks","Incoming material. Block specs are supplier-controlled (out-of-facility SPOS)."
+S02,Received blocks (passenger),SUPPLY,U01-LIG,product,solid_or_soln,"purified 5'-phosphorylated passenger-strand blocks",""
+S03,Ligation buffer,U00-BUF,U01-LIG,buffer,aqueous,"Tris/Mg2+/ATP/reductant/salt","Composition in buffers.csv (BUF-LIG)."
+S04,Ligation reaction mass,U01-LIG,U02-CF,product,aqueous,"full-length strand + n-1 + unreacted blocks + partial products + ligase + ATP/AMP/PPi + splint(if used)","Species list drives the clearance matrix."
+S05,Clarified ligation pool,U02-CF,U03-UFDF,product,aqueous,"strand + soluble impurities","After depth/clarifying filtration and/or immobilised-enzyme separation."
+S06,Diafiltration buffer,U00-BUF,U03-UFDF,buffer,aqueous,"exchange buffer -> spray-dry-compatible matrix","BUF-DF. Final DV must exchange into spray-dryable matrix (excipient + minimal/volatile salts)."
+S07,UF/DF permeate (waste),U03-UFDF,WASTE,waste,aqueous,"salts, ATP/AMP, small solutes, buffer","Largest aqueous waste volume; scales with diavolumes."
+S08,UF/DF retentate (concentrated strand/duplex),U03-UFDF,U04-EVAP,product,aqueous,"purified strand or duplex in matrix","Anneal point (single strand vs duplex) is Q-001."
+S09,Evaporator condensate (waste),U04-EVAP,WASTE,waste,aqueous,"water (low solute)","Recoverable as clean condensate; volume = water removed."
+S10,Concentrated feed to dryer,U04-EVAP,U05-SD,product,aqueous,"strand/duplex + excipient, high solids","Dryer feed."
+S11,Spray-dryer exhaust (waste),U05-SD,WASTE,gas,gas,"humid drying gas + fines","Cyclone/filter losses here."
+S12,Drug substance powder,U05-SD,DS-STORE,product,solid,"siRNA DS powder","Product form (duplex powder vs two strand powders) tied to Q-001."

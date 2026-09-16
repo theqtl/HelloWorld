@@ -1,0 +1,5 @@
+# Site build + generation layer. The generation code (gen/) uses only the Python
+# standard library; these are for the static site and tests.
+mkdocs-material>=9.5
+pymdown-extensions>=10.7
+pytest>=8.0
