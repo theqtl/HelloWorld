@@ -14,16 +14,19 @@ a fixed decision; the work here is how to make it robust.
   [SRC-PBCV1-2014](../registers/sources.md)).
 - All ATP-dependent ligases require **5'-phosphate + 3'-OH** at the junction. The 5'-phosphate is
   installed chemically (in-line phosphoramidite reagent, ~quantitative, DMT-trackable) or
-  enzymatically (T4 PNK; sequence/modification-sensitive; Almac ran PNK one-pot at 5 mM)
-  (<span class="prov-fact">fact</span>; [SRC-ALMAC-2023](../registers/sources.md)).
+  enzymatically by a polynucleotide kinase; Almac screened a kinase panel and ran a one-pot
+  phosphorylation at 5 mM blockmer (<span class="prov-fact">fact</span>;
+  [SRC-ALMAC-2023](../registers/sources.md)). The paper uses kinase cell-free extracts rather than a
+  named T4 enzyme, so the specific enzyme is not pinned down here.
 
 ## Annealing is interleaved (Q-001)
 
 dsRNA ligases need a duplex nick, so the complementary strand (or an overlap) templates each
 ligation and the duplex is **co-assembled**, not built as free single strands annealed at the end
 (<span class="prov-fact">fact</span>/<span class="prov-inference">inference</span>;
-[SRC-ALMAC-2023](../registers/sources.md), [SRC-HONGENE](../registers/sources.md)). Almac
-demonstrated ligation with overlaps as short as 3 bp using a directional "3-2-3-2" assembly.
+[SRC-ALMAC-2023](../registers/sources.md), [SRC-HONGENE](../registers/sources.md)). Almac used a directional "3-2-3-2" assembly, each stage starting with three blockmers and ending
+with two partially complementary strands whose overhang templates the next annealing step. (An
+often-quoted "3 bp overlap" could not be found in the paper or its SI and is **not** carried here.)
 
 ## Conditions (documented set, Almac, fully modified siRNA, bench→1 L)
 
@@ -32,12 +35,17 @@ demonstrated ligation with overlaps as short as 3 bp using a directional "3-2-3-
 | Anneal | 50 mM Tris-HCl pH 7.5, 100 mM KCl, 10 mM MgCl₂, 65 °C, 15 min | [SRC-ALMAC-2023](../registers/sources.md) |
 | Ligation | + 1 mM DTT, 25 °C, 400 rpm, 1–20 h | same |
 | Product conc | ~1 mM duplex (1 L jacketed) | largest real public scale |
-| Blockmer conc | up to 10 mM (slow/incomplete) | same |
-| ATP conc | **gap** (in SI, not accessed) | Q-010 reading list |
+| Blockmer conc | up to 10 mM, but slow and **did not go to completion** | flagged by the authors as an optimisation target |
+| ATP conc | 2 mM | from the SI, now retrieved ([SRC-ALMAC-2023](../registers/sources.md)) |
+| Ligase loading | RNA ligase cell-free extract 1 mg/mL | SI Table S1 |
 
-Vendor claims (not peer-reviewed): >95% conversion, substrate up to 100 g/L, 30 g/L titer
-([SRC-CODEXIS](../registers/sources.md)). Peer-reviewed conversion for a modified oligo is
-40–80% (abstract only). See conversion assumption `P-LIG-CONV` and Q-010.
+Vendor claims (not peer-reviewed): >95% conversion, substrate loads up to 100 g/L, and >98%
+post-purification purity ([SRC-CODEXIS](../registers/sources.md)). A product titre for the vendor
+route is a **gap** — no titre figure appears in the vendor material (Q-034). Peer-reviewed conversion
+figures for *modified* oligos are not established either: the 82–96% range often quoted from
+[SRC-NATCOMM-2024](../registers/sources.md) is that paper's initial ligase screen on an **unmodified**
+shortmer, and its 5'-monophosphorothioate substrates reacted only ~30% against >95% for
+5'-monophosphate. See conversion assumption `P-LIG-CONV` and Q-010.
 
 ## Side reactions to control at the reaction
 

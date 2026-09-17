@@ -8,12 +8,19 @@ gap cannot silently become a fabricated result.
 
 Boundary: received purified 5'-phosphorylated blocks -> ligation -> clarification
 -> UF/DF -> evaporation -> spray drying -> DS powder. Fully aqueous, no solvents.
+
+CONCENTRATION BASIS (stated because the two halves of the train differ):
+  * Ligation and UF concentrations are on an siRNA (active) basis, matching the cited
+    literature, which reports siRNA concentrations rather than total solids.
+  * The evaporator outlet concentration is on a TOTAL DISSOLVED SOLIDS basis, because a
+    viscosity limit constrains everything in solution, not just the active.
+  * How much excipient is in solution at the evaporator is itself a process choice, carried
+    explicitly as P-EXCIP-FRAC-PRE-EVAP (0 = all excipient added after evaporation, the base
+    case; 1 = the full load present from the final diafiltration). See Q-038.
 Basis: DS demand is taken as siRNA active mass (API); powder also carries excipient.
 """
 from dataclasses import dataclass, asdict
 from .dataio import load_params, load_rows, param_value
-
-LHV_DEFAULT = 2400.0  # kJ/kg, fallback only; real value read from P-H2O-LHV
 
 
 def _require(params, pid):
@@ -40,6 +47,8 @@ class ScenarioResult:
     evap_water_removed_L: float
     dryer_feed_mass_kg: float
     dryer_water_evaporated_kg: float
+    excip_frac_pre_evap: float
+    evap_outlet_solids_kg: float
     wfi_approx_L: float
     aqueous_waste_approx_L: float
     evap_duty_MJ: float
@@ -49,7 +58,6 @@ class ScenarioResult:
 
 
 def run_scenario(scn, params):
-    conv = 1.0  # conversion informs purity/yield discussion, not the mass split here
     # yields (fractions)
     y_lig = _require(params, "P-YLD-LIG") / 100.0
     y_ufdf = _require(params, "P-YLD-UFDF") / 100.0
@@ -63,7 +71,8 @@ def run_scenario(scn, params):
     c_evap = _require(params, "P-CONC-EVAP")        # g/L
     dryfeed_pct = _require(params, "P-CONC-DRYFEED")  # %w/w solids
     diavol = _require(params, "P-DF-DIAVOL")
-    lhv = param_value(params, "P-H2O-LHV") or LHV_DEFAULT  # kJ/kg
+    lhv = _require(params, "P-H2O-LHV")  # kJ/kg
+    f_pre = _require(params, "P-EXCIP-FRAC-PRE-EVAP")  # 0..1 excipient present at evaporator
 
     annual = float(scn["annual_ds_demand_kg_yr"])
     camp = float(scn["campaigns_per_yr"])
@@ -80,7 +89,10 @@ def run_scenario(scn, params):
     df_buffer = diavol * uf_vol  # L
     api_after_ufdf = api_after_lig * y_ufdf
 
-    evap_out_vol = (api_after_ufdf * 1000.0) / c_evap  # L
+    # Evaporator outlet is sized on TOTAL dissolved solids: the active plus whatever share of
+    # the excipient load is already in solution at this point (P-EXCIP-FRAC-PRE-EVAP).
+    evap_solids = api_after_ufdf * (1.0 + f_pre * r)  # kg total dissolved solids
+    evap_out_vol = (evap_solids * 1000.0) / c_evap  # L
     evap_water = max(uf_vol - evap_out_vol, 0.0)  # L ~ kg
     api_after_evap = api_after_ufdf * y_evap
 
@@ -104,6 +116,7 @@ def run_scenario(scn, params):
         ligation_volume_L=lig_vol, uf_retentate_volume_L=uf_vol,
         df_buffer_volume_L=df_buffer, evap_water_removed_L=evap_water,
         dryer_feed_mass_kg=dryer_feed, dryer_water_evaporated_kg=dryer_water,
+        excip_frac_pre_evap=f_pre, evap_outlet_solids_kg=evap_solids,
         wfi_approx_L=wfi, aqueous_waste_approx_L=aq_waste,
         evap_duty_MJ=evap_MJ, evap_duty_kWh=evap_MJ / 3.6,
         dryer_evap_duty_MJ=dry_MJ, dryer_evap_duty_kWh=dry_MJ / 3.6,
@@ -116,12 +129,17 @@ def run_all():
     return [run_scenario(s, params) for s in scns]
 
 
-def purity_floor(block_full_length_pct, n_blocks):
+def purity_floor(block_full_length_pct=None, n_blocks=3):
     """Internal-limited full-length ceiling = product of per-block FL fractions.
 
     This is the purity that block-internal n-1 fixes and that no size-based
     filtration can improve (see finding 1). Returns percent.
+
+    block_full_length_pct defaults to the registered P-BLOCK-PUR so the figure quoted in
+    the documents and the figure used in code cannot drift apart.
     """
+    if block_full_length_pct is None:
+        block_full_length_pct = _require(load_params(), "P-BLOCK-PUR")
     f = block_full_length_pct / 100.0
     return (f ** n_blocks) * 100.0
 

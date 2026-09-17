@@ -60,7 +60,7 @@
   <text class="sub" x="905" y="421" text-anchor="middle">S12</text>
 
   <!-- Main flows -->
-  <path class="flow" d="M140,210 L182,210"/><text class="sid" x="150" y="203">S01/02</text>
+  <path class="flow" d="M140,210 L182,210"/><text class="sid" x="150" y="203">S01/S02</text>
   <path class="flow" d="M305,210 L347,210"/><text class="sid" x="312" y="203">S04</text>
   <path class="flow" d="M470,210 L512,210"/><text class="sid" x="478" y="203">S05</text>
   <path class="flow" d="M635,210 L677,210"/><text class="sid" x="643" y="203">S08</text>

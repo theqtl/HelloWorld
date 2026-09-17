@@ -12,20 +12,25 @@ without degrading it.
 | Wiped / agitated thin film | seconds | low | handles high viscosity/fouling (active wiping) | moderate | **Fallback** for viscosity/fouling |
 | Thin film | seconds | low | moderate | moderate | alternative |
 | Forced circulation | longer | higher (longer exposure) | robust to fouling/crystallisation | moderate | avoid (long residence) |
-| MVR (drive) | n/a (a drive) | n/a | n/a | ~15–25 kWh/ton water; minimal live steam | **energy drive at high throughput** |
+| MVR (drive) | n/a (a drive) | n/a | n/a | ~15–25 kWh/ton water general industrial; ~10–12.5 kWh/ton in dairy practice; minimal live steam | **energy drive at high throughput** |
 | Flash | very short | low | limited concentration per stage | low | limited single-stage duty |
 
 Sources: [SRC-FFE-WIKI](../registers/sources.md), [SRC-POPE-FFE](../registers/sources.md),
-[SRC-SPX-MVR](../registers/sources.md) (<span class="prov-fact">fact</span>, general/food/vendor).
+[SRC-SPX-MVR](../registers/sources.md) (qualitative only — "very low; little or no steam required"),
+with the recompression energy figure from [SRC-EFSAN-MVR](../registers/sources.md) and the lower
+dairy figure from [SRC-TETRAPAK-DPH](../registers/sources.md)
+(<span class="prov-fact">fact</span>, general/food/vendor). Recompression energy is strongly
+application-dependent, so treat the range as indicative until it is computed for this duty.
 
 ## Recommendation
 
 **Falling-film evaporator under vacuum, MVR-driven at higher throughput, with a wiped/thin-film
 fallback if viscosity or fouling become limiting** (<span class="prov-inference">inference</span>):
 
-- Falling-film residence time is **seconds** and the film is 0.2–2 mm, giving high heat transfer
-  and minimal thermal exposure — it concentrates thermosensitive streams (milk, juice, pharma)
-  without decomposition. This protects the duplex.
+- Falling-film residence time is **seconds** ([SRC-FFE-WIKI](../registers/sources.md)) and the film
+  runs **0.2–2 mm** thick ([SRC-MEDINA-2022](../registers/sources.md)), giving high heat transfer and
+  minimal thermal exposure — it concentrates thermosensitive streams (milk, juice, pharma) without
+  decomposition. This protects the duplex.
 - Run under **vacuum** so the boiling temperature stays well below the duplex melting temperature
   (Tm, gap Q-030); boiling-point elevation rises as solutes concentrate (`EQ-EVAP`).
 - **MVR** recompresses and reuses the vapour, cutting live steam — the energy-efficient drive when

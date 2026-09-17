@@ -44,9 +44,21 @@ Every numeric value is flagged **fact** (cited), **inference** (our reasoning/ar
 left blank and recorded as gaps — never invented. The mass balance runs on flagged assumption
 inputs and refuses to run on a blank, so a gap cannot become a fabricated result.
 
+`data/sources.csv` carries a `verified` column recording who checked each source against the
+claims made from it, and when. A citation audit on 2026-09-17 checked all twenty-five original
+sources: every cited work existed, but several numbers were attached to real sources that do not
+contain them. Those were corrected or blanked, and the test suite now lints prose citations,
+so the same class of error fails the build rather than shipping.
+
 ## Status
 
 Tier 1: architecture, data model, executable balance across illustrative scenarios, the two
 headline findings (filtration closure; duplex survival in spray drying), and seeded registers.
 Unit-op depth, full energy balance, CIP/SIP, and the facility capital concept are Tier 2/3, marked
 as stubs or registered gaps.
+
+The information-architecture decision is recorded in
+[`docs/adr/0001-information-architecture.md`](docs/adr/0001-information-architecture.md), including
+the options rejected and what would reverse the choice. Two requirements it does not yet meet —
+filterable register tables, and a contribution path for people who do not use git — are documented
+there as open consequences.

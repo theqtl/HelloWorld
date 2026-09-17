@@ -20,6 +20,18 @@ The [results page](results.md) is generated from it; change the CSV inputs, run
   excipient at the ratio `P-EXCIPIENT-RATIO`.
 - **Per campaign** = annual demand ÷ campaigns per year.
 
+### Concentration basis (stated explicitly, because it differs across the train)
+
+- Ligation and ultrafiltration concentrations are on an **siRNA basis**, matching the cited
+  literature, which reports siRNA concentrations rather than total solids.
+- The evaporator outlet concentration is on a **total dissolved solids basis**, because a viscosity
+  limit constrains everything in solution, not only the active.
+- How much excipient is in solution *at the evaporator* is a process choice, not a constant, so it is
+  carried explicitly as `P-EXCIP-FRAC-PRE-EVAP`: 0 means the bulk excipient is added after
+  evaporation (the base case), 1 means the full load is present from the final diafiltration.
+  Risk R-005 requires the salts to be exchanged **out** at the final diafiltration; it does not
+  require the excipient load to go **in** there. See Q-038.
+
 ## The chain
 
 1. **Overall yield** \(Y = Y_\text{lig}\,Y_\text{UFDF}\,Y_\text{evap}\,Y_\text{dry}\).
@@ -36,11 +48,32 @@ The [results page](results.md) is generated from it; change the CSV inputs, run
 ## Concentration cascade (why evaporation duty is scenario-dependent)
 
 The hand-off concentrations decide how much work evaporation actually does. Ultrafiltration
-already concentrates: charged-membrane siRNA has reached >190 g/L at bench scale
-(<span class="prov-fact">fact</span>; [SRC-ZYDNEY-2024](../registers/sources.md)). If UF reaches
+already concentrates: charged membranes raised achievable siRNA concentration from 52 to
+**>180 mg/mL** at bench scale (<span class="prov-fact">fact</span>;
+[SRC-ZYDNEY-2024](../registers/sources.md)). If UF reaches
 close to the dryer-feed solids, evaporation duty is small; if viscosity limits UF earlier,
 evaporation carries more. The cascade `P-CONC-UF → P-CONC-EVAP → P-CONC-DRYFEED` is therefore
 explicit and adjustable, not assumed away. Questions Q-017/Q-018/Q-019 hold the real limits.
+
+## Where evaporation earns its place
+
+The excipient decision is not a detail — it largely decides whether there is any evaporation duty at
+all. Holding everything else at the current placeholders and varying only that one input:
+
+| Excipient in solution at the evaporator | Evaporator outlet solids (kg) | Water removed (L) | Duty (MJ) |
+|---|---|---|---|
+| none (base case, added after evaporation) | 28.3 | 115.5 | 277.1 |
+| half | 42.5 | 68.2 | 163.8 |
+| all (added at final diafiltration) | 56.7 | 21.0 | 50.4 |
+
+*(Per campaign, scenario S1. Figures regenerate from the data layer; the inputs are illustrative
+assumptions, not validated values.)*
+
+A five-fold swing in duty from one unresolved process choice. And it compounds with Q-017: if
+ultrafiltration alone reaches close to the dryer feed solids, evaporation has little left to do
+regardless. Evaporation is a fixed decision for this train, so the question is not *whether* it
+happens but *where it earns its place* — which is answered by resolving Q-017, Q-018 and Q-038, not
+by arithmetic on placeholders.
 
 ## What the balance does not yet do
 

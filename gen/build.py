@@ -96,6 +96,8 @@ def gen_balance():
         ("uf_retentate_volume_L", "UF retentate volume (L)"),
         ("df_buffer_volume_L", "Diafiltration buffer (L)"),
         ("evap_water_removed_L", "Evaporation water removed (L)"),
+        ("excip_frac_pre_evap", "Excipient fraction in solution at evaporator"),
+        ("evap_outlet_solids_kg", "Evaporator outlet total solids (kg)"),
         ("dryer_feed_mass_kg", "Spray-dryer feed (kg)"),
         ("dryer_water_evaporated_kg", "Dryer water evaporated (kg)"),
         ("wfi_approx_L", "Clean water demand approx (L)"),
@@ -112,7 +114,12 @@ def gen_balance():
     body += "\n".join(lines) + "\n\n"
     body += ("All quantities are per campaign unless labelled per year. Duties are the "
              "latent-heat minimum (mass of water removed × latent heat); real evaporator and "
-             "dryer duties add sensible heat, gas heating, and losses (Tier-2 energy balance).\n")
+             "dryer duties add sensible heat, gas heating, and losses (Tier-2 energy balance).\n\n"
+             "Concentrations up to and including ultrafiltration are on an siRNA basis; the "
+             "evaporator outlet is on a total dissolved solids basis. How much excipient is in "
+             "solution at the evaporator is an open process choice (`P-EXCIP-FRAC-PRE-EVAP`, "
+             "Q-038) and it swings the evaporation duty severalfold — see the "
+             "[method page](index.md).\n")
     return _write("balance/results.md", body)
 
 

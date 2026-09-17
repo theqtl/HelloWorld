@@ -18,17 +18,26 @@ Filtration separates by size, charge, and binding. It does not separate by one n
 - A product strand is about 7 kDa (21-mer); an n-1 deletion differs by about one residue,
   ~330 Da, which is ~4.7% of the strand mass (parameters `P-MW-STRAND`, `P-DMW-N1`,
   <span class="prov-inference">inference</span> from standard residue masses).
-- Ultrafiltration fractionation needs the two species to differ by roughly an order of
-  magnitude in molecular weight, and the practical resolution band is about ±50% of the
-  membrane cut-off (<span class="prov-fact">fact</span>, general UF; Sigma/USPTO 6187190 via
-  [SRC-ZYDNEY-2024](../registers/sources.md) reading list). A 5% difference is far inside a
-  single membrane's cut.
+- Ultrafiltration fractionation needs the two species to differ substantially in molecular
+  weight. The published thresholds are stricter than a single round number: conventional multistage
+  ultrafiltration is described as **grossly inefficient below a molecular-weight ratio of about
+  five** (<span class="prov-fact">fact</span>; [SRC-US7497950](../registers/sources.md)), and the
+  classical statement for clean fractionation is a difference of around two orders of magnitude.
+  An n-1 deletion sits at a ratio of about **1.05**, far below every threshold in the literature.
+- The cut is not sharp either. A molecular-weight cut-off is conventionally the molecular weight at
+  90% rejection; an ideal membrane would cut sharply because its pores are uniform, but real
+  membranes have broad pore-size distributions and correspondingly blurred cut-offs
+  (<span class="prov-fact">fact</span>; [SRC-MWCO-REVIEW-2024](../registers/sources.md)).
 - Charge separation is also marginal: n-1 differs by one internucleotide linkage on a 20-plus
   charge polyanion, ~4–5% of the charge (<span class="prov-inference">inference</span>).
 
 So **no filtration mode — ultrafiltration, nanofiltration, or a charged membrane adsorber —
 resolves block-internal n-1 from full-length.** The same limit applies to the adenylylated
-dead-end species (differs by ~AMP, ~329 Da) and to n+1/addition variants.
+dead-end species and to n+1/addition variants. (On the adenylylated species: adenylylation adds
+about 329 Da to the **5'-phosphorylated donor fragment**. That dead-end fragment is far smaller than
+the ligated product and its separation problem is a partial-product problem, not an n-1 problem;
+what keeps it uncontrollable downstream is that suppressing it belongs at the reaction. See
+[SRC-PBCV1-2014](../registers/sources.md), which reports the dead end but states no mass difference.)
 
 ## 2. Not all length variants are equal
 
@@ -94,7 +103,8 @@ single-nucleotide separation is attempted.
 
 ## 4. The enzyme: immobilisation is the linchpin
 
-Soluble ligase (tens of kDa) is *larger* than the 7 kDa strand, so size ultrafiltration cannot
+Soluble ligase (tens of kDa) is *larger* than the ~7 kDa strand (`P-MW-STRAND`), so size
+ultrafiltration cannot
 pass the enzyme while retaining product; a charged adsorber is unreliable because the polyanionic
 product competes for the sites. Conventionally, ligase removal uses affinity or ion-exchange
 **chromatography** — which would break the filtration-led thesis.
@@ -127,10 +137,19 @@ DNase digestion, which adds a protein to clear. Registered as **R-006**.
    **meets spec** depends on the spec (next point).
 3. **What would have to move for the filtration-only case to close?** Either the block
    full-length purity rises (fewer, purer blocks — 2 blocks at 97% gives ~94%), or the DS
-   full-length specification sits at or below the achievable floor. Public guidance is ≥80% by
-   LC with a 1% single-impurity characterisation threshold (<span class="prov-fact">fact</span>,
-   non-ICH; [SRC-AMVUTRA-EPAR](../registers/sources.md) and USP/FDA), but the actual approved-siRNA
-   numeric limits are **redacted**, so this is open — question **Q-033**.
+   full-length specification sits at or below the achievable floor. **There is no published
+   numeric purity specification for an siRNA drug substance to test this against.** The approved-siRNA
+   limits are redacted from the assessment report, which discloses the test methods and no acceptance
+   criteria at all (<span class="prov-fact">fact</span>;
+   [SRC-AMVUTRA-EPAR](../registers/sources.md)). The nearest published numbers are adjacent rather
+   than applicable, and should not be mistaken for a specification:
+   an identification threshold of 1.0% and a qualification threshold of 1.5% for oligonucleotide
+   impurities (<span class="prov-fact">fact</span>, draft guidance;
+   [SRC-EMA-OLIGO-2024](../registers/sources.md)); and a recommendation of **≥80% full-length with
+   impurities ≥1% identified** that applies to **guide RNA for genome editing**, not to siRNA drug
+   substance (<span class="prov-fact">fact</span>, scope-limited;
+   [SRC-FDA-CBER-2024](../registers/sources.md)). So this remains genuinely open — question
+   **Q-033** — and it is the single input that decides whether the filtration-only case closes.
 4. **If chromatography cannot be avoided, where is the minimum?** A single final polish
    (anion-exchange or IP-RP HPLC) on each **single strand** before annealing — exactly the
    orthogonal AX + IPRP control used for an approved siRNA (<span class="prov-fact">fact</span>;
@@ -150,7 +169,10 @@ is unambiguous. The biggest technical risk to the thesis is not n-1 at all; it i
 
 !!! warning "Evidence quality"
     Almost no quantitative data is specific to a fully modified 21-mer siRNA at scale. Membrane
-    flux figures are protein/pDNA/mRNA surrogates; the strongest oligo-specific UF source is
-    abstract-only. Block purities are from modified gapmer chemistry. Conversions span an
-    abstract range (40–80%) to vendor claims (>95%). Treat the direction as firm and the numbers
-    as provisional. See the [reading list](../sources/reading-list.md).
+    flux figures are protein and plasmid-DNA surrogates; the strongest oligo-specific UF source is
+    abstract-only. Block purities are from modified gapmer chemistry. **No verified conversion range
+    exists for a fully modified siRNA at scale**: the 82–96% figure in the literature is a ligase
+    screen on an *unmodified* shortmer, and phosphorothioate donors in that same work reacted at only
+    ~30% ([SRC-NATCOMM-2024](../registers/sources.md)); the >95% figure is an unreviewed vendor claim.
+    Treat the direction as firm and the numbers as provisional. See the
+    [reading list](../sources/reading-list.md).

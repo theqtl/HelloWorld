@@ -1,4 +1,7 @@
 site_name: siRNA DS Process & cGMP Facility
+# Fail the build on a broken cross-reference rather than printing a warning: this package is
+# meant to be handed to an engineering firm, and dead links in it are a credibility problem.
+strict: true
 site_description: >-
   Knowledge base for an enzymatic-ligation siRNA drug-substance process and its
   greenfield cGMP facility. Filtration-led purification, evaporation, spray drying.
@@ -43,6 +46,10 @@ markdown_extensions:
   - toc:
       permalink: true
   - pymdownx.details
+  - pymdownx.snippets:
+      base_path:
+        - docs
+      check_paths: true
   - pymdownx.superfences
   - pymdownx.tabbed:
       alternate_style: true
@@ -93,3 +100,5 @@ nav:
       - Open questions: registers/questions.md
       - Sources: registers/sources.md
   - Reading list: sources/reading-list.md
+  - Decisions:
+      - ADR 0001 — Information architecture: adr/0001-information-architecture.md

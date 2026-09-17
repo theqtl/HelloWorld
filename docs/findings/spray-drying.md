@@ -28,18 +28,26 @@ holds the duplex during storage.
 - **Evaporative cooling helps.** A drying droplet stays near the wet-bulb temperature until the
   surface dries, so the material runs cooler than the gas outlet during the critical wet period
   (<span class="prov-inference">inference</span>, standard drying theory).
-- **The glass stabilises the dry solid.** Trehalose is a high-Tg amorphous former
-  (Tg ≈ 117 °C dry; <span class="prov-fact">fact</span>, [SRC-KEIL-2021](../registers/sources.md)),
-  vitrifying the duplex and immobilising it. Residual moisture plasticises the glass and lowers
-  Tg (Gordon–Taylor; see [Equations](../equations/index.md), `EQ-TG`), so the outlet condition
-  must target low moisture (e.g. ~2–3% at ~10% outlet relative humidity for trehalose,
-  <span class="prov-fact">fact</span>) and the powder must be kept below its (moisture-shifted) Tg.
+- **The glass stabilises the dry solid — but the real window is narrow.** Trehalose is a
+  high-Tg amorphous former, and anhydrous trehalose is often quoted near 117 °C. That is *not* what
+  the spray-dried material does. In the siRNA spray-drying study itself, **all trehalose formulations
+  showed glass transitions between 38 and 53 °C**, set by their residual moisture, and the measured
+  residual moisture was **3.8–4.6%** for trehalose against 0.2–0.4% for mannitol
+  (<span class="prov-fact">fact</span>, bench; [SRC-KEIL-2021](../registers/sources.md)).
+  Water plasticises the glass (Gordon–Taylor; [Equations](../equations/index.md), `EQ-TG`), so
+  moisture and Tg move together and the powder must be held below the *moisture-shifted* Tg — which
+  for a 4% trehalose powder is nearer 40 °C than 117 °C. Storage and handling temperature, not just
+  dryer outlet temperature, therefore become design constraints. Driving residual moisture down
+  raises Tg and widens the window, and is the main lever available.
 
 ## 3. Recommendation, with the fallback
 
 **Base case: dry the annealed duplex** in an amorphous trehalose (or sucrose) glass, at an outlet
 temperature set below the duplex Tm and comfortably below the moisture-adjusted Tg, under low-oxygen
-(N₂) drying. This is consistent with the ligation finding that the product is co-assembled and
+(N₂) drying. Note that the moisture-adjusted Tg measured for spray-dried trehalose siRNA powders is
+38–53 °C ([SRC-KEIL-2021](../registers/sources.md)), so "comfortably below Tg" is a much tighter
+constraint than the anhydrous-trehalose figure suggests, and it binds on storage as well as on
+drying. This is consistent with the ligation finding that the product is co-assembled and
 handled **as a duplex** (see §5).
 
 **Fallback: dry the two single strands separately and anneal afterward** (during reconstitution or
@@ -77,6 +85,13 @@ the filtration species and the drying form.
 Drying the duplex is feasible and evidenced, not a leap of faith, provided the outlet stays below
 Tm and the product is vitrified in a sugar glass. The residual risk is real but bounded and has a
 clean fallback. Spray drying does **not** force a retreat to lyophilisation.
+
+The one thing that tightened on review is the **thermal margin after drying**. With a measured Tg of
+38–53 °C at 3.8–4.6% residual moisture ([SRC-KEIL-2021](../registers/sources.md), Q-039), the
+powder's stability window sits much closer to ambient
+than an anhydrous-trehalose figure would imply. Residual moisture specification and cold-chain
+handling of the dried drug substance move from housekeeping to critical, and the DoE below must map
+Tg against achieved moisture rather than assume a high-Tg glass.
 
 !!! warning "Transferability"
     The drying correlations (Péclet/morphology, Gordon–Taylor Tg–moisture, droplet kinetics) come

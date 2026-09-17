@@ -1,10 +1,12 @@
 name: Build & deploy docs
 
+# The build runs on every branch and pull request, so a feature branch stays validated.
+# Deployment only happens from the default branch: the `github-pages` environment rejects
+# deployments from other branches, which is why every earlier run on a feature branch failed
+# with a deploy job that died before its first step.
 on:
   push:
-    branches:
-      - main
-      - claude/sirna-process-facility-design-jfoyxt
+  pull_request:
   workflow_dispatch:
 
 permissions:
@@ -24,14 +26,16 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.txt
       - name: Install dependencies
         run: pip install -r requirements.txt
-      - name: Run tests (data integrity + balance)
+      - name: Run tests (data integrity, citations, balance)
         run: python -m pytest gen -q
       - name: Generate pages from data layer
         run: python -m gen.build
-      - name: Build site
-        run: mkdocs build
+      - name: Build site (strict — broken links fail the build)
+        run: mkdocs build --strict
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
@@ -39,6 +43,7 @@ jobs:
 
   deploy:
     needs: build
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment:
       name: github-pages
