@@ -22,6 +22,17 @@ dairy figure from [SRC-TETRAPAK-DPH](../registers/sources.md)
 (<span class="prov-fact">fact</span>, general/food/vendor). Recompression energy is strongly
 application-dependent, so treat the range as indicative until it is computed for this duty.
 
+## The oligonucleotide precedent (this is no longer a "no data" step)
+
+Thin-film evaporation of an oligonucleotide drug substance is **established practice**, not an analogy
+to dairy. The maximum concentration achieved in manufacture by thin-film evaporation is **160 mg
+ASO/g solution**, and the authors note that thin-film evaporation is likely to reach higher
+concentrations than UF/DF because more viscous liquids are less likely to foul the evaporator
+(<span class="prov-fact">fact</span>; [SRC-PMC7415879](../registers/sources.md)). Two caveats travel
+with it: the source is a **single-strand antisense** oligonucleotide solution, not an siRNA duplex and
+not a dryer feed; and its stated "few hours" is a **batch cycle time, not a fluid residence time** —
+do not cite it as a residence time. This anchors `P-CONC-EVAP` (Q-018).
+
 ## Recommendation
 
 **Falling-film evaporator under vacuum, MVR-driven at higher throughput, with a wiped/thin-film
@@ -46,9 +57,23 @@ pressure; area from \(Q = U A \Delta T_\text{lm}\) (`EQ-EVAP`). Water removed pe
 stream, the maximum concentration before the viscosity limit, and foaming behaviour are **gaps**
 (Q-018).
 
+**Turndown, not just duty, constrains a falling film (risk R-013).** A falling film needs a minimum
+feed per unit tube perimeter — the **minimum wetting rate**, reported at 0.10–0.22 kg m⁻¹ s⁻¹ for
+water on vertical steel (<span class="prov-fact">fact</span>, water/simple aqueous solutions;
+[SRC-HUGHES-2024](../registers/sources.md)). Below it the film breaks into rivulets and dry patches
+foul — a heat-transfer failure, not a throughput inconvenience. For a single 48 mm tube the wetted
+perimeter is 0.151 m, so the minimum feed is about 57 kg/h **for one tube**
+(<span class="prov-inference">inference</span>, arithmetic ours). A small pharmaceutical batch
+therefore cannot run single-pass; it must recirculate, and recirculation multiplies cumulative
+thermal exposure — the quantity R-004 is about. **A rotary evaporator is not a scale-down model of a
+falling film.** These numbers are for water, not a polyelectrolyte solution, so the transfer is
+plausible but unproven.
+
 !!! warning "Transferability & open question"
-    Evaporator correlations are largely from food, dairy, and fine chemicals; evaporation of an
-    oligonucleotide duplex is not a documented precedent (transferability caveat). Whether
-    evaporation is even needed depends on how far UF concentrates first — if UF reaches near the
-    dryer-feed solids (>190 g/L is achievable at bench), evaporation duty is small (Q-017, the
+    Evaporator hydrodynamic correlations are largely from food, dairy, and fine chemicals. Thin-film
+    evaporation of an oligonucleotide drug substance **is** a documented precedent
+    ([SRC-PMC7415879](../registers/sources.md)), but for a single-strand ASO solution, not an siRNA
+    duplex, so the transferability caveat still applies. Whether evaporation is even needed depends on
+    how far UF concentrates first — if UF reaches near the dryer-feed solids (~193 g/L is achievable at
+    bench; [SRC-ZYDNEY-2025](../registers/sources.md)), evaporation duty is small (Q-017, the
     concentration cascade).

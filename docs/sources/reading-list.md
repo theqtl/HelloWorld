@@ -211,7 +211,7 @@ on. Gives the gel-polarisation law, the three-to-six-times cut-off rule and the 
 [Claims to not repeat](#claims-to-not-repeat).
 
 **26. Pall Corporation. Introduction to Tangential Flow Filtration, report 20-0410.**
-[SRC-PALL-TFF] · open PDF · **full text read** · ~30 min · unblocks Q-020, EQ-AREA.
+[SRC-PALL-TFF] · open PDF · **full text read** · ~30 min · unblocks Q-020, EQ-FLUX (area sizing).
 Membrane area sizing with worked examples that reproduce by hand, and the diavolume table that
 confirms the site's removal percentages. Tag as a vendor claim wherever used.
 
@@ -418,7 +418,7 @@ answer.
 | [SRC-ZYDNEY-2024] | abstract only | Membrane cut-off selection and the charged-membrane concentration ceiling | Filtration process page, equations, balance |
 | [SRC-ZYDNEY-2025] | abstract only | The ~193 g/L concentration ceiling | Filtration process page |
 | [SRC-SD-MORPH] | abstract only | Qualifying the Péclet reading of particle morphology | Spray-drying finding §4, spray-drying process page, equations |
-| [SRC-GRONKE-2023] | abstract only | Cut-off rule, achievable concentration, diafiltration salt requirement | Not yet cited on the site; queued |
+| [SRC-GRONKE-2023] | abstract only | Cut-off rule, achievable concentration, diafiltration salt requirement | Equations (EQ-SIEVE), filtration process page, equipment register, R-014 |
 | [SRC-OPRD-2025] | record only | Nothing any more — both figures previously attributed to it have been traced to other sources | Microbial process page |
 | [SRC-MORISON-2006] | record only | Nothing directly; its numbers reach us through [SRC-HUGHES-2024], which was read | Provenance chain only |
 | [SRC-XIA-1998] | record only | Nothing directly; its parameters reach us through [SRC-NNDB-TURNER], which was read | Provenance chain only |

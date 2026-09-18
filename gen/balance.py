@@ -19,6 +19,7 @@ CONCENTRATION BASIS (stated because the two halves of the train differ):
     case; 1 = the full load present from the final diafiltration). See Q-038.
 Basis: DS demand is taken as siRNA active mass (API); powder also carries excipient.
 """
+import math
 from dataclasses import dataclass, asdict
 from .dataio import load_params, load_rows, param_value
 
@@ -40,6 +41,7 @@ class ScenarioResult:
     ds_api_per_campaign_kg: float
     powder_per_campaign_kg: float
     overall_yield_frac: float
+    ufdf_yield_frac: float
     api_at_ligation_kg: float
     ligation_volume_L: float
     uf_retentate_volume_L: float
@@ -60,10 +62,8 @@ class ScenarioResult:
 def run_scenario(scn, params):
     # yields (fractions)
     y_lig = _require(params, "P-YLD-LIG") / 100.0
-    y_ufdf = _require(params, "P-YLD-UFDF") / 100.0
     y_evap = _require(params, "P-YLD-EVAP") / 100.0
     y_dry = _require(params, "P-YLD-DRY") / 100.0
-    overall = y_lig * y_ufdf * y_evap * y_dry
 
     r = _require(params, "P-EXCIPIENT-RATIO")
     c_lig = _require(params, "P-CONC-LIG")          # g/L
@@ -73,6 +73,20 @@ def run_scenario(scn, params):
     diavol = _require(params, "P-DF-DIAVOL")
     lhv = _require(params, "P-H2O-LHV")  # kJ/kg
     f_pre = _require(params, "P-EXCIP-FRAC-PRE-EVAP")  # 0..1 excipient present at evaporator
+
+    # UF/DF yield is NOT a flat constant (F-019). Membrane-passage loss follows the diafiltration
+    # relation yield = exp(-(1-R)(ln VCF + N)) reproduced from the three worked points in
+    # SRC-MILLIPORE-TFF (R=0.99 -> 9.5% loss; R=0.999 -> 1.0% loss at ln VCF + N = 10). Two further
+    # loss terms are ADDITIVE and were absent from the old model: unrecoverable hold-up in tubing and
+    # filters (dominant at small batch, SRC-NOURAFKAN-2024) and membrane adsorption (SRC-MILLIPORE-TFF).
+    # See EQ-UFYIELD on the equations page.
+    retention = _require(params, "P-UFDF-RETENTION")        # fraction (~0.99)
+    holdup_loss = _require(params, "P-UFDF-HOLDUP-LOSS")    # fraction
+    adsorp_loss = _require(params, "P-UFDF-ADSORP-LOSS")    # fraction
+    vcf = c_uf / c_lig                                      # volume concentration factor
+    membrane_yield = math.exp(-(1.0 - retention) * (math.log(vcf) + diavol))
+    y_ufdf = membrane_yield - holdup_loss - adsorp_loss
+    overall = y_lig * y_ufdf * y_evap * y_dry
 
     annual = float(scn["annual_ds_demand_kg_yr"])
     camp = float(scn["campaigns_per_yr"])
@@ -112,7 +126,7 @@ def run_scenario(scn, params):
         scenario_id=scn["scenario_id"], label=scn["label"],
         annual_ds_api_kg=annual, campaigns_per_yr=camp,
         ds_api_per_campaign_kg=ds_api_camp, powder_per_campaign_kg=powder_camp,
-        overall_yield_frac=overall, api_at_ligation_kg=api_lig,
+        overall_yield_frac=overall, ufdf_yield_frac=y_ufdf, api_at_ligation_kg=api_lig,
         ligation_volume_L=lig_vol, uf_retentate_volume_L=uf_vol,
         df_buffer_volume_L=df_buffer, evap_water_removed_L=evap_water,
         dryer_feed_mass_kg=dryer_feed, dryer_water_evaporated_kg=dryer_water,

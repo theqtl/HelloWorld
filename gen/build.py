@@ -90,6 +90,7 @@ def gen_balance():
         ("campaigns_per_yr", "Campaigns/yr"),
         ("ds_api_per_campaign_kg", "DS API per campaign (kg)"),
         ("powder_per_campaign_kg", "DS powder per campaign (kg)"),
+        ("ufdf_yield_frac", "UF/DF yield (fraction)"),
         ("overall_yield_frac", "Overall yield (fraction)"),
         ("api_at_ligation_kg", "API at ligation input (kg)"),
         ("ligation_volume_L", "Ligation batch volume (L)"),

@@ -454,3 +454,121 @@ def test_unread_sources_cited_from_findings_are_on_the_reading_list():
         "list (add it to docs/sources/reading-list.md, or read it and update "
         "`access`): " + "; ".join(offenders)
     )
+
+
+# ---------------------------------------------------------------------------
+# Guards added 2026-09-18 by the revision session. Each encodes a defect the
+# evidence dive found or created a risk of: a band stored as a bare point value
+# (F-018, F-019), a cross-molecule number transferred without saying so, a source
+# left in the "unread" census after it was actually read, and a batch-cycle-time
+# figure cited as a residence time (F-002 trap).
+# ---------------------------------------------------------------------------
+
+def test_band_parameters_carry_an_explicit_range():
+    """A parameter that is a band must not hide as a bare point value (F-018, F-019).
+
+    Convention: a band parameter flags itself with the token 'BAND:' in its notes and
+    must then populate range_low/range_high; and any parameter carrying a range must
+    keep its point value inside it.
+    """
+    params = load_params()
+    offenders = []
+    for r in load_rows("parameters"):
+        pid = r["param_id"]
+        notes = r.get("notes") or ""
+        lo = (r.get("range_low") or "").strip()
+        hi = (r.get("range_high") or "").strip()
+        if "BAND:" in notes and not (lo and hi):
+            offenders.append(f"{pid}: notes flag a BAND but range_low/range_high are empty")
+            continue
+        if lo or hi:
+            if not (lo and hi):
+                offenders.append(f"{pid}: only one of range_low/range_high is set")
+                continue
+            flo, fhi = float(lo), float(hi)
+            if flo > fhi:
+                offenders.append(f"{pid}: range_low {flo} > range_high {fhi}")
+            v = param_value(params, pid)
+            if v is not None and not (flo <= v <= fhi):
+                offenders.append(f"{pid}: value {v} outside its range [{flo}, {fhi}]")
+    assert not offenders, "band/range defect(s): " + "; ".join(offenders)
+
+
+#: Tokens in a source's scale_system that name a molecule class other than our
+#: siRNA duplex. A parameter anchored to such a source must acknowledge the transfer.
+_FOREIGN_CLASS_TOKENS = (
+    "mrna", "messenger rna", "plasmid", "polysialic", "small molecule", "small-molecule",
+    "antisense", "single strand", "single-strand", "single-stranded", "gapmer",
+    "circular rna", " protein", "mab",
+)
+#: Tokens in a parameter's own notes that count as acknowledging the transfer.
+_TRANSFER_CAVEAT_TOKENS = (
+    "mrna", "plasmid", "polysialic", "small molecule", "small-molecule", "antisense",
+    "single strand", "single-strand", "single-stranded", "gapmer", "moe", "protein",
+    "not our", "not an sirna", "not a duplex", "not a nucleic", "different mol",
+    "different molecular", "transfer", "surrogate", "circular rna",
+)
+
+
+def test_cross_molecule_parameters_declare_the_transfer():
+    """A parameter whose source names a different molecule class must say so (transferability)."""
+    sources = {r["source_key"]: r for r in load_rows("sources")}
+    offenders = []
+    for r in load_rows("parameters"):
+        key = (r.get("source_key") or "").strip()
+        if not key or key not in sources:
+            continue
+        scale = (sources[key].get("scale_system") or "").lower()
+        if not any(tok in scale for tok in _FOREIGN_CLASS_TOKENS):
+            continue
+        notes = (r.get("notes") or "").lower() + " " + (r.get("scale_system") or "").lower()
+        if not any(tok in notes for tok in _TRANSFER_CAVEAT_TOKENS):
+            offenders.append(
+                f"{r['param_id']} cites {key} (scale_system names a different molecule class) "
+                f"but its notes state no transfer caveat"
+            )
+    assert not offenders, "; ".join(offenders)
+
+
+def test_read_sources_are_not_in_the_unread_census():
+    """The reverse of the reading-list guard: a source that WAS read must not still sit
+    in the reading list's 'What we have not actually read' census (its first column)."""
+    text = open(
+        os.path.join(ROOT, "docs", "sources", "reading-list.md"), encoding="utf-8"
+    ).read()
+    m = re.search(r"##\s*What we have not actually read(.*?)(\n##\s|\Z)", text, re.S)
+    assert m, "census section not found in reading-list.md"
+    census = m.group(1)
+    # First column of each census table row is the unread source: '| [SRC-XXX] | ...'
+    listed = re.findall(r"^\|\s*\[(SRC-[A-Z0-9-]+)\]", census, re.M)
+    access = {r["source_key"]: (r.get("access") or "").strip() for r in load_rows("sources")}
+    offenders = [k for k in listed if access.get(k) not in ACCESS_UNREAD]
+    assert not offenders, (
+        "source(s) listed in the unread census whose access is actually a full read "
+        "(remove them from the census or fix their access): " + ", ".join(offenders)
+    )
+
+
+def test_no_residence_time_cites_a_batch_cycle_time_trap():
+    """No page may state a residence time citing a source whose notes TRAP that figure as a
+    batch cycle time (F-002). A window that cites such a source next to 'residence time' must
+    also carry the correction ('cycle time')."""
+    trap_sources = {
+        r["source_key"] for r in load_rows("sources")
+        if re.search(r"\bTRAP\b", r.get("notes") or "")
+    }
+    offenders = []
+    for path in _doc_files():
+        lines = open(path, encoding="utf-8").read().split("\n")
+        for i, line in enumerate(lines):
+            if "residence time" not in line.lower():
+                continue
+            window = "\n".join(lines[max(0, i - 3): i + 4])
+            if not any(k in window for k in trap_sources):
+                continue
+            if "cycle time" not in window.lower():
+                offenders.append(f"{os.path.relpath(path, ROOT)}:{i + 1}  {line.strip()[:80]}")
+    assert not offenders, (
+        "residence-time claim(s) citing a batch-cycle-time TRAP source without the correction: "
+        + "; ".join(offenders)
+    )

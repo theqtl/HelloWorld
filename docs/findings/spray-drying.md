@@ -13,49 +13,59 @@ base pairing; above its melting temperature (Tm) the strands dissociate. The que
 during the seconds a droplet dries, the material ever exceeds Tm, and whether the dry solid then
 holds the duplex during storage.
 
-## 2. What the evidence shows
+## 2. What the evidence shows — the glass transition binds first
 
-- **Trehalose gives full recovery; the matrix matters more than the fact of drying.** In spray
-  drying of siRNA formulations, **trehalose formulations allowed full siRNA recovery**, whereas
-  crystalline **mannitol lost ~20% of the siRNA** (and 50–60% of polymer) and "inefficiently
-  stabilises" the duplex against drying-stress strand dissociation (<span class="prov-fact">fact</span>,
-  bench, siRNA polyplex; [SRC-KEIL-2021](../registers/sources.md)).
-- **The temperature rule is explicit.** Both mannitol and trehalose formulations "preserved siRNA
-  integrity regardless of excipient concentration and temperature **at outlet temperature below
-  the siRNA melting temperature**" (<span class="prov-fact">fact</span>, bench;
-  [SRC-KEIL-2021](../registers/sources.md)). This is the direct answer: keep the outlet (and
-  therefore the particle) below Tm and the duplex survives.
+- **The binding constraint is the glass transition, not the melting temperature.** The spray-dried
+  powder must be held below its *moisture-shifted* glass transition, and that sits **below** the
+  duplex melting temperature, so it is the limit that binds. In the siRNA spray-drying study, **all
+  trehalose formulations showed glass transitions between 38 and 53 °C**, set by residual moisture of
+  **3.8–4.6%** (0.2–0.4% for mannitol) (<span class="prov-fact">fact</span>, bench;
+  [SRC-KEIL-2021](../registers/sources.md)). Water plasticises the glass (Gordon–Taylor;
+  [Equations](../equations/index.md), `EQ-TG`), so moisture and Tg move together. Anhydrous trehalose
+  is often quoted near 117 °C; that is *not* what the dried product does, and designing to it would
+  overstate the thermal margin by decades of degrees. Driving residual moisture down raises Tg and is
+  the main lever available. **This binds on storage and handling, not just on the dryer.**
+- **The melting temperature is the looser of the two limits.** A 21-nucleotide siRNA duplex melts at
+  **58.1 °C** unmodified, rising to 60.4–64.1 °C with 2'-F or 2'-OMe at three positions, in 100 mM
+  NaCl (<span class="prov-fact">fact</span>, bench UV melting; [SRC-MALEK-2019](../registers/sources.md)).
+  Against a 38–53 °C glass transition, a 58–64 °C melting point is **5–25 °C higher** — necessary to
+  respect but not the constraint that binds. Keeping the outlet below Tm is still required: both
+  matrices "preserved siRNA integrity … at outlet temperature below the siRNA melting temperature"
+  (<span class="prov-fact">fact</span>; [SRC-KEIL-2021](../registers/sources.md)). **Do not extrapolate
+  the +1 to +2 °C/nt modification increment across all 21 positions** — it was measured over three, and
+  multiplying it to claim a fully modified duplex melts near 100 °C is unsupported (Q-030).
+- **Trehalose gives full recovery; the matrix matters more than the fact of drying.** Trehalose
+  formulations allowed **full siRNA recovery** where crystalline **mannitol lost ~20% of the siRNA**
+  (and 50–60% of polymer) (<span class="prov-fact">fact</span>, bench, siRNA polyplex;
+  [SRC-KEIL-2021](../registers/sources.md)).
 - **Evaporative cooling helps.** A drying droplet stays near the wet-bulb temperature until the
   surface dries, so the material runs cooler than the gas outlet during the critical wet period
   (<span class="prov-inference">inference</span>, standard drying theory).
-- **The glass stabilises the dry solid — but the real window is narrow.** Trehalose is a
-  high-Tg amorphous former, and anhydrous trehalose is often quoted near 117 °C. That is *not* what
-  the spray-dried material does. In the siRNA spray-drying study itself, **all trehalose formulations
-  showed glass transitions between 38 and 53 °C**, set by their residual moisture, and the measured
-  residual moisture was **3.8–4.6%** for trehalose against 0.2–0.4% for mannitol
-  (<span class="prov-fact">fact</span>, bench; [SRC-KEIL-2021](../registers/sources.md)).
-  Water plasticises the glass (Gordon–Taylor; [Equations](../equations/index.md), `EQ-TG`), so
-  moisture and Tg move together and the powder must be held below the *moisture-shifted* Tg — which
-  for a 4% trehalose powder is nearer 40 °C than 117 °C. Storage and handling temperature, not just
-  dryer outlet temperature, therefore become design constraints. Driving residual moisture down
-  raises Tg and widens the window, and is the main lever available.
+- **Atomisation shear is not a governing risk for a short duplex.** Naked siRNA kept **>80% band
+  intensity and full silencing activity** through sonication, vortexing, atomisation and
+  lyophilisation, whereas naked plasmid DNA did not survive the same treatments
+  (<span class="prov-fact">fact</span>, bench, naked nucleic acids;
+  [SRC-NAKED-NA-2023](../registers/sources.md)). The shear worry is real for a large flexible molecule
+  like plasmid DNA; a short rigid duplex is not damaged by atomisation. This lets R-003 refocus
+  entirely on temperature and the glass transition.
 
 ## 3. Recommendation, with the fallback
 
-**Base case: dry the annealed duplex** in an amorphous trehalose (or sucrose) glass, at an outlet
-temperature set below the duplex Tm and comfortably below the moisture-adjusted Tg, under low-oxygen
-(N₂) drying. Note that the moisture-adjusted Tg measured for spray-dried trehalose siRNA powders is
-38–53 °C ([SRC-KEIL-2021](../registers/sources.md)), so "comfortably below Tg" is a much tighter
-constraint than the anhydrous-trehalose figure suggests, and it binds on storage as well as on
-drying. This is consistent with the ligation finding that the product is co-assembled and
-handled **as a duplex** (see §5).
+**Base case: dry the annealed duplex** in an amorphous trehalose (or sucrose) glass, held first
+**below the moisture-adjusted Tg** (the binding limit, measured 38–53 °C for spray-dried trehalose
+siRNA powders; [SRC-KEIL-2021](../registers/sources.md)) and, as the looser limit, below the duplex Tm
+(58–64 °C; [SRC-MALEK-2019](../registers/sources.md)), under low-oxygen (N₂) drying. "Below Tg" is a
+much tighter constraint than the anhydrous-trehalose figure suggests, and it binds on storage as well
+as on drying, so residual-moisture control leads the design. This is consistent with the ligation
+finding that the product is co-assembled and handled **as a duplex** (see §5).
 
 **Fallback: dry the two single strands separately and anneal afterward** (during reconstitution or
 fill-finish). Single strands have no duplex to lose in the dryer, so this removes the Tm risk
 entirely — at the cost that the drug substance becomes **two powders plus a downstream annealing
 step**, a materially different product definition. Registered as risk **R-003**, tied to **Q-001**.
 
-The DoE that resolves the choice: measure the modified-duplex **Tm** (Q-030), then map retained
+The DoE that resolves the choice: measure the achieved-moisture **Tg** for our matrix (Q-039, the
+higher-priority unknown) and the modified-duplex **Tm** for our sequence (Q-030), then map retained
 duplex fraction and activity against outlet temperature, excipient:API ratio, and residual
 moisture, at pilot scale where the outlet/particle temperature relationship is representative.
 
@@ -82,9 +92,14 @@ the filtration species and the drying form.
 
 ## 6. Bottom line
 
-Drying the duplex is feasible and evidenced, not a leap of faith, provided the outlet stays below
-Tm and the product is vitrified in a sugar glass. The residual risk is real but bounded and has a
-clean fallback. Spray drying does **not** force a retreat to lyophilisation.
+Drying the duplex is feasible and evidenced, not a leap of faith, provided the powder is held below
+its moisture-shifted glass transition (the binding limit) and the outlet stays below Tm (the looser
+one), vitrified in a sugar glass. Atomisation shear is not a governing risk for a short duplex
+([SRC-NAKED-NA-2023](../registers/sources.md)). The residual risk is real but bounded and has a clean
+fallback. Spray drying does **not** force a retreat to lyophilisation — noting honestly that the one
+approved siRNA process in the register dries by lyophilisation
+([SRC-PATISIRAN-EPAR](../registers/sources.md)), which is a fact to record, not an argument to change
+this process.
 
 The one thing that tightened on review is the **thermal margin after drying**. With a measured Tg of
 38–53 °C at 3.8–4.6% residual moisture ([SRC-KEIL-2021](../registers/sources.md), Q-039), the
