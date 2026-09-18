@@ -35,7 +35,6 @@ inference and must not be recorded as a fact.
 | F-006 | The microbial page carries a bioburden and endotoxin ladder reproduced from a mammalian cell-culture article. | An **oligonucleotide-specific** statement exists and is open access: **"levels <1 CFU/mL demonstrate microbial control"**. |
 | F-007 | `SRC-CODEXIS` supplies ">95% conversion, up to 100 g/L, >98% purity". | Traceable **only** to a marketing blog. Absent from the company's own press release and all four of its ligation patent families. |
 | F-008 | The balance treats ligation conversion and step yield as broadly aligned. | Per-ligation conversion (>92%) and **overall mass yield (19–43%)** differ by an order of magnitude. |
-| **F-016** | `docs/equations/index.md` states diafiltration clearance as `C/C₀ = exp(−N(1−σ))` where σ is the **sieving** coefficient. | **Wrong as written.** That form is correct only if σ is the **rejection** coefficient. Read as sieving, it says a freely permeating salt never washes out. The site's *numbers* are right; its stated equation is not. |
 | **F-017** | The four governing equations lean on an anonymous secondary website whose domain is six months old. | Peer-reviewed and named-author primaries now exist for all four, two of them on nucleic acids. The anonymous source is no longer needed for any of them. |
 | **F-018** | `P-YLD-DRY` carries a flat 90% dryer yield. | Measured spray-dryer recoveries run **8.6–22% before optimisation and 61–89% after**, across 5 g to 400 g. A point value is indefensible. |
 | **F-019** | `P-YLD-UFDF` carries 90%, justified as "TFF loss <10%" from a protein surrogate. | Loss is an **exponential function** of retention and of the combined concentration-and-diavolume term, plus an additive adsorption term and a hold-up term. At 0.99 retention it is 9.5%; at 0.999 it is 1.0%. |
@@ -276,16 +275,32 @@ inference and must not be recorded as a fact.
 - Why it matters: this is the first naked-siRNA drying evidence in the register — the existing drying source is a polyplex formulation. It separates the shear risk cleanly: a plasmid is damaged by atomisation, a short duplex is not.
 - Proposed action: cite on the drying finding to retire atomisation shear as a governing risk and refocus R-003 entirely on temperature and the glass transition.
 
-### F-016 — The diafiltration clearance equation on the equations page is mislabelled and, read literally, is wrong
+### F-016 — RETRACTED BY THIS SESSION: the site's diafiltration equation is correct, and the reconciliation note it already carries can now be closed
 - Stream: C (membranes)
-- Type: contradiction
-- Affects: `docs/equations/index.md`, `EQ-DIAF`; Q-020; `docs/process/filtration.md`
-- Sources: SRC-NOURAFKAN-2024 and SRC-KELLY-OPRD-2025 (two peer-reviewed primaries, both on nucleic acids), corroborated numerically by SRC-PALL-TFF
-- Verbatim (the numeric check that settles it, from the vendor diavolume table): "1 63.2 50.0 / 2 86.5 75.0 / 3 95.0 87.5 / 4 98.2 93.8 / 5 99.3 96.9 / 6 99.8 98.4 / 7 99.9 99.2"
-- Scale/system: generic ultrafiltration theory; the two equation sources are peer-reviewed, one on messenger RNA and one on oligonucleotides
-- Confidence: read in full for all three
-- Why it matters: the site writes the clearance as an exponential in `N(1−σ)` and calls σ the **sieving** coefficient. Sieving and rejection are complements. With σ read as sieving, a freely permeating species has σ = 1 and the formula says it never washes out, which is plainly false. The site's own numbers (5 diavolumes gives 99.3%, 7 gives 99.9%) are computed as if σ were sieving in the *other* form, and they match the vendor table exactly. So the numbers are right and the stated equation contradicts them. Dimensional analysis does not catch this; limiting cases do.
-- Proposed action: fix the symbol definition on the equations page, and state both the sieving and rejection forms with their relationship, so the next reader cannot make the same substitution.
+- Type: source-upgrade
+- Affects: `docs/equations/index.md`, `EQ-DIAF` and `EQ-SIEVE`; Q-020
+- **Correction, recorded openly because it is the exact failure mode this dive exists to prevent.** This
+  entry was first written as a contradiction, on a research stream's report that the site states
+  diafiltration clearance as an exponential in `N(1−σ)` with σ called the sieving coefficient. **I then
+  opened `docs/equations/index.md` and that is not what it says.** The page states
+  `C/C₀ = e^{−σN}` with σ defined as "sieving coefficient (0 fully retained … 1 freely permeable)",
+  which is the correct pairing. It already carries the note: "the field-standard form uses
+  \(e^{-\sigma N}\); an alternative \(e^{-N(1-\sigma)}\) appears with a retentate-basis σ —
+  reconcile the σ definition before use." **There is no defect. No edit to the equation is required.**
+  The finding was written against a paraphrase rather than the page, and it should never have been
+  entered as a contradiction.
+- Sources: SRC-NOURAFKAN-2024 and SRC-KELLY-OPRD-2025 (peer-reviewed primaries, both on nucleic acids), corroborated numerically by SRC-PALL-TFF
+- Verbatim (the numeric check, from the vendor diavolume table): "1 63.2 50.0 / 2 86.5 75.0 / 3 95.0 87.5 / 4 98.2 93.8 / 5 99.3 96.9 / 6 99.8 98.4 / 7 99.9 99.2"
+- Scale/system: generic ultrafiltration theory; two of the three sources apply the relation to a nucleic acid
+- Confidence: read in full for all three sources, and the site page verified directly
+- Why it still matters: the page's own caveat says "reconcile the σ definition before use", and it can now
+  be closed. The continuous column of the vendor table reproduces the page's 5 and 7 diavolume figures
+  exactly, which confirms the page's form and its numbers together. The complementary form **is** a live
+  trap in the wider literature, so it is worth stating the relationship explicitly rather than only
+  warning about it.
+- Proposed action: keep `EQ-DIAF` as written. Replace the "reconcile before use" caveat with the closed
+  statement, cite the two primaries, and cross-reference `EQ-SIEVE` so the complement relation is on the
+  page next to the equation that depends on it. Do **not** change the formula or the symbol definition.
 
 ### F-017 — Primary sources now exist for all four governing equations, so the anonymous secondary can be retired
 - Stream: C (membranes)
@@ -296,7 +311,7 @@ inference and must not be recorded as a fact.
 - Scale/system: general membrane theory; two of the four sources apply the equations to a nucleic acid
 - Confidence: read in full
 - Why it matters: the site's four governing equations currently lean on an anonymous, organisation-attributed website with no named author whose domain was registered six months ago. That is now unnecessary for every one of them.
-- Proposed action: re-cite all four equations to the primaries and demote SRC-BPT-TFF to a "see also". **Do not** re-cite the gel-polarisation source for process time: it prints "Process Time = Filtrate Flow Rate × Volume", which is litres per hour times litres, and is not a time. Two further traps recorded during this dive: an open-access review prints the film-theory equation without its logarithm, and the site's own published numbers disagree with its own printed symbol definition (F-016).
+- Proposed action: re-cite all four equations to the primaries and demote SRC-BPT-TFF to a "see also". **Do not** re-cite the gel-polarisation source for process time: it prints "Process Time = Filtrate Flow Rate × Volume", which is litres per hour times litres, and is not a time. Two further traps recorded during this dive: an open-access review prints the film-theory equation without its logarithm, and the complementary sieving/rejection form is a live trap in the literature, though the site itself states the equation correctly (see F-016, which was retracted after checking the page).
 
 ### F-018 — The spray-dryer step yield is not a constant and the registered value is indefensible
 - Stream: H (scale-up)
