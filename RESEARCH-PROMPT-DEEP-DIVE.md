@@ -30,16 +30,19 @@ NON-GOALS, and these are hard:
 
 ## 1. Files you may write. Everything else is read-only.
 
-You may modify exactly three files:
+You may modify exactly four files:
 
-1. `data/sources.csv` — append newly discovered sources. You may also correct the
-   `reachability`, `notes` or `verified` fields of an EXISTING row if, and only if, your
-   research proves the current entry wrong. Do not delete rows. Do not change `source_key`
-   values, because the documents link to them.
+1. `data/sources.csv` — append newly discovered sources, and add the `access` column described
+   in section 4a. You may also correct the `reachability`, `notes` or `verified` fields of an
+   EXISTING row if, and only if, your research proves the current entry wrong. Do not delete
+   rows. Do not change `source_key` values, because the documents link to them.
 2. `docs/sources/reading-list.md` — rewrite into the expert curriculum described in section 6.
 3. `RESEARCH-QUEUE.md` at the repository root — create this. It is the flagged-findings
    handover described in section 7. It is deliberately outside `docs/` so it does not become
    a site page and cannot affect the strict site build.
+4. `gen/test_balance.py` — APPEND new test functions only, for the three checks named in
+   section 4a. Do not modify, weaken, rename or delete any existing test. If an existing test
+   fails because of something you did, fix what you did, not the test.
 
 If you believe something else must change, do not change it. Write it into RESEARCH-QUEUE.md
 as a proposed action for a future session. That is the entire point of the queue.
@@ -118,6 +121,71 @@ Assume you will make the same class of error unless you actively prevent it.
 8. **Check for retractions and corrections** on any source that will carry weight. Retraction
    Watch, PubPeer, the publisher's erratum list. One source in the register already has a
    known erratum.
+
+## 4a. Do this before you add a single new source
+
+The register cannot currently tell you, at a glance, which sources were only ever read as an
+abstract. That is the precise condition that produced the errors in section 3, so fix the
+instrument before you use it.
+
+What is wrong today, checked on 2026-09-18:
+
+- `reachability` is free text. Thirty-five rows carry fourteen distinct values.
+- Six sources were seen as an abstract or less, and they are spelled five different ways:
+  "paywalled (abstract)", "paywalled (abstract via ScienceDirect org)", "paywalled (record
+  confirmed via Semantic Scholar)", "abstract open (Penn State research portal); full text
+  paywalled", and plain "abstract". You cannot scan, sort or filter for them.
+- Twelve rows say only "reachable", which conflates "the URL loads" with "somebody read it".
+  For a blog, vendor page or patent those are the same thing. For a journal article they are
+  not, and nothing in the schema distinguishes them.
+- Two abstract-only sources are cited from findings pages but appear nowhere on the reading
+  list, so nobody is queued to pull them: the 2026 spray-dried particle morphology paper,
+  which qualifies the Péclet reading on the drying finding, and the 2024 molecular-weight
+  cut-off review, which carries the pore-distribution claim on the central filtration finding.
+  That second one is the replacement for a claim the audit discredited, so an abstract-only
+  source is now load-bearing on the site's most important page.
+
+Three fixes, in this order:
+
+**1. Add a controlled `access` column to `data/sources.csv`.** One value per row, from this
+vocabulary and no other:
+
+    full-text-read   the complete article or document was read
+    web-page-read    a web page, blog, vendor note, standard or patent read in full
+    abstract-only    only the abstract, or an abstract-equivalent record summary, was seen
+    record-only      only bibliographic metadata was confirmed; no abstract was read
+    redacted         obtainable and read, but the numbers we need are withheld in it
+    not-retrieved    could not be obtained at all
+
+Keep `reachability` for the prose detail, such as which mirror or repository served it. The
+two columns answer different questions: `access` says what was actually read, `reachability`
+says how to get it.
+
+Backfill all existing rows. This is a mechanical classification of what the `reachability` and
+`verified` fields already record, not a fresh research judgement, and it must not change any
+claim. Where the existing fields genuinely do not say, use `record-only` and flag it in
+RESEARCH-QUEUE.md rather than guessing upward.
+
+You do not need to edit any page to make this visible. The source register page is generated
+from the CSV by `gen/build.py`, so the new column appears on the site as soon as you run the
+build. That is the whole point of the data layer, and it is why adding the column is inside
+your write scope while editing pages is not.
+
+**2. Put the two unlisted abstract-only sources on the reading list**, with what each unblocks,
+and attempt to pull them during this dive. If either turns out to be open access somewhere, say
+so loudly, because that is the same discovery that overturned the glass-transition figure.
+
+**3. Append three tests to `gen/test_balance.py`:**
+
+- every row's `access` value is in the controlled vocabulary above
+- no row claims `full-text-read` while its `reachability` says paywalled with no open-access
+  route named, because that combination is how the glass-transition error hid
+- any source whose `access` is `abstract-only`, `record-only` or `not-retrieved`, and which is
+  cited from any page under `docs/findings/`, must also appear in
+  `docs/sources/reading-list.md`
+
+That third test is the structural one. It makes it impossible to rest a headline finding on
+something nobody has read without also queueing it to be read.
 
 ## 5. The research programme
 
@@ -255,11 +323,18 @@ finishes able to hold their own with a specialist. Structure it as a curriculum,
 - **Tier 3, regulatory and standards.** What you must be able to cite by name.
 
 Every entry carries: the full citation, a working access route with the open-access mirror
-named explicitly where one exists, an honest reachability note, an estimated reading time,
-the question or risk identifier it unblocks, and one or two sentences on what the reader will
-take away from it.
+named explicitly where one exists, its `access` value from the section 4a vocabulary written
+out plainly, an estimated reading time, the question or risk identifier it unblocks, and one
+or two sentences on what the reader will take away from it.
 
-Add two sections that do not exist today:
+Add three sections that do not exist today:
+
+- **"What we have not actually read."** A short table of every source in the register whose
+  `access` is `abstract-only`, `record-only` or `not-retrieved`, with what it is currently
+  being used to support and which page uses it. Today that is six sources and nobody can list
+  them without parsing free text. This is a census, not a pull list, so it covers sources that
+  do not merit a place in the curriculum. A reader should be able to answer "what is this site
+  resting on that nobody has opened" in ten seconds.
 
 - **"What you must be able to say."** Fifteen to twenty statements that constitute fluency in
   this process, each with the source that backs it. This is the section that makes someone
@@ -311,18 +386,20 @@ the source.
 
 ## 9. Finish clean
 
-- Run `python -m pytest gen -q`. All tests must pass. Note in particular that a test lints
-  prose citations: any patent number or digital object identifier that appears in
-  `docs/sources/reading-list.md` must also exist in `data/sources.csv`, or the build fails.
-  Another test asserts that no source is marked paywalled when an open-access identifier
-  exists for it.
+- Run `python -m pytest gen -q`. All 23 existing tests, plus the three you add in section 4a,
+  must pass. Note in particular that a test lints prose citations: any patent number or digital
+  object identifier that appears in `docs/sources/reading-list.md` must also exist in
+  `data/sources.csv`, or the build fails. Another asserts that no source is marked paywalled
+  when an open-access identifier exists for it. Do not weaken either to make room for your
+  additions.
 - Run `python -m gen.build` and then `mkdocs build --strict`. Both must be clean.
 - Commit to this session's designated branch and push. Do not open a pull request unless
   asked. Do not merge to main.
 - Report back in chat, not in the repository, with: how many sources you added and how many
   you could not reach; which open questions you closed, with the answer; which you could not
-  and why; the three findings most likely to change the design; and anything currently on the
-  site that you believe is wrong.
+  and why; the three findings most likely to change the design; anything currently on the site
+  that you believe is wrong; and the count of sources the site still rests on that nobody has
+  read in full, which should be lower than the six it stands at today.
 
 ## 10. What good looks like
 
