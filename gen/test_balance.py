@@ -350,3 +350,107 @@ def test_numeric_claims_in_prose_carry_a_citation():
         "numeric claim(s) with no citation, parameter, equation or provenance flag nearby:\n  "
         + "\n  ".join(offenders)
     )
+
+
+# ---------------------------------------------------------------------------
+# Source-access guards added 2026-09-18.
+#
+# Before these, the register could not tell you at a glance which sources had only
+# ever been read as an abstract — precisely the condition that produced the
+# 2026-09-17 citation defects. `reachability` was free text: 35 rows carried 14
+# distinct values, and the six abstract-or-less sources were spelled five
+# different ways. The controlled `access` column fixes the instrument; these
+# three tests keep it honest.
+#
+# `access` says what was actually READ. `reachability` says how to GET it.
+# ---------------------------------------------------------------------------
+
+#: The controlled vocabulary. One value per row, nothing else.
+ACCESS_VOCAB = {
+    "full-text-read",   # the complete article or document was read
+    "web-page-read",    # a web page, blog, vendor note, standard or patent read in full
+    "abstract-only",    # only the abstract, or an abstract-equivalent record summary
+    "record-only",      # only bibliographic metadata confirmed; no abstract read
+    "redacted",         # obtainable and read, but the numbers we need are withheld in it
+    "not-retrieved",    # could not be obtained at all
+}
+
+#: Access values that mean nobody has read the work itself.
+ACCESS_UNREAD = {"abstract-only", "record-only", "not-retrieved"}
+
+#: Tokens that count as naming an open-access route out of a paywall. A row may
+#: claim full-text-read behind a paywall only if it says HOW the full text was got.
+_OPEN_ROUTE_TOKENS = (
+    "open access", "open-access", "pmc", "europe pmc", "europepmc", "unpaywall",
+    "repository", "scholarsphere", "etda", "eprint", "preprint", "biorxiv",
+    "chemrxiv", "arxiv", "ssrn", "thesis", "dissertation", "figshare",
+    "author manuscript", "accepted manuscript", "proceedings", "si retrieved",
+)
+
+
+def test_access_values_are_in_the_controlled_vocabulary():
+    """`access` is a controlled column, not free text. That is the whole point of it."""
+    offenders = []
+    for r in load_rows("sources"):
+        value = (r.get("access") or "").strip()
+        if value not in ACCESS_VOCAB:
+            offenders.append(f"{r['source_key']}: {value!r}")
+    assert not offenders, (
+        "source(s) with an access value outside the controlled vocabulary "
+        f"{sorted(ACCESS_VOCAB)}: " + "; ".join(offenders)
+    )
+
+
+def test_no_full_text_claim_behind_an_unexplained_paywall():
+    """A paywalled row may claim full-text-read only if it names the route in.
+
+    This combination is how the glass-transition error hid: the source was
+    labelled paywalled while a number was carried from it as though read. The
+    inverse — claiming a full read of something recorded as paywalled with no
+    open-access mirror, repository, preprint or retrieved-SI route named — is the
+    same defect with the fields swapped.
+    """
+    offenders = []
+    for r in load_rows("sources"):
+        if (r.get("access") or "").strip() != "full-text-read":
+            continue
+        reach = (r.get("reachability") or "").lower()
+        if "paywall" not in reach:
+            continue
+        blob = " ".join(v or "" for v in r.values()).lower()
+        if not any(tok in blob for tok in _OPEN_ROUTE_TOKENS):
+            offenders.append(r["source_key"])
+    assert not offenders, (
+        "source(s) claiming full-text-read while recorded as paywalled with no "
+        "open-access route named: " + ", ".join(offenders)
+    )
+
+
+def test_unread_sources_cited_from_findings_are_on_the_reading_list():
+    """A headline finding may not rest on something nobody has read unless it is queued.
+
+    The structural check. Two abstract-only sources were cited from findings pages
+    and appeared nowhere on the reading list, so nobody was queued to pull them —
+    one of them carrying the pore-distribution claim on the site's most important
+    page. This makes that state impossible.
+    """
+    unread = {
+        r["source_key"] for r in load_rows("sources")
+        if (r.get("access") or "").strip() in ACCESS_UNREAD
+    }
+    reading_list = open(
+        os.path.join(ROOT, "docs", "sources", "reading-list.md"), encoding="utf-8"
+    ).read()
+
+    offenders = []
+    for path in sorted(glob.glob(os.path.join(ROOT, "docs", "findings", "*.md"))):
+        rel = os.path.relpath(path, ROOT)
+        text = open(path, encoding="utf-8").read()
+        for key in sorted(set(re.findall(r"SRC-[A-Z0-9-]+", text))):
+            if key in unread and key not in reading_list:
+                offenders.append(f"{rel} cites {key}")
+    assert not offenders, (
+        "finding(s) resting on an unread source that is not queued on the reading "
+        "list (add it to docs/sources/reading-list.md, or read it and update "
+        "`access`): " + "; ".join(offenders)
+    )
