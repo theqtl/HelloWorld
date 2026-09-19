@@ -57,6 +57,12 @@ class ScenarioResult:
     evap_duty_kWh: float
     dryer_evap_duty_MJ: float
     dryer_evap_duty_kWh: float
+    evap_sensible_MJ: float
+    evap_duty_full_MJ: float
+    evap_duty_full_kWh: float
+    drying_gas_kg: float
+    dryer_duty_full_MJ: float
+    dryer_duty_full_kWh: float
 
 
 def run_scenario(scn, params):
@@ -73,6 +79,16 @@ def run_scenario(scn, params):
     diavol = _require(params, "P-DF-DIAVOL")
     lhv = _require(params, "P-H2O-LHV")  # kJ/kg
     f_pre = _require(params, "P-EXCIP-FRAC-PRE-EVAP")  # 0..1 excipient present at evaporator
+
+    # Full-energy-balance inputs (Tier 2): sensible heat, drying-gas heating, losses.
+    cp_soln = _require(params, "P-CP-SOLN")        # kJ/kg/K
+    cp_gas = _require(params, "P-DRYGAS-CP")       # kJ/kg/K
+    t_feed = _require(params, "P-EVAP-T-FEED")     # degC
+    t_boil = _require(params, "P-EVAP-T-BOIL")     # degC
+    t_dry_in = _require(params, "P-DRY-T-IN")      # degC
+    t_dry_out = _require(params, "P-DRY-T-OUT")    # degC
+    gas_ratio = _require(params, "P-DRYGAS-RATIO")  # kg drying gas / kg water evaporated
+    loss_frac = _require(params, "P-HEAT-LOSS-FRAC")  # fraction added for losses
 
     # UF/DF yield is NOT a flat constant (F-019). Membrane-passage loss follows the diafiltration
     # relation yield = exp(-(1-R)(ln VCF + N)) reproduced from the three worked points in
@@ -122,6 +138,18 @@ def run_scenario(scn, params):
     evap_MJ = evap_water * lhv / 1000.0
     dry_MJ = dryer_water * lhv / 1000.0
 
+    # Full energy balance (Tier 2). The latent minima above are the floor; the real duties
+    # add sensible heat, drying-gas heating and losses (EQ-ENERGY).
+    # Evaporator: raise the whole retentate feed to the vacuum boiling point, then evaporate,
+    # then uplift for heat loss. Sensible + latent + losses, all >= 0, so >= the latent minimum.
+    evap_sensible_MJ = uf_vol * cp_soln * max(t_boil - t_feed, 0.0) / 1000.0
+    evap_full_MJ = (evap_MJ + evap_sensible_MJ) * (1.0 + loss_frac)
+    # Dryer: the drying gas carries the heat. Its mass is a scale-independent ratio to the water
+    # evaporated (so it does not resolve Q-002), and the gas enthalpy drop across the dryer is the
+    # heat delivered (UT-DRYGAS) - the dominant, energy-intensive load spray drying is known for.
+    drying_gas_kg = gas_ratio * dryer_water
+    dryer_full_MJ = drying_gas_kg * cp_gas * max(t_dry_in - t_dry_out, 0.0) / 1000.0 * (1.0 + loss_frac)
+
     return ScenarioResult(
         scenario_id=scn["scenario_id"], label=scn["label"],
         annual_ds_api_kg=annual, campaigns_per_yr=camp,
@@ -134,6 +162,10 @@ def run_scenario(scn, params):
         wfi_approx_L=wfi, aqueous_waste_approx_L=aq_waste,
         evap_duty_MJ=evap_MJ, evap_duty_kWh=evap_MJ / 3.6,
         dryer_evap_duty_MJ=dry_MJ, dryer_evap_duty_kWh=dry_MJ / 3.6,
+        evap_sensible_MJ=evap_sensible_MJ,
+        evap_duty_full_MJ=evap_full_MJ, evap_duty_full_kWh=evap_full_MJ / 3.6,
+        drying_gas_kg=drying_gas_kg,
+        dryer_duty_full_MJ=dryer_full_MJ, dryer_duty_full_kWh=dryer_full_MJ / 3.6,
     )
 
 

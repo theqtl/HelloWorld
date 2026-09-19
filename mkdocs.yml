@@ -61,6 +61,7 @@ extra_javascript:
   - https://cdnjs.cloudflare.com/ajax/libs/mathjax/3.2.2/es5/tex-mml-chtml.min.js
   - https://cdnjs.cloudflare.com/ajax/libs/tablesort/5.3.0/tablesort.min.js
   - javascripts/tablesort.js
+  - javascripts/tablefilter.js
 
 extra_css:
   - stylesheets/extra.css
@@ -85,6 +86,7 @@ nav:
   - Mass & energy balance:
       - Method: balance/index.md
       - Results: balance/results.md
+      - Impurity fate: balance/impurities.md
   - Equations: equations/index.md
   - Diagrams: diagrams/index.md
   - Facility concept: facility/index.md

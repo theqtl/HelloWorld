@@ -6,8 +6,8 @@ from gen.balance import run_all, purity_floor
 
 def test_all_source_keys_resolve():
     sources = {r["source_key"] for r in load_rows("sources")}
-    # parameters and risks reference source_key; blanks allowed
-    for name in ("parameters", "risks"):
+    # parameters, risks and impurities reference source_key; blanks allowed
+    for name in ("parameters", "risks", "impurities"):
         for r in load_rows(name):
             key = (r.get("source_key") or "").strip()
             if key:
@@ -179,7 +179,7 @@ def test_every_question_reference_exists_in_every_csv():
     qids = {r["question_id"] for r in load_rows("questions")}
     offenders = []
     for name in ("parameters", "scenarios", "risks", "equipment", "buffers", "utilities",
-                 "streams", "sources"):
+                 "streams", "sources", "impurities"):
         for row in load_rows(name):
             for value in row.values():
                 for tok in re.findall(r"Q-\d{3}", value or ""):
@@ -227,6 +227,33 @@ def test_solids_close_between_evaporator_and_dryer():
         )
 
 
+def test_full_energy_duty_is_at_least_the_latent_minimum():
+    """The Tier-2 full duty only ADDS sensible heat, gas heating and losses to the latent
+    floor, so it can never fall below it. The dryer check also verifies the gas enthalpy drop
+    can actually supply the latent load - a physical sanity check on the gas ratio and dT."""
+    for r in run_all():
+        assert r.evap_sensible_MJ >= 0
+        assert r.drying_gas_kg >= 0
+        assert r.evap_duty_full_MJ >= r.evap_duty_MJ
+        assert r.dryer_duty_full_MJ >= r.dryer_evap_duty_MJ
+        assert abs(r.evap_duty_full_MJ / 3.6 - r.evap_duty_full_kWh) < 1e-6
+        assert abs(r.dryer_duty_full_MJ / 3.6 - r.dryer_duty_full_kWh) < 1e-6
+
+
+def test_blanking_a_thermal_constant_refuses():
+    """Every new energy-balance input obeys the blank-refusal rule: a gap raises, never
+    silently defaults to a number (same invariant as P-H2O-LHV)."""
+    import pytest
+    from gen.balance import run_scenario
+    scn = load_rows("scenarios")[0]
+    for pid in ("P-CP-SOLN", "P-DRYGAS-CP", "P-EVAP-T-FEED", "P-EVAP-T-BOIL",
+                "P-DRY-T-IN", "P-DRY-T-OUT", "P-DRYGAS-RATIO", "P-HEAT-LOSS-FRAC"):
+        params = load_params()
+        params[pid]["value"] = ""
+        with pytest.raises(ValueError):
+            run_scenario(scn, params)
+
+
 def test_balance_refuses_a_blank_required_input():
     """A gap must raise, never silently become a number. The latent-heat fallback broke this."""
     import pytest
@@ -254,6 +281,26 @@ def test_flowsheet_stream_ids_match_the_register():
     unknown = drawn - registered
     assert not missing, f"stream(s) in the register but absent from the flowsheet: {sorted(missing)}"
     assert not unknown, f"stream(s) drawn but not in the register: {sorted(unknown)}"
+
+
+def test_flowsheet_is_up_to_date():
+    """bfd.svg is generated from data/streams.csv; the committed file must match render().
+
+    CI runs the flowsheet drift tests against the committed SVG BEFORE gen.build
+    regenerates it, so a stale committed file would pass the drift check while showing
+    the wrong picture. This closes that gap: regenerate and commit after any data change.
+    """
+    from gen.flowsheet import render
+    committed = open(os.path.join(ROOT, "docs", "diagrams", "bfd.svg"), encoding="utf-8").read()
+    assert render() == committed, (
+        "docs/diagrams/bfd.svg is stale; run `python -m gen.build` and commit the result"
+    )
+
+
+def test_flowsheet_layout_is_deterministic():
+    """The generator must be a pure function of the data (no dict/order nondeterminism)."""
+    from gen.flowsheet import render
+    assert render() == render()
 
 
 def test_flowsheet_units_resolve_to_equipment():
@@ -333,7 +380,8 @@ def test_numeric_claims_in_prose_carry_a_citation():
         rel = os.path.relpath(path, ROOT)
         # Generated register pages carry their provenance in columns; the ADR is an
         # architecture argument, not a process claim.
-        if "/registers/" in rel or rel.endswith(("balance/results.md", "process/streams.md")):
+        if "/registers/" in rel or rel.endswith(("balance/results.md", "balance/impurities.md",
+                                                 "process/streams.md")):
             continue
         if "/adr/" in rel:
             continue
@@ -546,6 +594,100 @@ def test_read_sources_are_not_in_the_unread_census():
     assert not offenders, (
         "source(s) listed in the unread census whose access is actually a full read "
         "(remove them from the census or fix their access): " + ", ".join(offenders)
+    )
+
+
+def test_hbel_stays_a_registered_gap():
+    """The health-based exposure limit is blocked on toxicology data that does not exist publicly,
+    so its value must stay BLANK and registered against an open question - never invented."""
+    params = load_params()
+    row = params.get("P-HBEL-DS")
+    assert row is not None, "P-HBEL-DS is not registered"
+    assert not (row.get("value") or "").strip(), "P-HBEL-DS must have no value (it is a registered gap)"
+    assert "Q-" in (row.get("notes") or ""), "P-HBEL-DS must reference an open question"
+
+
+def test_ccs_cites_the_hbel_method_source():
+    """The contamination-control section must cite the HBEL derivation method, not assert a number."""
+    text = open(os.path.join(ROOT, "docs", "process", "microbial.md"), encoding="utf-8").read()
+    assert "SRC-WHO-TRS1044" in text, "microbial CCS section must cite the HBEL method source"
+    assert "P-HBEL-DS" in text, "microbial CCS section must reference the HBEL gap parameter"
+
+
+def test_md_table_emits_markdown_only():
+    """The register tables are Markdown pipe tables (sorted/filtered client-side over the rendered
+    HTML), never hand-emitted HTML. Locks in that decision so md_table cannot start emitting tags."""
+    from gen.tables import md_table
+    out = md_table([{"a": "1", "b": "2"}, {"a": "3", "b": "4"}])
+    assert "<" not in out, "md_table must emit Markdown pipe tables, not HTML"
+
+
+def test_table_enhancers_are_registered():
+    """The sort and filter enhancements must be wired into the site, or the register tables lose
+    them silently. Guards against the asset existing but never being loaded."""
+    cfg = open(os.path.join(ROOT, "mkdocs.yml"), encoding="utf-8").read()
+    for asset in ("javascripts/tablesort.js", "javascripts/tablefilter.js"):
+        assert asset in cfg, f"{asset} is not registered in mkdocs.yml extra_javascript"
+        assert os.path.exists(os.path.join(ROOT, "docs", asset)), f"missing asset file {asset}"
+
+
+def test_impurity_classes_are_in_the_clearance_matrix():
+    """Every impurity class in the data table must appear in the prose clearance matrix, so the
+    numeric overlay and the qualitative matrix cannot drift apart."""
+    matrix = open(os.path.join(ROOT, "docs", "process", "filtration.md"), encoding="utf-8").read()
+    offenders = []
+    for r in load_rows("impurities"):
+        key = (r.get("matrix_key") or "").strip()
+        if key and key not in matrix:
+            offenders.append(f"{r['impurity_id']} ({key})")
+    assert not offenders, (
+        "impurity class(es) absent from the filtration clearance matrix: " + ", ".join(offenders)
+    )
+
+
+def test_unclearable_impurities_are_not_modelled_as_cleared():
+    """Physical fact (finding 1): block-internal n-1 is floored at the blocks, and the adenylylated
+    dead-end is controlled at the reaction. Neither may be modelled as a downstream separation."""
+    rows = {r["impurity_id"]: r for r in load_rows("impurities")}
+    assert rows["IMP-N1"]["clearance_model"] == "block_floor", \
+        "n-1 must be floored (block_floor), never modelled as cleared downstream"
+    assert rows["IMP-APPN"]["clearance_model"] == "designed_out", \
+        "the adenylylated dead-end must be controlled at the reaction (designed_out)"
+
+
+def test_impurity_overlay_is_deterministic_and_scenario_free():
+    """Impurity fate is a fraction picture, independent of annual demand (Q-002): the overlay is a
+    pure function of the parameters, and no throughput-scenario label leaks into it."""
+    from gen.impurity import render
+    out = render()
+    assert out == render()
+    for label in ("Low (illustrative)", "Mid (illustrative)", "High (illustrative)"):
+        assert label not in out
+
+
+def test_equipment_turndown_is_populated_or_flagged():
+    """Turndown was a fully blank column in Tier 1 - a silent sizing stub. Every equipment
+    item must state a turndown basis, or register the gap against an open question (Q-...)."""
+    offenders = []
+    for r in load_rows("equipment"):
+        turndown = (r.get("turndown") or "").strip()
+        notes = r.get("notes") or ""
+        if not turndown and not re.search(r"Q-\d{3}", notes):
+            offenders.append(r["equip_id"])
+    assert not offenders, (
+        "equipment item(s) with a blank turndown and no open-question reference: "
+        + ", ".join(offenders)
+    )
+
+
+def test_equipment_moc_is_committed():
+    """Materials of construction must be a decided candidate for every item, never left blank."""
+    offenders = [
+        r["equip_id"] for r in load_rows("equipment")
+        if not (r.get("moc_candidate") or "").strip()
+    ]
+    assert not offenders, (
+        "equipment item(s) with no materials of construction committed: " + ", ".join(offenders)
     )
 
 
