@@ -350,3 +350,225 @@ def test_numeric_claims_in_prose_carry_a_citation():
         "numeric claim(s) with no citation, parameter, equation or provenance flag nearby:\n  "
         + "\n  ".join(offenders)
     )
+
+
+# ---------------------------------------------------------------------------
+# Source-access guards added 2026-09-18.
+#
+# Before these, the register could not tell you at a glance which sources had only
+# ever been read as an abstract — precisely the condition that produced the
+# 2026-09-17 citation defects. `reachability` was free text: 35 rows carried 14
+# distinct values, and the six abstract-or-less sources were spelled five
+# different ways. The controlled `access` column fixes the instrument; these
+# three tests keep it honest.
+#
+# `access` says what was actually READ. `reachability` says how to GET it.
+# ---------------------------------------------------------------------------
+
+#: The controlled vocabulary. One value per row, nothing else.
+ACCESS_VOCAB = {
+    "full-text-read",   # the complete article or document was read
+    "web-page-read",    # a web page, blog, vendor note, standard or patent read in full
+    "abstract-only",    # only the abstract, or an abstract-equivalent record summary
+    "record-only",      # only bibliographic metadata confirmed; no abstract read
+    "redacted",         # obtainable and read, but the numbers we need are withheld in it
+    "not-retrieved",    # could not be obtained at all
+}
+
+#: Access values that mean nobody has read the work itself.
+ACCESS_UNREAD = {"abstract-only", "record-only", "not-retrieved"}
+
+#: Tokens that count as naming an open-access route out of a paywall. A row may
+#: claim full-text-read behind a paywall only if it says HOW the full text was got.
+_OPEN_ROUTE_TOKENS = (
+    "open access", "open-access", "pmc", "europe pmc", "europepmc", "unpaywall",
+    "repository", "scholarsphere", "etda", "eprint", "preprint", "biorxiv",
+    "chemrxiv", "arxiv", "ssrn", "thesis", "dissertation", "figshare",
+    "author manuscript", "accepted manuscript", "proceedings", "si retrieved",
+)
+
+
+def test_access_values_are_in_the_controlled_vocabulary():
+    """`access` is a controlled column, not free text. That is the whole point of it."""
+    offenders = []
+    for r in load_rows("sources"):
+        value = (r.get("access") or "").strip()
+        if value not in ACCESS_VOCAB:
+            offenders.append(f"{r['source_key']}: {value!r}")
+    assert not offenders, (
+        "source(s) with an access value outside the controlled vocabulary "
+        f"{sorted(ACCESS_VOCAB)}: " + "; ".join(offenders)
+    )
+
+
+def test_no_full_text_claim_behind_an_unexplained_paywall():
+    """A paywalled row may claim full-text-read only if it names the route in.
+
+    This combination is how the glass-transition error hid: the source was
+    labelled paywalled while a number was carried from it as though read. The
+    inverse — claiming a full read of something recorded as paywalled with no
+    open-access mirror, repository, preprint or retrieved-SI route named — is the
+    same defect with the fields swapped.
+    """
+    offenders = []
+    for r in load_rows("sources"):
+        if (r.get("access") or "").strip() != "full-text-read":
+            continue
+        reach = (r.get("reachability") or "").lower()
+        if "paywall" not in reach:
+            continue
+        blob = " ".join(v or "" for v in r.values()).lower()
+        if not any(tok in blob for tok in _OPEN_ROUTE_TOKENS):
+            offenders.append(r["source_key"])
+    assert not offenders, (
+        "source(s) claiming full-text-read while recorded as paywalled with no "
+        "open-access route named: " + ", ".join(offenders)
+    )
+
+
+def test_unread_sources_cited_from_findings_are_on_the_reading_list():
+    """A headline finding may not rest on something nobody has read unless it is queued.
+
+    The structural check. Two abstract-only sources were cited from findings pages
+    and appeared nowhere on the reading list, so nobody was queued to pull them —
+    one of them carrying the pore-distribution claim on the site's most important
+    page. This makes that state impossible.
+    """
+    unread = {
+        r["source_key"] for r in load_rows("sources")
+        if (r.get("access") or "").strip() in ACCESS_UNREAD
+    }
+    reading_list = open(
+        os.path.join(ROOT, "docs", "sources", "reading-list.md"), encoding="utf-8"
+    ).read()
+
+    offenders = []
+    for path in sorted(glob.glob(os.path.join(ROOT, "docs", "findings", "*.md"))):
+        rel = os.path.relpath(path, ROOT)
+        text = open(path, encoding="utf-8").read()
+        for key in sorted(set(re.findall(r"SRC-[A-Z0-9-]+", text))):
+            if key in unread and key not in reading_list:
+                offenders.append(f"{rel} cites {key}")
+    assert not offenders, (
+        "finding(s) resting on an unread source that is not queued on the reading "
+        "list (add it to docs/sources/reading-list.md, or read it and update "
+        "`access`): " + "; ".join(offenders)
+    )
+
+
+# ---------------------------------------------------------------------------
+# Guards added 2026-09-18 by the revision session. Each encodes a defect the
+# evidence dive found or created a risk of: a band stored as a bare point value
+# (F-018, F-019), a cross-molecule number transferred without saying so, a source
+# left in the "unread" census after it was actually read, and a batch-cycle-time
+# figure cited as a residence time (F-002 trap).
+# ---------------------------------------------------------------------------
+
+def test_band_parameters_carry_an_explicit_range():
+    """A parameter that is a band must not hide as a bare point value (F-018, F-019).
+
+    Convention: a band parameter flags itself with the token 'BAND:' in its notes and
+    must then populate range_low/range_high; and any parameter carrying a range must
+    keep its point value inside it.
+    """
+    params = load_params()
+    offenders = []
+    for r in load_rows("parameters"):
+        pid = r["param_id"]
+        notes = r.get("notes") or ""
+        lo = (r.get("range_low") or "").strip()
+        hi = (r.get("range_high") or "").strip()
+        if "BAND:" in notes and not (lo and hi):
+            offenders.append(f"{pid}: notes flag a BAND but range_low/range_high are empty")
+            continue
+        if lo or hi:
+            if not (lo and hi):
+                offenders.append(f"{pid}: only one of range_low/range_high is set")
+                continue
+            flo, fhi = float(lo), float(hi)
+            if flo > fhi:
+                offenders.append(f"{pid}: range_low {flo} > range_high {fhi}")
+            v = param_value(params, pid)
+            if v is not None and not (flo <= v <= fhi):
+                offenders.append(f"{pid}: value {v} outside its range [{flo}, {fhi}]")
+    assert not offenders, "band/range defect(s): " + "; ".join(offenders)
+
+
+#: Tokens in a source's scale_system that name a molecule class other than our
+#: siRNA duplex. A parameter anchored to such a source must acknowledge the transfer.
+_FOREIGN_CLASS_TOKENS = (
+    "mrna", "messenger rna", "plasmid", "polysialic", "small molecule", "small-molecule",
+    "antisense", "single strand", "single-strand", "single-stranded", "gapmer",
+    "circular rna", " protein", "mab",
+)
+#: Tokens in a parameter's own notes that count as acknowledging the transfer.
+_TRANSFER_CAVEAT_TOKENS = (
+    "mrna", "plasmid", "polysialic", "small molecule", "small-molecule", "antisense",
+    "single strand", "single-strand", "single-stranded", "gapmer", "moe", "protein",
+    "not our", "not an sirna", "not a duplex", "not a nucleic", "different mol",
+    "different molecular", "transfer", "surrogate", "circular rna",
+)
+
+
+def test_cross_molecule_parameters_declare_the_transfer():
+    """A parameter whose source names a different molecule class must say so (transferability)."""
+    sources = {r["source_key"]: r for r in load_rows("sources")}
+    offenders = []
+    for r in load_rows("parameters"):
+        key = (r.get("source_key") or "").strip()
+        if not key or key not in sources:
+            continue
+        scale = (sources[key].get("scale_system") or "").lower()
+        if not any(tok in scale for tok in _FOREIGN_CLASS_TOKENS):
+            continue
+        notes = (r.get("notes") or "").lower() + " " + (r.get("scale_system") or "").lower()
+        if not any(tok in notes for tok in _TRANSFER_CAVEAT_TOKENS):
+            offenders.append(
+                f"{r['param_id']} cites {key} (scale_system names a different molecule class) "
+                f"but its notes state no transfer caveat"
+            )
+    assert not offenders, "; ".join(offenders)
+
+
+def test_read_sources_are_not_in_the_unread_census():
+    """The reverse of the reading-list guard: a source that WAS read must not still sit
+    in the reading list's 'What we have not actually read' census (its first column)."""
+    text = open(
+        os.path.join(ROOT, "docs", "sources", "reading-list.md"), encoding="utf-8"
+    ).read()
+    m = re.search(r"##\s*What we have not actually read(.*?)(\n##\s|\Z)", text, re.S)
+    assert m, "census section not found in reading-list.md"
+    census = m.group(1)
+    # First column of each census table row is the unread source: '| [SRC-XXX] | ...'
+    listed = re.findall(r"^\|\s*\[(SRC-[A-Z0-9-]+)\]", census, re.M)
+    access = {r["source_key"]: (r.get("access") or "").strip() for r in load_rows("sources")}
+    offenders = [k for k in listed if access.get(k) not in ACCESS_UNREAD]
+    assert not offenders, (
+        "source(s) listed in the unread census whose access is actually a full read "
+        "(remove them from the census or fix their access): " + ", ".join(offenders)
+    )
+
+
+def test_no_residence_time_cites_a_batch_cycle_time_trap():
+    """No page may state a residence time citing a source whose notes TRAP that figure as a
+    batch cycle time (F-002). A window that cites such a source next to 'residence time' must
+    also carry the correction ('cycle time')."""
+    trap_sources = {
+        r["source_key"] for r in load_rows("sources")
+        if re.search(r"\bTRAP\b", r.get("notes") or "")
+    }
+    offenders = []
+    for path in _doc_files():
+        lines = open(path, encoding="utf-8").read().split("\n")
+        for i, line in enumerate(lines):
+            if "residence time" not in line.lower():
+                continue
+            window = "\n".join(lines[max(0, i - 3): i + 4])
+            if not any(k in window for k in trap_sources):
+                continue
+            if "cycle time" not in window.lower():
+                offenders.append(f"{os.path.relpath(path, ROOT)}:{i + 1}  {line.strip()[:80]}")
+    assert not offenders, (
+        "residence-time claim(s) citing a batch-cycle-time TRAP source without the correction: "
+        + "; ".join(offenders)
+    )

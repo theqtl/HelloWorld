@@ -34,10 +34,14 @@ Filtration separates by size, charge, and binding. It does not separate by one n
 So **no filtration mode — ultrafiltration, nanofiltration, or a charged membrane adsorber —
 resolves block-internal n-1 from full-length.** The same limit applies to the adenylylated
 dead-end species and to n+1/addition variants. (On the adenylylated species: adenylylation adds
-about 329 Da to the **5'-phosphorylated donor fragment**. That dead-end fragment is far smaller than
+about 329 Da (<span class="prov-inference">inference</span>) to the **5'-phosphorylated donor
+fragment**. That dead-end fragment is far smaller than
 the ligated product and its separation problem is a partial-product problem, not an n-1 problem;
-what keeps it uncontrollable downstream is that suppressing it belongs at the reaction. See
-[SRC-PBCV1-2014](../registers/sources.md), which reports the dead end but states no mass difference.)
+what keeps it uncontrollable downstream is that suppressing it belongs at the reaction. The dead end
+has now been observed directly in fully modified siRNA blockmer ligation
+([SRC-ALMAC-2023](../registers/sources.md), the "[+AMP]" by-product), where the authors' fix was to
+restage the reaction so it does not form — not to remove it downstream; the mechanism and its ATP
+dependence are in [SRC-PBCV1-2014](../registers/sources.md), which states no mass difference.)
 
 ## 2. Not all length variants are equal
 
@@ -50,7 +54,8 @@ membrane data):
 | **Block-internal n-1 / n+1** | ~1 nt in ~21 (~5%) | **Cannot be cleared** by size or charge. |
 | **Unreacted blocks & partial ligation products** | a whole block (3–10 nt in 21) | **Clearable** by UF/DF (and NF for the very short ones). |
 | Adenylylated dead-end (AppN) | ~1 residue | Cannot be cleared; control at the reaction. |
-| ATP / AMP / PPi / Mg²⁺ / salts | << 1 kDa | **Cleared** by diafiltration — the workhorse. |
+| ATP / AMP / PPi / monovalent salts | << 1 kDa | **Cleared** by diafiltration — the workhorse. |
+| Divalent cations (Mg²⁺ / Ca²⁺) | << 1 kDa but charge-bound | **Not reliably** — they bind the polyanion and resist diafiltration (R-014). |
 | Ligase protein | larger than the strand | Not by size UF in solution; **immobilise the enzyme** (see §4). |
 | Splint oligo | same chemistry as product | Not by filtration; **designed out** (see §5). |
 | Endotoxin (LPS micelles ~10³ kDa) | co-retained with product | UF is counter-productive; use adsorber (unproven for oligo). |
@@ -75,24 +80,39 @@ P_{\text{FL}} \;\approx\; \prod_{i=1}^{k} f_i
 
 with terms defined in [Equations](../equations/index.md) (`EQ-PURITY`). This is
 <span class="prov-inference">inference</span> (our synthesis; no published closed-form model
-exists for siRNA blockmer ligation), but it is grounded in cited component values and in a
+exists for siRNA blockmer ligation), but it is grounded in cited component values, in a
 direct empirical observation that ~5% of fragment-internal impurity is carried into the ligated
 product (<span class="prov-fact">fact</span>, analytical scale, modified/PS oligo;
-[SRC-NATCOMM-2024](../registers/sources.md)).
+[SRC-NATCOMM-2024](../registers/sources.md)), and — the strongest support the equation has — in two
+independent routes that reproduce the floor (below).
 
 Worked example (<span class="prov-inference">inference</span>; inputs are cited facts):
 
-- A 21-mer from **3 blocks of ~7 nt**, each 90–95% full-length (fragment purities reported at
-  0.3–3 kg scale for modified gapmer chemistry, <span class="prov-fact">fact</span>,
-  [SRC-ZHOU-2022](../registers/sources.md)):
-  \(0.90^3 = 72.9\%\) to \(0.95^3 = 85.7\%\) internal-limited full-length, **before any final
-  polish**.
+- A 21-mer from **3 blocks of ~7 nt**. Measured chromatography-free purity for 4–5 nt modified blocks
+  is **89–96%** at 145–258 g (<span class="prov-fact">fact</span>;
+  [SRC-WO2020227618](../registers/sources.md)): \(0.89^3 = 70.5\%\) to \(0.96^3 = 88.5\%\)
+  internal-limited full-length, **before any final polish**.
 - Compare linear solid-phase synthesis of a 21-mer at 98.5% coupling: \(0.985^{20} = 74\%\)
   crude full-length (<span class="prov-fact">fact</span>, model, [SRC-ATDBIO-SPOS](../registers/sources.md)).
 
-The block-ligation route lands similar-to-better on internal full-length content, **and** its
-dominant discardable impurities (unreacted blocks, partials) differ by a whole block, so
-filtration removes them cleanly.
+**The floor model is empirically validated, twice.** An 18-mer built from four blocks was measured at
+80% purity at 200 g without chromatography, implying an effective per-block fraction of
+\(0.80^{1/4}=0.946\) (<span class="prov-inference">inference</span>;
+[SRC-NAR-2025](../registers/sources.md)); independently, a 1–3% per-cycle failure rate gives
+\(0.97^4=0.885\) to \(0.99^4=0.961\) for a 5-mer ([SRC-US6087491](../registers/sources.md)). Both land
+in the measured 89–96% band. The block-ligation route therefore lands similar-to-better on internal
+full-length content, **and** its dominant discardable impurities (unreacted blocks, partials) differ
+by a whole block, so filtration removes them cleanly.
+
+Two cautions travel with the arithmetic. The block figures are MOE/DNA gapmer chemistry with a 5'-DMTr
+purity handle a 5'-phosphate block lacks, and a 6-mer 2'-OMe PS oligomer measured only 81%
+([SRC-KELLY-OPRD-2025](../registers/sources.md)), so 95%-class blocks are not assured in our chemistry.
+And **the floor multiplies only within one analytical dimension**: it multiplies denaturing
+single-strand full-length fractions and must not be used to predict a non-denaturing duplex purity,
+which is a different measurement and can read higher than either strand
+(<span class="prov-fact">fact</span>, method architecture;
+[SRC-FDA-OXLUMO-CHEMR](../registers/sources.md)). Which dimension the specification is written in is
+itself open (Q-044).
 
 The crucial corollary: the single-nucleotide resolution that filtration cannot do is done at the
 **block stage**, on short blocks, where one nucleotide is a much larger fractional difference
@@ -133,23 +153,29 @@ DNase digestion, which adds a protein to clear. Registered as **R-006**.
    7 diavolumes (σ≈1); UF/DF concentrates and clears whole-block species; depth/0.2 µm clears
    particulates and bioburden. None clears n-1.
 2. **Does block control + high conversion hold final purity without a polish?** It holds the
-   *internal-limited* purity at \(\prod f_i\) (~73–86% for 3 blocks at 90–95%). Whether that
-   **meets spec** depends on the spec (next point).
-3. **What would have to move for the filtration-only case to close?** Either the block
-   full-length purity rises (fewer, purer blocks — 2 blocks at 97% gives ~94%), or the DS
-   full-length specification sits at or below the achievable floor. **There is no published
-   numeric purity specification for an siRNA drug substance to test this against.** The approved-siRNA
-   limits are redacted from the assessment report, which discloses the test methods and no acceptance
-   criteria at all (<span class="prov-fact">fact</span>;
-   [SRC-AMVUTRA-EPAR](../registers/sources.md)). The nearest published numbers are adjacent rather
-   than applicable, and should not be mistaken for a specification:
-   an identification threshold of 1.0% and a qualification threshold of 1.5% for oligonucleotide
-   impurities (<span class="prov-fact">fact</span>, draft guidance;
-   [SRC-EMA-OLIGO-2024](../registers/sources.md)); and a recommendation of **≥80% full-length with
-   impurities ≥1% identified** that applies to **guide RNA for genome editing**, not to siRNA drug
-   substance (<span class="prov-fact">fact</span>, scope-limited;
-   [SRC-FDA-CBER-2024](../registers/sources.md)). So this remains genuinely open — question
-   **Q-033** — and it is the single input that decides whether the filtration-only case closes.
+   *internal-limited* purity at \(\prod f_i\) (~70–88% for 3 blocks at 89–96%). Whether that
+   **meets spec** depends on how the spec is set (next point).
+3. **What would have to move for the filtration-only case to close?** The old framing — "does the
+   floor beat the published number" — has no answer because **there is no such number and there is not
+   meant to be one.** No published full-length percentage or single-impurity limit exists for any
+   approved siRNA drug substance in any jurisdiction; regulators disclose the test methods and redact
+   every acceptance criterion (<span class="prov-fact">fact</span>;
+   [SRC-AMVUTRA-EPAR](../registers/sources.md), [SRC-PATISIRAN-EPAR](../registers/sources.md)). The
+   criterion is instead **indexed to the applicant's own toxicology batches**: the FDA's stated
+   position is that specified impurity limits must "not exceed the maximum levels observed in the
+   nonclinical batches", and it ratchets downward as commercial batches accumulate
+   (<span class="prov-fact">fact</span>; [SRC-FDA-OXLUMO-CHEMR](../registers/sources.md),
+   [SRC-FDA-INCLISIRAN-CHEMR](../registers/sources.md)). So the question becomes **what capability the
+   route demonstrates, and whether the toxicology programme can qualify what the route leaves behind.**
+   A route whose floor is structurally capped near 80% does not fail against a threshold; it sets its
+   own specification at its own capability and must then qualify every impurity above that level
+   toxicologically rather than purify it away. The often-cited numbers are adjacent, not applicable:
+   the 1.0%/1.5% identification and qualification thresholds are draft oligonucleotide guidance
+   ([SRC-EMA-OLIGO-2024](../registers/sources.md)), and "≥80% full-length" is an FDA recommendation for
+   **guide RNA in genome editing**, not siRNA ([SRC-FDA-CBER-2024](../registers/sources.md));
+   oligonucleotides are outside ICH Q3A/Q6A scope entirely
+   ([SRC-ICH-Q3A-SCOPE](../registers/sources.md)). This reframing (Q-033) is the largest single change
+   this evidence dive produced.
 4. **If chromatography cannot be avoided, where is the minimum?** A single final polish
    (anion-exchange or IP-RP HPLC) on each **single strand** before annealing — exactly the
    orthogonal AX + IPRP control used for an approved siRNA (<span class="prov-fact">fact</span>;
@@ -162,10 +188,21 @@ DNase digestion, which adds a protein to clear. Registered as **R-006**.
 The filtration-led train is sound as the **workhorse** and closes **inside the facility** for
 everything except single-nucleotide resolution. That last job is either (a) pushed to the block
 supplier and held by high block purity plus high ligation conversion, or (b) met by one final
-per-strand chromatographic polish. Which of the two applies is decided by the real DS
-specification (Q-033) and the achievable block purity (Q-011) — not by filtration physics, which
-is unambiguous. The biggest technical risk to the thesis is not n-1 at all; it is proving
-**enzyme clearance by filtration** at scale (R-002).
+per-strand chromatographic polish. Which of the two applies is decided by the demonstrated capability
+of the route against a batch-derived specification (Q-033) and the achievable block purity (Q-011) —
+not by filtration physics, which is unambiguous. The biggest technical risk to the thesis is not n-1 at
+all; it is proving **enzyme clearance by filtration** at scale (R-002).
+
+**The strongest external check on the thesis cuts against it, and it must be stated plainly.** The
+only named commercial practitioner of ligation-built siRNA runs **HPLC purification of the siRNA
+itself in *both* of its routes** — in its own words, "P-to-P = HPLC purified fragments and purified
+siRNA; C-to-P = UF/DF processed fragments and HPLC purified siRNA" — on kilogram-scale GMP batches
+(<span class="prov-fact">fact</span>; [SRC-HONGENE-BROCHURE-2025](../registers/sources.md)). Filtration
+there replaces *fragment* chromatography, not final-product chromatography. The honest statement is
+that **no public ligation route omits final-product chromatography, so this site is ahead of
+demonstrated practice at the final-purification step** (risk R-019). That is not a reason to change the
+process — the physics of what filtration clears is unchanged — but it is the gap between this concept
+and the current state of the art, and it belongs on the page.
 
 !!! warning "Evidence quality"
     Almost no quantitative data is specific to a fully modified 21-mer siRNA at scale. Membrane
@@ -174,5 +211,8 @@ is unambiguous. The biggest technical risk to the thesis is not n-1 at all; it i
     exists for a fully modified siRNA at scale**: the 82–96% figure in the literature is a ligase
     screen on an *unmodified* shortmer, and phosphorothioate donors in that same work reacted at only
     ~30% ([SRC-NATCOMM-2024](../registers/sources.md)); the >95% figure is an unreviewed vendor claim.
-    Treat the direction as firm and the numbers as provisional. See the
+    The sharpest statement is no longer "no data is specific to siRNA" but this: **no public ligation
+    route omits final-product chromatography of the siRNA itself**
+    ([SRC-HONGENE-BROCHURE-2025](../registers/sources.md)). Treat the direction as firm, the numbers as
+    provisional, and the final-purification step as ahead of demonstrated practice. See the
     [reading list](../sources/reading-list.md).

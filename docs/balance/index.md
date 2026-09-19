@@ -34,7 +34,12 @@ The [results page](results.md) is generated from it; change the CSV inputs, run
 
 ## The chain
 
-1. **Overall yield** \(Y = Y_\text{lig}\,Y_\text{UFDF}\,Y_\text{evap}\,Y_\text{dry}\).
+1. **Overall yield** \(Y = Y_\text{lig}\,Y_\text{UFDF}\,Y_\text{evap}\,Y_\text{dry}\). The UF/DF term
+   is **not a flat constant**: it is computed from product retention, the concentration factor, the
+   diavolumes and two additive loss terms (hold-up and adsorption) via `EQ-UFYIELD`
+   ([SRC-MILLIPORE-TFF](../registers/sources.md), [SRC-NOURAFKAN-2024](../registers/sources.md)). The
+   dryer term is a **band** (61–89% optimised, 8.6–22% unoptimised; `P-YLD-DRY`,
+   [SRC-KAPIL-2025](../registers/sources.md)) carried at a representative point.
 2. **API required at ligation** = DS API per campaign ÷ \(Y\).
 3. **Volumes** at each stage from the stage concentration: ligation at `P-CONC-LIG`,
    UF retentate at `P-CONC-UF`, evaporator outlet at `P-CONC-EVAP`, dryer feed solids at
@@ -45,15 +50,29 @@ The [results page](results.md) is generated from it; change the CSV inputs, run
 7. **Thermal duty** = mass of water removed × latent heat (`P-H2O-LHV`). This is the
    latent-heat **minimum**; the real duty adds sensible heat, gas heating, and losses (Tier-2).
 
+!!! warning "Conversion is not yield"
+    Per-ligation conversion and overall mass yield are **different quantities, an order of magnitude
+    apart**. Measured per-ligation conversion on modified siRNA blocks is >92% (`P-LIG-CONV`;
+    [SRC-CN119265174](../registers/sources.md)), but published **overall campaign** mass yields for
+    kilogram-scale ligation-built siRNA are **19–43%** (`P-YIELD-OVERALL-PUB`;
+    [SRC-HONGENE-BROCHURE-2025](../registers/sources.md)) — a conservative figure, unoptimised and
+    calculated from the lowest-yielding fragment. A balance that read a >92% conversion as a step yield
+    would overstate drug substance several-fold. The balance's own step-yield product is a different
+    construction again and is not directly comparable to the vendor's 19–43% definition.
+
 ## Concentration cascade (why evaporation duty is scenario-dependent)
 
 The hand-off concentrations decide how much work evaporation actually does. Ultrafiltration
 already concentrates: charged membranes raised achievable siRNA concentration from 52 to
-**>180 mg/mL** at bench scale (<span class="prov-fact">fact</span>;
-[SRC-ZYDNEY-2024](../registers/sources.md)). If UF reaches
-close to the dryer-feed solids, evaporation duty is small; if viscosity limits UF earlier,
-evaporation carries more. The cascade `P-CONC-UF → P-CONC-EVAP → P-CONC-DRYFEED` is therefore
-explicit and adjustable, not assumed away. Questions Q-017/Q-018/Q-019 hold the real limits.
+**>180 mg/mL**, and to **~193 g/L** in the ligand-density follow-up
+(<span class="prov-fact">fact</span>, bench; [SRC-ZYDNEY-2024](../registers/sources.md),
+[SRC-ZYDNEY-2025](../registers/sources.md)). The evaporator outlet is now anchored to a real achieved
+concentration, **160 mg ASO/g** by thin-film evaporation (<span class="prov-fact">fact</span>,
+single-strand ASO; [SRC-PMC7415879](../registers/sources.md), `P-CONC-EVAP`). That anchor sits only
+just above the placeholder UF ceiling of 150 g/L, which sharpens the cascade point: if UF alone
+reaches the evaporator target, evaporation has little left to do. The cascade
+`P-CONC-UF → P-CONC-EVAP → P-CONC-DRYFEED` is therefore explicit and adjustable, not assumed away.
+Questions Q-017/Q-018/Q-019 hold the real limits.
 
 ## Where evaporation earns its place
 
@@ -62,18 +81,20 @@ all. Holding everything else at the current placeholders and varying only that o
 
 | Excipient in solution at the evaporator | Evaporator outlet solids (kg) | Water removed (L) | Duty (MJ) |
 |---|---|---|---|
-| none (base case, added after evaporation) | 28.3 | 115.5 | 277.1 |
-| half | 42.5 | 68.2 | 163.8 |
-| all (added at final diafiltration) | 56.7 | 21.0 | 50.4 |
+| none (base case, added after evaporation) | 34.0 | 66.2 | 158.8 |
+| half | 51.0 | 0.0 | 0.0 |
+| all (added at final diafiltration) | 68.0 | 0.0 | 0.0 |
 
 *(Per campaign, scenario S1. Figures regenerate from the data layer; the inputs are illustrative
 assumptions, not validated values.)*
 
-A five-fold swing in duty from one unresolved process choice. And it compounds with Q-017: if
-ultrafiltration alone reaches close to the dryer feed solids, evaporation has little left to do
-regardless. Evaporation is a fixed decision for this train, so the question is not *whether* it
-happens but *where it earns its place* — which is answered by resolving Q-017, Q-018 and Q-038, not
-by arithmetic on placeholders.
+With the evaporator outlet now anchored just above the UF ceiling, evaporation carries a modest duty
+in the base case and **none at all once excipient is added upstream** — the retentate already sits at
+or above the evaporator target, so there is nothing to remove. That is the concentration-cascade point
+made concrete: whether evaporation earns its place is decided by resolving Q-017 (how far UF
+concentrates), Q-018 (the real evaporator ceiling) and Q-038 (where excipient enters), not by
+arithmetic on placeholders. Evaporation is a fixed decision for this train, so the question is not
+*whether* it happens but *where it earns its place*.
 
 ## What the balance does not yet do
 

@@ -18,7 +18,22 @@ P_{\text{FL}} \;\approx\; \prod_{i=1}^{k} f_i
   by a whole block and are filterable), so only block-internal deletions survive.
 - **Validity:** order-of-magnitude design use. <span class="prov-inference">inference</span> —
   our synthesis; no published closed form for siRNA blockmer ligation. Grounded in
-  [SRC-ZHOU-2022](../registers/sources.md), [SRC-NATCOMM-2024](../registers/sources.md).
+  [SRC-WO2020227618](../registers/sources.md) (measured 89–96% blocks) and
+  [SRC-NATCOMM-2024](../registers/sources.md) (~5% fragment-internal carry-through).
+- **Empirically validated.** Two independent routes reproduce the multiplicative floor. An 18-mer
+  assembled from four blocks was measured at **80% purity at 200 g without chromatography**, which
+  implies an effective per-block full-length fraction of \(0.80^{1/4} = 0.946\)
+  (<span class="prov-inference">inference</span>; [SRC-NAR-2025](../registers/sources.md)); separately
+  a 1–3% per-cycle synthesis failure rate gives \(0.97^4 = 0.885\) to \(0.99^4 = 0.961\) for a 5-mer
+  (<span class="prov-inference">inference</span>; [SRC-US6087491](../registers/sources.md)). Both land
+  in the measured 89–96% block band, so the model reproduces a real assembly to within a point or two.
+  Caveat: 80% is the purity of the *protected* 18-mer by that paper's own assay, and chemical coupling
+  is not enzymatic ligation.
+- **Purity multiplies only within one analytical dimension.** This floor multiplies *denaturing*
+  single-strand full-length fractions. It must **not** be used to predict a *non-denaturing* duplex
+  purity, which is a different measurement and can read higher than either single strand
+  (<span class="prov-fact">fact</span>, method architecture; [SRC-FDA-OXLUMO-CHEMR](../registers/sources.md)).
+  Which analytical dimension the drug-substance specification is written in is open (Q-044).
 - Central to the [filtration finding](../findings/filtration.md).
 
 ## EQ-SPOS — solid-phase full-length yield
@@ -41,11 +56,17 @@ N = -\frac{\ln(C/C_0)}{\sigma}
 
 - \(C, C_0\): final / initial small-solute concentration; \(\sigma\): sieving coefficient
   (0 fully retained … 1 freely permeable); \(N\): diavolumes.
-- \(\sigma \approx 1\): 5 DV → 99.3%, 7 DV → 99.9% cleared.
-- **Well founded** for buffer exchange/desalting (<span class="prov-fact">fact</span>;
-  [SRC-BPT-TFF](../registers/sources.md)). Note: the field-standard form uses
-  \(e^{-\sigma N}\); an alternative \(e^{-N(1-\sigma)}\) appears with a retentate-basis σ — reconcile
-  the σ definition before use.
+- \(\sigma \approx 1\): 5 DV → 99.3%, 7 DV → 99.9% cleared. The vendor diavolume table reproduces
+  these figures exactly (<span class="prov-fact">fact</span>; [SRC-PALL-TFF](../registers/sources.md)).
+- **Well founded** for buffer exchange/desalting, now cited to peer-reviewed primaries that apply the
+  relation to a nucleic acid (<span class="prov-fact">fact</span>;
+  [SRC-NOURAFKAN-2024](../registers/sources.md), [SRC-KELLY-OPRD-2025](../registers/sources.md); see
+  also [SRC-BPT-TFF](../registers/sources.md)).
+- **On the σ definition.** The field-standard form is \(e^{-\sigma N}\) with σ the *sieving*
+  coefficient, as written above; the complementary form \(e^{-N(1-\sigma)}\) is correct only when σ is
+  the *rejection* coefficient. The two are consistent once the coefficient is named, and the vendor
+  table's numbers confirm this page's form; see `EQ-SIEVE` for the sieving/rejection relation. The
+  complementary form is a live trap in the wider literature, but this page states it correctly.
 
 ## EQ-SIEVE — sieving / rejection
 
@@ -54,8 +75,20 @@ S = \frac{C_{\text{permeate}}}{C_{\text{retentate}}}, \qquad R = 1 - S
 \]
 
 - MWCO is conventionally the molecular weight at 90% rejection (\(S = 0.1\)).
+- **Cut-off selection points below the product mass, not above it.** An oligonucleotide should be
+  **at least twice the reported membrane cut-off** for robust retention
+  (<span class="prov-fact">fact</span>, single-strand antisense, abstract;
+  [SRC-GRONKE-2023](../registers/sources.md)); the vendor **3–6× rule** selects a cut-off three to six
+  times *lower* than the molecule to be retained (<span class="prov-fact">fact</span>;
+  [SRC-SCHWARTZ-BPI-2003](../registers/sources.md), [SRC-PALL-TFF](../registers/sources.md)). For a
+  17 kDa duplex these give an upper bound near 8 kDa (twice rule) or 3–6 kDa (vendor rule); the only
+  siRNA optimisation study ran at 10 kDa ([SRC-ZYDNEY-2025](../registers/sources.md)). A previously
+  asserted **"30 kDa upper limit" is struck** — it could not be found in any openable source, and
+  every quotable rule points the other way (Q-035).
 - Real retention differs from nominal: higher ionic strength shrinks the effective nucleic-acid
-  size and raises leakage. <span class="prov-fact">fact</span>; [SRC-ZYDNEY-2024](../registers/sources.md).
+  size and raises leakage, and charged solutes retain very differently from the uncharged tracers
+  cut-offs are measured with (<span class="prov-fact">fact</span>;
+  [SRC-ZYDNEY-2024](../registers/sources.md), [SRC-MWCO-REVIEW-2024](../registers/sources.md)).
 
 ## EQ-FLUX — gel-polarisation flux
 
@@ -65,9 +98,40 @@ J = k \,\ln\!\left(\frac{C_{\text{wall}}}{C_{\text{bulk}}}\right)
 
 - \(J\): permeate flux (LMH); \(k\): mass-transfer coefficient (rises with crossflow);
   \(C_\text{wall}, C_\text{bulk}\): gel-layer and bulk concentrations.
-- Valid in the pressure-independent (gel-limited) regime. Membrane sizing:
-  \(A = V_\text{permeate}/(J_\text{avg}\,t)\). <span class="prov-fact">fact</span> (protein-scale);
-  [SRC-BPT-TFF](../registers/sources.md). **Borrowed** — oligo-specific flux is a gap.
+- Valid in the pressure-independent (gel-limited) regime. Cited to a named-author primary with the
+  law and its 0.37×\(C_G\) optimum (<span class="prov-fact">fact</span>;
+  [SRC-SCHWARTZ-BPI-2003](../registers/sources.md)), corroborated in exponential form by a
+  membrane-science preprint (<span class="prov-fact">fact</span>;
+  [SRC-BIESHEUVEL-2024](../registers/sources.md)); the anonymous secondary
+  [SRC-BPT-TFF](../registers/sources.md) is demoted to a see-also. **Do not** cite the gel-polarisation
+  article for process time: its "Process Time = Filtrate Flow Rate × Volume" is dimensionally
+  impossible (L/h × L is not a time). **Borrowed** — oligo-specific flux is a gap (Q-036).
+- Membrane sizing: \(A = V_\text{permeate}/(J_\text{avg}\,t)\), with worked examples that reproduce
+  by hand (<span class="prov-fact">fact</span>, vendor; [SRC-PALL-TFF](../registers/sources.md)).
+
+## EQ-UFYIELD — UF/DF yield (not a constant)
+
+\[
+Y_{\text{UF/DF}} \;=\; \underbrace{e^{-(1-R)\,(\ln \mathrm{VCF} + N)}}_{\text{membrane passage}}
+\;-\; \underbrace{L_{\text{hold-up}}}_{\text{tubing + filters}}
+\;-\; \underbrace{L_{\text{ads}}}_{\text{membrane adsorption}}
+\]
+
+- \(R\): product retention coefficient (`P-UFDF-RETENTION`); \(\mathrm{VCF}\): volume concentration
+  factor; \(N\): diavolumes (`P-DF-DIAVOL`); \(L_\text{hold-up}\), \(L_\text{ads}\): additive losses
+  (`P-UFDF-HOLDUP-LOSS`, `P-UFDF-ADSORP-LOSS`).
+- **Why it replaces a flat "<10%".** The membrane-passage term is a tenfold swing from one membrane
+  choice: at \(R=0.99\) the loss is 9.5%, at \(R=0.999\) it is 1.0% (both at \(\ln \mathrm{VCF}+N=10\)),
+  reproduced from three worked points (<span class="prov-fact">fact</span>, vendor;
+  [SRC-MILLIPORE-TFF](../registers/sources.md)). The **hold-up** term, absent from the old model, is the
+  dominant loss at small batch size: 30–40% of a nucleic acid can remain in tubing and filters
+  (<span class="prov-fact">fact</span>, mRNA at 20–80 mL; [SRC-NOURAFKAN-2024](../registers/sources.md)).
+  Adsorption is additive and protein-specific.
+- **Honesty note.** The Millipore relation itself sits in a graphic that did not extract; the
+  exponential form above is **derived** from its three worked points, not copied from the figure. The
+  hold-up loss is carried as an explicit assumption, not a transferable constant.
+- **Validity:** design-level, <span class="prov-inference">inference</span> as applied to this stream.
+  Used by the balance (`gen/balance.py`) in place of a flat UF/DF yield. See Q-036, R-011.
 
 ## EQ-UFRULE — UF fractionation resolution
 
@@ -138,10 +202,18 @@ T_g = \frac{w_1 T_{g,1} + k\, w_2 T_{g,2}}{w_1 + k\, w_2}
 
 ## EQ-LIG — ligation conversion (yield term)
 
-Overall recovered yield through assembly scales with the product of junction conversions,
-\(\prod_j c_j\); reported junction conversions span 82–96% (analytical, modified/PS;
-[SRC-NATCOMM-2024](../registers/sources.md)) to >95% (vendor). Kinetics are enzyme-specific and a
-development gap for our system (Q-010).
+Per-ligation conversion and overall mass yield are **different quantities, an order of magnitude
+apart**, and must never be conflated. Recovered yield through assembly scales with the product of
+junction conversions \(\prod_j c_j\), but each junction also loses material to workup, so the campaign
+yield is far below the per-junction conversion. Measured **per-ligation conversion** on fully modified
+siRNA blocks is >92% single-feed / >94% split-feed (<span class="prov-fact">fact</span>;
+[SRC-CN119265174](../registers/sources.md), `P-LIG-CONV`), while measured **overall campaign mass
+yield** for kilogram-scale ligation-built siRNA is **19–43%** (<span class="prov-fact">fact</span>;
+[SRC-HONGENE-BROCHURE-2025](../registers/sources.md), `P-YIELD-OVERALL-PUB`) — a conservative figure,
+unoptimised and calculated from the lowest-yielding fragment. The 82–96% range often quoted is a
+ligase screen on an *unmodified* shortmer whose phosphorothioate donors reacted only ~30%
+([SRC-NATCOMM-2024](../registers/sources.md)); >95% is an unreviewed vendor claim. Kinetics are
+enzyme-specific and a development gap for our system (Q-010).
 
 
 ## EQ-CASCADE — membrane cascade staging

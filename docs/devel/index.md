@@ -16,8 +16,23 @@ small scale misleads.
 - **Spray drying:** the outlet/particle temperature relationship, cyclone/wall losses, and
   morphology are notoriously unrepresentative at bench scale — qualify at **pilot** scale.
 - **Evaporation:** residence-time distribution and fouling/viscosity limits do not scale down
-  cleanly; falling-film behaviour differs from a rotovap.
-- **UF/DF:** flux, fouling, and hold-up losses scale by area/shear rules, not by simple volume.
+  cleanly. **A rotary evaporator is not a scale-down model of a falling film**: a falling film has a
+  minimum wetting rate below which it breaks into rivulets and fouls, so a small batch must recirculate
+  and multiply thermal exposure (<span class="prov-fact">fact</span>;
+  [SRC-HUGHES-2024](../registers/sources.md), R-013, R-004).
+- **UF/DF:** flux, fouling, and hold-up losses scale by area/shear rules, not by simple volume. Yield
+  is an equation, not a "<10%" rule (`EQ-UFYIELD`), and its dominant term at small batch is
+  unrecoverable hold-up, not membrane passage.
+
+## Mass-balance discipline the site must apply
+
+Do not track yield alone. To know where product goes, calculate a **mass balance across every UF/DF
+step**: total product in the retentate, in the filtrate, **and** in the unrecoverable hold-up volume
+(<span class="prov-fact">fact</span>; [SRC-MILLIPORE-TFF](../registers/sources.md)). Hold-up is where
+the loss hides — 30–40% of a nucleic acid can remain in tubing and filters at small scale
+(<span class="prov-fact">fact</span>, mRNA; [SRC-NOURAFKAN-2024](../registers/sources.md)), and it is
+not captured by a retention coefficient. Membrane-passage loss itself swings tenfold (9.5% at R=0.99,
+1.0% at R=0.999), so the retention target is a real development decision, not a rounding choice.
 
 ## Scale-down models to qualify
 
