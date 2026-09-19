@@ -11,6 +11,7 @@ from dataclasses import asdict
 from .dataio import load_rows
 from .tables import md_table
 from .balance import run_all
+from .flowsheet import render as render_flowsheet
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DOCS = os.path.join(ROOT, "docs")
@@ -129,6 +130,7 @@ def main():
     written += gen_registers()
     written.append(gen_streams_on_process())
     written.append(gen_balance())
+    written.append(_write("diagrams/bfd.svg", render_flowsheet()))
     print("Generated:")
     for w in written:
         print("  docs/" + w)

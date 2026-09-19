@@ -256,6 +256,26 @@ def test_flowsheet_stream_ids_match_the_register():
     assert not unknown, f"stream(s) drawn but not in the register: {sorted(unknown)}"
 
 
+def test_flowsheet_is_up_to_date():
+    """bfd.svg is generated from data/streams.csv; the committed file must match render().
+
+    CI runs the flowsheet drift tests against the committed SVG BEFORE gen.build
+    regenerates it, so a stale committed file would pass the drift check while showing
+    the wrong picture. This closes that gap: regenerate and commit after any data change.
+    """
+    from gen.flowsheet import render
+    committed = open(os.path.join(ROOT, "docs", "diagrams", "bfd.svg"), encoding="utf-8").read()
+    assert render() == committed, (
+        "docs/diagrams/bfd.svg is stale; run `python -m gen.build` and commit the result"
+    )
+
+
+def test_flowsheet_layout_is_deterministic():
+    """The generator must be a pure function of the data (no dict/order nondeterminism)."""
+    from gen.flowsheet import render
+    assert render() == render()
+
+
 def test_flowsheet_units_resolve_to_equipment():
     """Every from_unit/to_unit must be a real equipment id or a declared boundary sentinel."""
     sentinels = {"SUPPLY", "WASTE", "DS-STORE"}
