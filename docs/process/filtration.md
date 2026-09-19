@@ -47,9 +47,10 @@ out cationic impurities including the ligation buffer's magnesium
   siRNA concentration **from 52 to >180 mg/mL** (<span class="prov-fact">fact</span>;
   [SRC-ZYDNEY-2024](../registers/sources.md)), and **~193 g/L** in the ligand-density follow-up on a
   10 kDa membrane (<span class="prov-fact">fact</span>, bench; [SRC-ZYDNEY-2025](../registers/sources.md)).
-  A single-strand antisense oligo reached 200 mg/mL at ≥95% yield and <15 cP on a 3 kDa membrane, so
-  **viscosity is not what stops it** (<span class="prov-fact">fact</span>;
-  [SRC-GRONKE-2023](../registers/sources.md)); oligo UF/DF routinely reaches 40–100 mg/mL
+  A single-strand antisense oligo reached 200 mg/mL at ≥95% yield and <15 cP on a 3 kDa membrane
+  (<span class="prov-fact">fact</span>, single-strand antisense;
+  [SRC-GRONKE-2023](../registers/sources.md)), so for our duplex **viscosity is unlikely to be the
+  binding constraint** (<span class="prov-inference">inference</span>); oligo UF/DF routinely reaches 40–100 mg/mL
   (<span class="prov-fact">fact</span>; [SRC-PMC7415879](../registers/sources.md)). Whether osmotic
   pressure or fouling sets our ceiling is open (Q-041). The high-concentration patent claims a final
   composition "greater than about 150 mg/mL", with embodiments described up to 250–400 mg/mL — an

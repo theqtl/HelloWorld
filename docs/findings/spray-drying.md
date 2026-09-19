@@ -71,10 +71,15 @@ moisture, at pilot scale where the outlet/particle temperature relationship is r
 
 ## 4. Particle engineering and yield
 
-Particle morphology is governed by the **Péclet number** (ratio of evaporation rate to solute
-back-diffusion): high Pe enriches the surface early and gives hollow, wrinkled particles; low Pe
-gives dense spheres (<span class="prov-fact">fact</span>, general pharma;
-[SRC-SD-MORPH](../registers/sources.md), and `EQ-PECLET` in [Equations](../equations/index.md)).
+Particle morphology is commonly interpreted through the **Péclet number** (ratio of evaporation
+rate to solute back-diffusion): high Pe enriches the surface early and gives hollow, wrinkled
+particles; low Pe gives dense spheres (<span class="prov-fact">fact</span>, general pharma;
+[SRC-VEHRING-2008](../registers/sources.md), the origin of this framework, and `EQ-PECLET` in
+[Equations](../equations/index.md)). Inlet temperature alone is an insufficient predictor of
+morphology, which also depends on solute solidification kinetics
+(<span class="prov-fact">fact</span>, general pharma, abstract only;
+[SRC-SD-MORPH](../registers/sources.md)); that paper reports no numbers and does not establish that
+outlet temperature is a sufficient predictor.
 Yield at scale is set by cyclone and wall losses; these are a **gap** for our system (Q-019 and the
 [spray-drying process page](../process/spray-drying.md)).
 
