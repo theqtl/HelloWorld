@@ -6,7 +6,9 @@ what already exists here.
 ## Already in this knowledge base
 
 - Block flow diagram with numbered streams ([diagrams](../diagrams/index.md)).
-- Executable mass balance across scenarios ([balance](../balance/results.md)).
+- Executable mass **and energy** balance across scenarios, with the full evaporator and drying-gas
+  duties (`EQ-ENERGY`) and a species-resolved [impurity-fate overlay](../balance/impurities.md)
+  ([balance](../balance/results.md)).
 - Governing equations with terms, assumptions, and transferability notes ([equations](../equations/index.md)).
 - Equipment, stream, buffer, utility, risk, and question registers.
 - A cited source log with reachability and scale/system tags.
@@ -14,10 +16,12 @@ what already exists here.
 ## To be produced
 
 - **Process flow diagrams (PFDs)** with instrument tags and control loops.
-- **Full mass & energy balance** with sensible heat, gas loads, and species-resolved impurity
-  tracking.
+- **Measured inputs for the mass & energy balance.** The balance now computes the full evaporator and
+  drying-gas duties and the species-resolved impurity fate, but on assumption-flagged inputs; the
+  package still needs measured thermal (Q-045, Q-046) and clearance (Q-036) data to replace them.
 - **Equipment specifications and sizing basis** per item (the [equipment register](../registers/equipment.md)
-  carries sizing-basis, MOC, and turndown columns as stubs).
+  now carries a sizing basis, materials of construction, and a turndown basis per item; absolute sizes
+  remain a function of demand, Q-002).
 - **Instrumentation and PAT** per unit operation (e.g. in-line UV/conductivity on UF/DF, outlet
   temperature and residual moisture on the dryer).
 - **Control strategy** linking critical process parameters to critical quality attributes.
@@ -37,6 +41,9 @@ itemised list a contract manufacturer works from (<span class="prov-fact">fact</
 - **No hold-time protocols** for the aqueous intermediates (Q-043, R-009).
 - **No cleaning-validation master plan with a health-based exposure limit** for shared filtration and
   drying equipment (R-015) — a potent, highly water-soluble polyanion on hard-to-clean surfaces (R-008).
+  The derivation method and the registered HBEL gap are now on the
+  [microbial page](../process/microbial.md) (`P-HBEL-DS`, Q-047); the value stays blank until
+  toxicology data exists.
 - **No forced-degradation stability data.**
 - **No side-by-side comparison** of premises, equipment, instruments, materials, procedures and
   methods between the sending and receiving units.
