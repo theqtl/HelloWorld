@@ -6,8 +6,8 @@ from gen.balance import run_all, purity_floor
 
 def test_all_source_keys_resolve():
     sources = {r["source_key"] for r in load_rows("sources")}
-    # parameters and risks reference source_key; blanks allowed
-    for name in ("parameters", "risks"):
+    # parameters, risks and impurities reference source_key; blanks allowed
+    for name in ("parameters", "risks", "impurities"):
         for r in load_rows(name):
             key = (r.get("source_key") or "").strip()
             if key:
@@ -179,7 +179,7 @@ def test_every_question_reference_exists_in_every_csv():
     qids = {r["question_id"] for r in load_rows("questions")}
     offenders = []
     for name in ("parameters", "scenarios", "risks", "equipment", "buffers", "utilities",
-                 "streams", "sources"):
+                 "streams", "sources", "impurities"):
         for row in load_rows(name):
             for value in row.values():
                 for tok in re.findall(r"Q-\d{3}", value or ""):
@@ -380,7 +380,8 @@ def test_numeric_claims_in_prose_carry_a_citation():
         rel = os.path.relpath(path, ROOT)
         # Generated register pages carry their provenance in columns; the ADR is an
         # architecture argument, not a process claim.
-        if "/registers/" in rel or rel.endswith(("balance/results.md", "process/streams.md")):
+        if "/registers/" in rel or rel.endswith(("balance/results.md", "balance/impurities.md",
+                                                 "process/streams.md")):
             continue
         if "/adr/" in rel:
             continue
@@ -594,6 +595,40 @@ def test_read_sources_are_not_in_the_unread_census():
         "source(s) listed in the unread census whose access is actually a full read "
         "(remove them from the census or fix their access): " + ", ".join(offenders)
     )
+
+
+def test_impurity_classes_are_in_the_clearance_matrix():
+    """Every impurity class in the data table must appear in the prose clearance matrix, so the
+    numeric overlay and the qualitative matrix cannot drift apart."""
+    matrix = open(os.path.join(ROOT, "docs", "process", "filtration.md"), encoding="utf-8").read()
+    offenders = []
+    for r in load_rows("impurities"):
+        key = (r.get("matrix_key") or "").strip()
+        if key and key not in matrix:
+            offenders.append(f"{r['impurity_id']} ({key})")
+    assert not offenders, (
+        "impurity class(es) absent from the filtration clearance matrix: " + ", ".join(offenders)
+    )
+
+
+def test_unclearable_impurities_are_not_modelled_as_cleared():
+    """Physical fact (finding 1): block-internal n-1 is floored at the blocks, and the adenylylated
+    dead-end is controlled at the reaction. Neither may be modelled as a downstream separation."""
+    rows = {r["impurity_id"]: r for r in load_rows("impurities")}
+    assert rows["IMP-N1"]["clearance_model"] == "block_floor", \
+        "n-1 must be floored (block_floor), never modelled as cleared downstream"
+    assert rows["IMP-APPN"]["clearance_model"] == "designed_out", \
+        "the adenylylated dead-end must be controlled at the reaction (designed_out)"
+
+
+def test_impurity_overlay_is_deterministic_and_scenario_free():
+    """Impurity fate is a fraction picture, independent of annual demand (Q-002): the overlay is a
+    pure function of the parameters, and no throughput-scenario label leaks into it."""
+    from gen.impurity import render
+    out = render()
+    assert out == render()
+    for label in ("Low (illustrative)", "Mid (illustrative)", "High (illustrative)"):
+        assert label not in out
 
 
 def test_equipment_turndown_is_populated_or_flagged():

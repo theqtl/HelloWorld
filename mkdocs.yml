@@ -85,6 +85,7 @@ nav:
   - Mass & energy balance:
       - Method: balance/index.md
       - Results: balance/results.md
+      - Impurity fate: balance/impurities.md
   - Equations: equations/index.md
   - Diagrams: diagrams/index.md
   - Facility concept: facility/index.md

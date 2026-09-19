@@ -104,7 +104,6 @@ arithmetic on placeholders. Evaporation is a fixed decision for this train, so t
 
 ## What the balance does not yet do
 
-- Species-resolved impurity tracking (n-1, partials) per stream — Tier 2.
 - Buffer salt mass carried into the powder — depends on the final-matrix design (R-005).
 
 See the [generated results](results.md).
