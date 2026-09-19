@@ -549,6 +549,32 @@ def test_read_sources_are_not_in_the_unread_census():
     )
 
 
+def test_equipment_turndown_is_populated_or_flagged():
+    """Turndown was a fully blank column in Tier 1 - a silent sizing stub. Every equipment
+    item must state a turndown basis, or register the gap against an open question (Q-...)."""
+    offenders = []
+    for r in load_rows("equipment"):
+        turndown = (r.get("turndown") or "").strip()
+        notes = r.get("notes") or ""
+        if not turndown and not re.search(r"Q-\d{3}", notes):
+            offenders.append(r["equip_id"])
+    assert not offenders, (
+        "equipment item(s) with a blank turndown and no open-question reference: "
+        + ", ".join(offenders)
+    )
+
+
+def test_equipment_moc_is_committed():
+    """Materials of construction must be a decided candidate for every item, never left blank."""
+    offenders = [
+        r["equip_id"] for r in load_rows("equipment")
+        if not (r.get("moc_candidate") or "").strip()
+    ]
+    assert not offenders, (
+        "equipment item(s) with no materials of construction committed: " + ", ".join(offenders)
+    )
+
+
 def test_no_residence_time_cites_a_batch_cycle_time_trap():
     """No page may state a residence time citing a source whose notes TRAP that figure as a
     batch cycle time (F-002). A window that cites such a source next to 'residence time' must
