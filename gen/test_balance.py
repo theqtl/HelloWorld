@@ -597,6 +597,23 @@ def test_read_sources_are_not_in_the_unread_census():
     )
 
 
+def test_md_table_emits_markdown_only():
+    """The register tables are Markdown pipe tables (sorted/filtered client-side over the rendered
+    HTML), never hand-emitted HTML. Locks in that decision so md_table cannot start emitting tags."""
+    from gen.tables import md_table
+    out = md_table([{"a": "1", "b": "2"}, {"a": "3", "b": "4"}])
+    assert "<" not in out, "md_table must emit Markdown pipe tables, not HTML"
+
+
+def test_table_enhancers_are_registered():
+    """The sort and filter enhancements must be wired into the site, or the register tables lose
+    them silently. Guards against the asset existing but never being loaded."""
+    cfg = open(os.path.join(ROOT, "mkdocs.yml"), encoding="utf-8").read()
+    for asset in ("javascripts/tablesort.js", "javascripts/tablefilter.js"):
+        assert asset in cfg, f"{asset} is not registered in mkdocs.yml extra_javascript"
+        assert os.path.exists(os.path.join(ROOT, "docs", asset)), f"missing asset file {asset}"
+
+
 def test_impurity_classes_are_in_the_clearance_matrix():
     """Every impurity class in the data table must appear in the prose clearance matrix, so the
     numeric overlay and the qualitative matrix cannot drift apart."""
