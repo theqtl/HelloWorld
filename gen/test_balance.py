@@ -597,6 +597,23 @@ def test_read_sources_are_not_in_the_unread_census():
     )
 
 
+def test_hbel_stays_a_registered_gap():
+    """The health-based exposure limit is blocked on toxicology data that does not exist publicly,
+    so its value must stay BLANK and registered against an open question - never invented."""
+    params = load_params()
+    row = params.get("P-HBEL-DS")
+    assert row is not None, "P-HBEL-DS is not registered"
+    assert not (row.get("value") or "").strip(), "P-HBEL-DS must have no value (it is a registered gap)"
+    assert "Q-" in (row.get("notes") or ""), "P-HBEL-DS must reference an open question"
+
+
+def test_ccs_cites_the_hbel_method_source():
+    """The contamination-control section must cite the HBEL derivation method, not assert a number."""
+    text = open(os.path.join(ROOT, "docs", "process", "microbial.md"), encoding="utf-8").read()
+    assert "SRC-WHO-TRS1044" in text, "microbial CCS section must cite the HBEL method source"
+    assert "P-HBEL-DS" in text, "microbial CCS section must reference the HBEL gap parameter"
+
+
 def test_md_table_emits_markdown_only():
     """The register tables are Markdown pipe tables (sorted/filtered client-side over the rendered
     HTML), never hand-emitted HTML. Locks in that decision so md_table cannot start emitting tags."""
