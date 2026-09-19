@@ -227,6 +227,33 @@ def test_solids_close_between_evaporator_and_dryer():
         )
 
 
+def test_full_energy_duty_is_at_least_the_latent_minimum():
+    """The Tier-2 full duty only ADDS sensible heat, gas heating and losses to the latent
+    floor, so it can never fall below it. The dryer check also verifies the gas enthalpy drop
+    can actually supply the latent load - a physical sanity check on the gas ratio and dT."""
+    for r in run_all():
+        assert r.evap_sensible_MJ >= 0
+        assert r.drying_gas_kg >= 0
+        assert r.evap_duty_full_MJ >= r.evap_duty_MJ
+        assert r.dryer_duty_full_MJ >= r.dryer_evap_duty_MJ
+        assert abs(r.evap_duty_full_MJ / 3.6 - r.evap_duty_full_kWh) < 1e-6
+        assert abs(r.dryer_duty_full_MJ / 3.6 - r.dryer_duty_full_kWh) < 1e-6
+
+
+def test_blanking_a_thermal_constant_refuses():
+    """Every new energy-balance input obeys the blank-refusal rule: a gap raises, never
+    silently defaults to a number (same invariant as P-H2O-LHV)."""
+    import pytest
+    from gen.balance import run_scenario
+    scn = load_rows("scenarios")[0]
+    for pid in ("P-CP-SOLN", "P-DRYGAS-CP", "P-EVAP-T-FEED", "P-EVAP-T-BOIL",
+                "P-DRY-T-IN", "P-DRY-T-OUT", "P-DRYGAS-RATIO", "P-HEAT-LOSS-FRAC"):
+        params = load_params()
+        params[pid]["value"] = ""
+        with pytest.raises(ValueError):
+            run_scenario(scn, params)
+
+
 def test_balance_refuses_a_blank_required_input():
     """A gap must raise, never silently become a number. The latent-heat fallback broke this."""
     import pytest

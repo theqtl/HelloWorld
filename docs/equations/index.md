@@ -165,6 +165,30 @@ Q = U A\, \Delta T_{\text{lm}}, \qquad Q_{\min} = \dot m_{\text{water}}\, \lambd
 - Boiling-point elevation raises the required \(\Delta T\) as solutes concentrate.
 - <span class="prov-fact">fact</span> (standard). \(U\) for this stream is a gap. Correlations
   are **borrowed** from food/fine-chemical evaporation — transferability caveat.
+- \(Q_{\min}\) here is only the **latent floor**; the full evaporator duty (sensible + latent +
+  losses) and the drying-gas duty are in `EQ-ENERGY`.
+
+## EQ-ENERGY — full thermal duty (evaporator and dryer)
+
+\[
+Q_\text{evap} = \big(\dot m_\text{feed}\,c_p\,(T_\text{boil}-T_\text{feed}) + \dot m_\text{water}\,\lambda\big)\,(1+f_\text{loss})
+\qquad
+Q_\text{dry} = r_\text{gas}\,\dot m_\text{water}\,c_{p,\text{gas}}\,(T_\text{in}-T_\text{out})\,(1+f_\text{loss})
+\]
+
+- **Evaporator:** sensible heat to raise the feed \(\dot m_\text{feed}\) from `P-EVAP-T-FEED` to the
+  vacuum boiling point `P-EVAP-T-BOIL` at `P-CP-SOLN`, plus the latent term \(\dot m_\text{water}\lambda\)
+  (`EQ-EVAP`), plus a loss uplift `P-HEAT-LOSS-FRAC`. MVR recovers most of the latent part as
+  recompressed vapour, so this full duty is the thermal load, not the live-steam demand.
+- **Dryer:** the drying-gas heat load. Gas mass is a scale-independent ratio `P-DRYGAS-RATIO` to the
+  water evaporated, and \(c_{p,\text{gas}}(T_\text{in}-T_\text{out})\) (`P-DRYGAS-CP`, `P-DRY-T-IN`,
+  `P-DRY-T-OUT`) is the enthalpy the gas gives up across the dryer — the dominant load, well above the
+  latent minimum, because the large gas flow leaves warm. The gas ratio must be large enough that this
+  enthalpy drop covers the latent load.
+- Both reduce to the latent minimum when the sensible, gas and loss terms vanish, so the balance's
+  minimum figures stay a strict lower bound on the full duty.
+- <span class="prov-inference">inference</span> — a standard sensible/latent/gas construction applied
+  to this train; the temperatures, the gas ratio and the loss fraction are assumptions (Q-045, Q-046).
 
 ## EQ-PECLET — spray-dried particle morphology
 

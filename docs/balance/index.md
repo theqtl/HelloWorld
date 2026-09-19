@@ -47,8 +47,14 @@ The [results page](results.md) is generated from it; change the CSV inputs, run
 4. **Diafiltration buffer** = diavolumes × UF retentate volume (dominant clean-water and aqueous-waste driver).
 5. **Water removed in evaporation** = UF volume − evaporator outlet volume.
 6. **Dryer water** = dryer feed mass − solids (API + excipient).
-7. **Thermal duty** = mass of water removed × latent heat (`P-H2O-LHV`). This is the
-   latent-heat **minimum**; the real duty adds sensible heat, gas heating, and losses (Tier-2).
+7. **Thermal duty** — two figures per unit. The **latent-heat minimum** is mass of water removed ×
+   latent heat (`P-H2O-LHV`). The **full duty** (`EQ-ENERGY`) adds the rest: the evaporator raises the
+   whole retentate feed from `P-EVAP-T-FEED` to the vacuum boiling point `P-EVAP-T-BOIL` at the
+   solution specific heat `P-CP-SOLN`, then evaporates, with a `P-HEAT-LOSS-FRAC` loss uplift; the
+   dryer reports the **drying-gas heat load** — the enthalpy the gas gives up from `P-DRY-T-IN` to
+   `P-DRY-T-OUT` at `P-DRYGAS-CP`, its mass set by the scale-independent ratio `P-DRYGAS-RATIO`, which
+   is the dominant, energy-intensive load and sits well above the latent floor. Operating temperatures
+   and the gas ratio are assumptions (Q-045, Q-046); MVR recovers most of the evaporator latent load.
 
 !!! warning "Conversion is not yield"
     Per-ligation conversion and overall mass yield are **different quantities, an order of magnitude
@@ -99,7 +105,6 @@ arithmetic on placeholders. Evaporation is a fixed decision for this train, so t
 ## What the balance does not yet do
 
 - Species-resolved impurity tracking (n-1, partials) per stream — Tier 2.
-- Full energy balance with sensible heat and gas loads — Tier 2.
 - Buffer salt mass carried into the powder — depends on the final-matrix design (R-005).
 
 See the [generated results](results.md).

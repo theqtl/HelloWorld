@@ -102,10 +102,14 @@ def gen_balance():
         ("evap_outlet_solids_kg", "Evaporator outlet total solids (kg)"),
         ("dryer_feed_mass_kg", "Spray-dryer feed (kg)"),
         ("dryer_water_evaporated_kg", "Dryer water evaporated (kg)"),
+        ("drying_gas_kg", "Drying gas required (kg)"),
         ("wfi_approx_L", "Clean water demand approx (L)"),
         ("aqueous_waste_approx_L", "Aqueous waste approx (L)"),
-        ("evap_duty_MJ", "Evaporation duty (MJ)"),
-        ("dryer_evap_duty_MJ", "Dryer evaporation duty (MJ)"),
+        ("evap_duty_MJ", "Evaporation duty, latent minimum (MJ)"),
+        ("evap_sensible_MJ", "Evaporation sensible heat (MJ)"),
+        ("evap_duty_full_MJ", "Evaporation full duty, sensible+latent+loss (MJ)"),
+        ("dryer_evap_duty_MJ", "Dryer duty, latent minimum (MJ)"),
+        ("dryer_duty_full_MJ", "Dryer full duty, gas heating+loss (MJ)"),
     ]
     header = ["Quantity"] + [r["label"] for r in results]
     lines = ["| " + " | ".join(header) + " |",
@@ -114,9 +118,15 @@ def gen_balance():
         row = [label] + [_fmt(r[k]) for r in results]
         lines.append("| " + " | ".join(row) + " |")
     body += "\n".join(lines) + "\n\n"
-    body += ("All quantities are per campaign unless labelled per year. Duties are the "
-             "latent-heat minimum (mass of water removed × latent heat); real evaporator and "
-             "dryer duties add sensible heat, gas heating, and losses (Tier-2 energy balance).\n\n"
+    body += ("All quantities are per campaign unless labelled per year. Each unit reports both the "
+             "latent-heat **minimum** (mass of water removed × latent heat) and the **full duty**: "
+             "the evaporator adds sensible heat to raise the feed to its vacuum boiling point plus a "
+             "loss uplift (`P-CP-SOLN`, `P-EVAP-T-FEED`, `P-EVAP-T-BOIL`, `P-HEAT-LOSS-FRAC`), and "
+             "the dryer reports the drying-gas heat load, the enthalpy the gas gives up across the "
+             "dryer at a scale-independent gas:water ratio (`P-DRYGAS-RATIO`, `P-DRYGAS-CP`, "
+             "`P-DRY-T-IN`, `P-DRY-T-OUT`) — the dominant, energy-intensive load, well above the "
+             "latent floor. The operating temperatures and gas ratio are assumptions (Q-045, Q-046); "
+             "MVR recovers most of the evaporator's latent load as recompressed vapour.\n\n"
              "Concentrations up to and including ultrafiltration are on an siRNA basis; the "
              "evaporator outlet is on a total dissolved solids basis. How much excipient is in "
              "solution at the evaporator is an open process choice (`P-EXCIP-FRAC-PRE-EVAP`, "
