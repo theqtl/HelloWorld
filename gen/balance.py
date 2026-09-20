@@ -32,6 +32,21 @@ def _require(params, pid):
     return v
 
 
+def _require_above(hi, lo, hi_id, lo_id):
+    """An inconsistent operating point is a DATA error, so raise rather than clamp.
+
+    The previous model wrapped its temperature differences in max(..., 0), which turned an
+    inverted pair into a silent 0 MJ duty - the same defect-masking the blank-refusal rule
+    exists to prevent. Legitimate process states are still clamped (see the dryer feed term);
+    only physically impossible data raises.
+    """
+    if hi <= lo:
+        raise ValueError(
+            f"{hi_id} ({hi}) must be above {lo_id} ({lo}); the energy balance has no "
+            f"physical meaning otherwise. Fix the registered values rather than the code."
+        )
+
+
 @dataclass
 class ScenarioResult:
     scenario_id: str
@@ -57,12 +72,16 @@ class ScenarioResult:
     evap_duty_kWh: float
     dryer_evap_duty_MJ: float
     dryer_evap_duty_kWh: float
+    evap_feed_mass_kg: float
     evap_sensible_MJ: float
     evap_duty_full_MJ: float
     evap_duty_full_kWh: float
+    dryer_feed_sensible_MJ: float
+    dryer_process_duty_MJ: float
+    dryer_process_duty_kWh: float
     drying_gas_kg: float
-    dryer_duty_full_MJ: float
-    dryer_duty_full_kWh: float
+    dryer_heater_duty_MJ: float
+    dryer_heater_duty_kWh: float
 
 
 def run_scenario(scn, params):
@@ -87,8 +106,14 @@ def run_scenario(scn, params):
     t_boil = _require(params, "P-EVAP-T-BOIL")     # degC
     t_dry_in = _require(params, "P-DRY-T-IN")      # degC
     t_dry_out = _require(params, "P-DRY-T-OUT")    # degC
-    gas_ratio = _require(params, "P-DRYGAS-RATIO")  # kg drying gas / kg water evaporated
+    t_amb = _require(params, "P-DRY-T-AMBIENT")    # degC
+    rho = _require(params, "P-SOLN-DENSITY")       # kg/L
     loss_frac = _require(params, "P-HEAT-LOSS-FRAC")  # fraction added for losses
+
+    # Operating points that are physically impossible are data errors, not something to clamp.
+    _require_above(t_boil, t_feed, "P-EVAP-T-BOIL", "P-EVAP-T-FEED")
+    _require_above(t_dry_in, t_dry_out, "P-DRY-T-IN", "P-DRY-T-OUT")
+    _require_above(t_dry_out, t_amb, "P-DRY-T-OUT", "P-DRY-T-AMBIENT")
 
     # UF/DF yield is NOT a flat constant (F-019). Membrane-passage loss follows the diafiltration
     # relation yield = exp(-(1-R)(ln VCF + N)) reproduced from the three worked points in
@@ -115,9 +140,13 @@ def run_scenario(scn, params):
     # forward volumes (g = kg*1000)
     lig_vol = (api_lig * 1000.0) / c_lig  # L
     api_after_lig = api_lig * y_lig
-    uf_vol = (api_after_lig * 1000.0) / c_uf  # L retentate
-    df_buffer = diavol * uf_vol  # L
+    # The retentate is what SURVIVES UF/DF, so its volume is sized on api_after_ufdf, not on the
+    # API entering the step. Sizing it on api_after_lig overstated the retentate (and therefore
+    # the evaporator feed and its duty) by 1/y_ufdf, and made the reported "UF retentate volume"
+    # a quantity that never exists in the process.
     api_after_ufdf = api_after_lig * y_ufdf
+    uf_vol = (api_after_ufdf * 1000.0) / c_uf  # L retentate leaving UF/DF
+    df_buffer = diavol * uf_vol  # L
 
     # Evaporator outlet is sized on TOTAL dissolved solids: the active plus whatever share of
     # the excipient load is already in solution at this point (P-EXCIP-FRAC-PRE-EVAP).
@@ -138,17 +167,34 @@ def run_scenario(scn, params):
     evap_MJ = evap_water * lhv / 1000.0
     dry_MJ = dryer_water * lhv / 1000.0
 
-    # Full energy balance (Tier 2). The latent minima above are the floor; the real duties
-    # add sensible heat, drying-gas heating and losses (EQ-ENERGY).
-    # Evaporator: raise the whole retentate feed to the vacuum boiling point, then evaporate,
-    # then uplift for heat loss. Sensible + latent + losses, all >= 0, so >= the latent minimum.
-    evap_sensible_MJ = uf_vol * cp_soln * max(t_boil - t_feed, 0.0) / 1000.0
+    # Full energy balance (EQ-ENERGY). The latent minima above are a strict floor, and every
+    # term added below is non-negative, so that ordering holds BY CONSTRUCTION rather than as a
+    # consequence of the chosen placeholder values.
+    #
+    # Evaporator: raise the feed MASS to the vacuum boiling point, evaporate, then uplift once
+    # for heat loss. The feed mass needs a density (P-SOLN-DENSITY); using litres as kilograms
+    # smuggled an unregistered number into the balance.
+    # If ultrafiltration already meets the evaporator target there is nothing to remove, the unit
+    # is bypassed, and it costs nothing - so the sensible term is gated on there being water to
+    # evaporate. (Generating the excipient-sensitivity table exposed this: the old model charged
+    # sensible heat to an evaporator that was doing no work.)
+    evap_feed_mass_kg = uf_vol * rho
+    evap_sensible_MJ = (evap_feed_mass_kg * cp_soln * (t_boil - t_feed) / 1000.0
+                        if evap_water > 0 else 0.0)
     evap_full_MJ = (evap_MJ + evap_sensible_MJ) * (1.0 + loss_frac)
-    # Dryer: the drying gas carries the heat. Its mass is a scale-independent ratio to the water
-    # evaporated (so it does not resolve Q-002), and the gas enthalpy drop across the dryer is the
-    # heat delivered (UT-DRYGAS) - the dominant, energy-intensive load spray drying is known for.
-    drying_gas_kg = gas_ratio * dryer_water
-    dryer_full_MJ = drying_gas_kg * cp_gas * max(t_dry_in - t_dry_out, 0.0) / 1000.0 * (1.0 + loss_frac)
+    #
+    # Dryer, in two reported quantities that are different things:
+    #  * PROCESS duty - what drying actually requires: evaporate the water, raise the feed to the
+    #    outlet temperature, plus losses. The feed arrives from the evaporator at its boiling
+    #    point, so a feed hotter than the outlet needs no heating; that clamp is a legitimate
+    #    process state, unlike an inverted inlet/outlet, which raises above.
+    #  * HEATER duty - the utility load, which is what UT-DRYGAS actually is: inlet gas heating
+    #    from ambient. The gas MASS is derived from the process duty, so no tuned gas:water ratio
+    #    is needed, and the result stays scale-parametric (it scales with the water evaporated).
+    dryer_feed_sensible_MJ = dryer_feed * cp_soln * max(t_dry_out - t_boil, 0.0) / 1000.0
+    dryer_process_MJ = (dry_MJ + dryer_feed_sensible_MJ) * (1.0 + loss_frac)
+    drying_gas_kg = dryer_process_MJ * 1000.0 / (cp_gas * (t_dry_in - t_dry_out))
+    dryer_heater_MJ = drying_gas_kg * cp_gas * (t_dry_in - t_amb) / 1000.0
 
     return ScenarioResult(
         scenario_id=scn["scenario_id"], label=scn["label"],
@@ -162,10 +208,12 @@ def run_scenario(scn, params):
         wfi_approx_L=wfi, aqueous_waste_approx_L=aq_waste,
         evap_duty_MJ=evap_MJ, evap_duty_kWh=evap_MJ / 3.6,
         dryer_evap_duty_MJ=dry_MJ, dryer_evap_duty_kWh=dry_MJ / 3.6,
-        evap_sensible_MJ=evap_sensible_MJ,
+        evap_feed_mass_kg=evap_feed_mass_kg, evap_sensible_MJ=evap_sensible_MJ,
         evap_duty_full_MJ=evap_full_MJ, evap_duty_full_kWh=evap_full_MJ / 3.6,
+        dryer_feed_sensible_MJ=dryer_feed_sensible_MJ,
+        dryer_process_duty_MJ=dryer_process_MJ, dryer_process_duty_kWh=dryer_process_MJ / 3.6,
         drying_gas_kg=drying_gas_kg,
-        dryer_duty_full_MJ=dryer_full_MJ, dryer_duty_full_kWh=dryer_full_MJ / 3.6,
+        dryer_heater_duty_MJ=dryer_heater_MJ, dryer_heater_duty_kWh=dryer_heater_MJ / 3.6,
     )
 
 

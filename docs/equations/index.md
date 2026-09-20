@@ -117,9 +117,16 @@ Y_{\text{UF/DF}} \;=\; \underbrace{e^{-(1-R)\,(\ln \mathrm{VCF} + N)}}_{\text{me
 \;-\; \underbrace{L_{\text{ads}}}_{\text{membrane adsorption}}
 \]
 
-- \(R\): product retention coefficient (`P-UFDF-RETENTION`); \(\mathrm{VCF}\): volume concentration
-  factor; \(N\): diavolumes (`P-DF-DIAVOL`); \(L_\text{hold-up}\), \(L_\text{ads}\): additive losses
-  (`P-UFDF-HOLDUP-LOSS`, `P-UFDF-ADSORP-LOSS`).
+- \(R\): product retention coefficient (`P-UFDF-RETENTION`); \(\mathrm{VCF}\): concentration factor
+  (see the note below); \(N\): diavolumes (`P-DF-DIAVOL`); \(L_\text{hold-up}\), \(L_\text{ads}\):
+  additive losses (`P-UFDF-HOLDUP-LOSS`, `P-UFDF-ADSORP-LOSS`).
+- **Which VCF this uses, stated precisely.** The balance computes VCF as the **concentration** ratio
+  `P-CONC-UF`/`P-CONC-LIG`. That is not the volumetric ratio implied by the stream volumes, because
+  product is lost across the step: with the retentate sized on what survives UF/DF, the volumetric
+  ratio is larger by \(1/(Y_\text{lig}\,Y_\text{UF/DF})\), and the two coincide only at 100% recovery.
+  Reconciling them properly means solving the yield and the volume together — the yield depends on VCF,
+  which depends on the retentate volume, which depends on the yield — which this balance does not
+  attempt. Registered as Q-048 rather than left as an unstated mismatch.
 - **Why it replaces a flat "<10%".** The membrane-passage term is a tenfold swing from one membrane
   choice: at \(R=0.99\) the loss is 9.5%, at \(R=0.999\) it is 1.0% (both at \(\ln \mathrm{VCF}+N=10\)),
   reproduced from three worked points (<span class="prov-fact">fact</span>, vendor;
@@ -171,24 +178,36 @@ Q = U A\, \Delta T_{\text{lm}}, \qquad Q_{\min} = \dot m_{\text{water}}\, \lambd
 ## EQ-ENERGY — full thermal duty (evaporator and dryer)
 
 \[
-Q_\text{evap} = \big(\dot m_\text{feed}\,c_p\,(T_\text{boil}-T_\text{feed}) + \dot m_\text{water}\,\lambda\big)\,(1+f_\text{loss})
+Q_\text{evap} = \big(m_\text{feed}\,c_p\,(T_\text{boil}-T_\text{feed}) + m_\text{water}\,\lambda\big)\,(1+f_\text{loss})
+\]
+\[
+Q_\text{dry,process} = \big(m_\text{water}\,\lambda + m_\text{feed,dry}\,c_p\,(T_\text{out}-T_\text{feed,dry})\big)\,(1+f_\text{loss})
+\]
+\[
+m_\text{gas} = \frac{Q_\text{dry,process}}{c_{p,\text{gas}}\,(T_\text{in}-T_\text{out})}
 \qquad
-Q_\text{dry} = r_\text{gas}\,\dot m_\text{water}\,c_{p,\text{gas}}\,(T_\text{in}-T_\text{out})\,(1+f_\text{loss})
+Q_\text{dry,heater} = m_\text{gas}\,c_{p,\text{gas}}\,(T_\text{in}-T_\text{amb})
 \]
 
-- **Evaporator:** sensible heat to raise the feed \(\dot m_\text{feed}\) from `P-EVAP-T-FEED` to the
-  vacuum boiling point `P-EVAP-T-BOIL` at `P-CP-SOLN`, plus the latent term \(\dot m_\text{water}\lambda\)
-  (`EQ-EVAP`), plus a loss uplift `P-HEAT-LOSS-FRAC`. MVR recovers most of the latent part as
-  recompressed vapour, so this full duty is the thermal load, not the live-steam demand.
-- **Dryer:** the drying-gas heat load. Gas mass is a scale-independent ratio `P-DRYGAS-RATIO` to the
-  water evaporated, and \(c_{p,\text{gas}}(T_\text{in}-T_\text{out})\) (`P-DRYGAS-CP`, `P-DRY-T-IN`,
-  `P-DRY-T-OUT`) is the enthalpy the gas gives up across the dryer — the dominant load, well above the
-  latent minimum, because the large gas flow leaves warm. The gas ratio must be large enough that this
-  enthalpy drop covers the latent load.
-- Both reduce to the latent minimum when the sensible, gas and loss terms vanish, so the balance's
-  minimum figures stay a strict lower bound on the full duty.
+- **Evaporator:** sensible heat to raise the feed **mass** \(m_\text{feed}\) (volume × `P-SOLN-DENSITY`)
+  from `P-EVAP-T-FEED` to the vacuum boiling point `P-EVAP-T-BOIL` at `P-CP-SOLN`, plus the latent term
+  (`EQ-EVAP`), plus one loss uplift `P-HEAT-LOSS-FRAC`. If ultrafiltration already meets the evaporator
+  target the unit is bypassed and both terms vanish. MVR recovers most of the latent part as
+  recompressed vapour, so this is the thermal load, not the live-steam demand.
+- **Dryer — two distinct quantities, and conflating them understates the plant load.** The *process*
+  duty is what drying requires: evaporate the water, raise the feed to the outlet temperature, plus
+  losses. The *heater* duty is the utility load, and it is inlet-gas heating **from ambient**
+  (`P-DRY-T-AMBIENT`) — which is what `UT-DRYGAS` is defined as. The enthalpy the gas gives up *across*
+  the dryer, \(c_{p,\text{gas}}(T_\text{in}-T_\text{out})\), is neither: it is what sizes the gas mass.
+- **The gas mass is derived, not assumed.** It follows from the process duty, so no gas:water ratio is
+  carried. It remains scale-parametric because it scales with the water evaporated, so it does not
+  resolve Q-002.
+- **The latent minimum is a strict floor by construction.** Every term added to it is non-negative, and
+  \(Q_\text{heater}/Q_\text{process} = (T_\text{in}-T_\text{amb})/(T_\text{in}-T_\text{out}) \ge 1\)
+  whenever \(T_\text{out} \ge T_\text{amb}\). An inverted temperature pair is a data error and **raises**
+  rather than silently reporting a zero duty.
 - <span class="prov-inference">inference</span> — a standard sensible/latent/gas construction applied
-  to this train; the temperatures, the gas ratio and the loss fraction are assumptions (Q-045, Q-046).
+  to this train; the temperatures, the density and the loss fraction are assumptions (Q-045, Q-046).
 
 ## EQ-PECLET — spray-dried particle morphology
 

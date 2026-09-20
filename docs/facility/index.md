@@ -58,10 +58,12 @@ specification is set on the drug substance (<span class="prov-fact">fact</span>,
 
 - **Water (WFI/purified):** the dominant consumer is diafiltration (diavolumes × retentate
   volume). See [utilities](../registers/utilities.md) and the [balance](../balance/results.md).
-- **Thermal:** evaporator and spray-dryer duties. The balance now reports both the latent-heat
-  minimum and the **full duty** — evaporator sensible heat plus the drying-gas heat load, which
-  dominates (`EQ-ENERGY`, [balance](../balance/results.md); utilities `UT-STEAM`, `UT-DRYGAS`). MVR
-  reduces evaporator steam. Absolute loads scale with demand (Q-002).
+- **Thermal:** the spray dryer dominates, and by more than a latent-heat figure suggests. The balance
+  reports the dryer's *process* duty and, separately, its **heater** duty — inlet gas heated from
+  ambient, which is what `UT-DRYGAS` actually is and the number to size the utility on. The evaporator
+  is much the smaller load and is bypassed entirely if ultrafiltration already meets its target
+  (`EQ-ENERGY`, [balance](../balance/results.md); utilities `UT-STEAM`, `UT-DRYGAS`). MVR reduces
+  evaporator steam. Absolute loads scale with demand (Q-002).
 - **Waste:** large aqueous waste (spent permeate + condensate) — a facility and EHS driver.
 
 ## To be developed (Tier 3)

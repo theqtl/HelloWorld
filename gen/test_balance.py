@@ -227,27 +227,84 @@ def test_solids_close_between_evaporator_and_dryer():
         )
 
 
-def test_full_energy_duty_is_at_least_the_latent_minimum():
-    """The Tier-2 full duty only ADDS sensible heat, gas heating and losses to the latent
-    floor, so it can never fall below it. The dryer check also verifies the gas enthalpy drop
-    can actually supply the latent load - a physical sanity check on the gas ratio and dT."""
+def test_energy_duties_exceed_the_latent_minimum_by_construction():
+    """The latent minimum is a STRICT floor, and it must hold structurally - not because the
+    placeholder values happen to be large enough.
+
+    The previous version of this test asserted the same ordering for a dryer model that
+    contained no latent term at all, so it passed only while P-DRYGAS-RATIO was set high
+    enough (it failed below ~24, and a 120 C inlet broke it). The model now adds only
+    non-negative terms to the latent floor, and the heater duty is the process duty scaled by
+    (T_in - T_amb)/(T_in - T_out) >= 1, so both orderings are guaranteed by the arithmetic.
+    """
     for r in run_all():
+        assert r.evap_feed_mass_kg > 0
         assert r.evap_sensible_MJ >= 0
-        assert r.drying_gas_kg >= 0
+        assert r.dryer_feed_sensible_MJ >= 0
+        assert r.drying_gas_kg > 0
         assert r.evap_duty_full_MJ >= r.evap_duty_MJ
-        assert r.dryer_duty_full_MJ >= r.dryer_evap_duty_MJ
+        assert r.dryer_process_duty_MJ >= r.dryer_evap_duty_MJ
+        # the utility load is never below what the process needs
+        assert r.dryer_heater_duty_MJ >= r.dryer_process_duty_MJ
         assert abs(r.evap_duty_full_MJ / 3.6 - r.evap_duty_full_kWh) < 1e-6
-        assert abs(r.dryer_duty_full_MJ / 3.6 - r.dryer_duty_full_kWh) < 1e-6
+        assert abs(r.dryer_process_duty_MJ / 3.6 - r.dryer_process_duty_kWh) < 1e-6
+        assert abs(r.dryer_heater_duty_MJ / 3.6 - r.dryer_heater_duty_kWh) < 1e-6
+
+
+def test_the_latent_floor_ordering_survives_adverse_parameters():
+    """The ordering must be structural, so it has to survive values that broke the old model.
+
+    A 120 C inlet and a low outlet-to-ambient span used to make the dryer 'full duty' fall
+    below its own latent floor. Nothing about the registered placeholders may be load-bearing.
+    """
+    from gen.balance import run_scenario
+    scn = load_rows("scenarios")[0]
+    for t_in, t_out, t_amb in ((120, 60, 20), (90, 55, 20), (150, 25, 20), (200, 56, 55)):
+        params = load_params()
+        params["P-DRY-T-IN"]["value"] = str(t_in)
+        params["P-DRY-T-OUT"]["value"] = str(t_out)
+        params["P-DRY-T-AMBIENT"]["value"] = str(t_amb)
+        r = run_scenario(scn, params)
+        assert r.dryer_process_duty_MJ >= r.dryer_evap_duty_MJ, (t_in, t_out, t_amb)
+        assert r.dryer_heater_duty_MJ >= r.dryer_process_duty_MJ, (t_in, t_out, t_amb)
+
+
+def test_an_impossible_operating_point_raises_instead_of_clamping():
+    """An inverted temperature pair is a data error. It used to vanish into max(...,0) and
+    report a silent 0 MJ duty; it must raise, like any other bad input."""
+    import pytest
+    from gen.balance import run_scenario
+    scn = load_rows("scenarios")[0]
+    for pid, bad in (("P-DRY-T-IN", "40"),        # inlet below outlet
+                     ("P-DRY-T-AMBIENT", "90"),   # ambient above outlet
+                     ("P-EVAP-T-FEED", "90")):    # feed above the boiling point
+        params = load_params()
+        params[pid]["value"] = bad
+        with pytest.raises(ValueError):
+            run_scenario(scn, params)
+
+
+def test_the_base_case_actually_evaporates_something():
+    """`evap_water` is clamped at zero for a legitimate reason (UF may already exceed the
+    evaporator target), but that clamp can also absorb a wrong volume basis into a silent zero
+    duty. Assert the registered base case still has evaporation to do, so that cannot pass
+    unnoticed."""
+    for r in run_all():
+        assert r.evap_water_removed_L > 0, (
+            f"{r.scenario_id}: the evaporator removes no water, so its duty is silently zero; "
+            "check the volume basis rather than accepting the clamp"
+        )
 
 
 def test_blanking_a_thermal_constant_refuses():
-    """Every new energy-balance input obeys the blank-refusal rule: a gap raises, never
+    """Every energy-balance input obeys the blank-refusal rule: a gap raises, never
     silently defaults to a number (same invariant as P-H2O-LHV)."""
     import pytest
     from gen.balance import run_scenario
     scn = load_rows("scenarios")[0]
     for pid in ("P-CP-SOLN", "P-DRYGAS-CP", "P-EVAP-T-FEED", "P-EVAP-T-BOIL",
-                "P-DRY-T-IN", "P-DRY-T-OUT", "P-DRYGAS-RATIO", "P-HEAT-LOSS-FRAC"):
+                "P-DRY-T-IN", "P-DRY-T-OUT", "P-DRY-T-AMBIENT", "P-SOLN-DENSITY",
+                "P-HEAT-LOSS-FRAC"):
         params = load_params()
         params[pid]["value"] = ""
         with pytest.raises(ValueError):
