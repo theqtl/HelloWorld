@@ -81,7 +81,7 @@ def test_purity_floor_monotonic_and_bounded():
 
 def test_data_files_present():
     for name in ("parameters", "streams", "equipment", "buffers", "utilities",
-                 "risks", "questions", "sources", "scenarios"):
+                 "risks", "questions", "sources", "scenarios", "impurities"):
         assert load_rows(name), f"{name}.csv empty or missing"
 
 
@@ -360,6 +360,22 @@ def test_flowsheet_layout_is_deterministic():
     assert render() == render()
 
 
+def test_flowsheet_legend_describes_the_actual_styles():
+    """The legend claimed "Teal = product path" while the product arrows were currentColor, and
+    "red dashed = waste" while the waste lines carried no dash pattern - two of three claims
+    false. Inherited from the hand-drawn file, then carried into a GENERATED artifact under the
+    claim that it could no longer drift, so it is now checked against the emitted CSS."""
+    from gen.flowsheet import render
+    svg = render()
+    assert "Teal = product path" in svg and "red dashed = waste" in svg, "legend text changed"
+    flow = re.search(r"\.flow \{[^}]*\}", svg).group(0)
+    wflow = re.search(r"\.wflow \{[^}]*\}", svg).group(0)
+    uflow = re.search(r"\.uflow \{[^}]*\}", svg).group(0)
+    assert "#00897b" in flow, f"legend says teal, but .flow is {flow}"
+    assert "stroke-dasharray" in wflow, f"legend says red DASHED, but .wflow is {wflow}"
+    assert "stroke-dasharray" in uflow, f"legend says purple DASHED, but .uflow is {uflow}"
+
+
 def test_flowsheet_survives_a_non_product_stream(monkeypatch):
     """A utility/CIP stream must not take down the build.
 
@@ -459,7 +475,7 @@ def test_every_csv_row_has_the_right_number_of_fields():
 # figure, a vendor titre that existed nowhere, a concentration ceiling belonging to another
 # paper, a film thickness absent from both cited pages.
 _QUANTITY = re.compile(
-    r"(?<![\w.-])\d+(?:\.\d+)?\s?(?:%|percent|g/L|mg/mL|kDa|Da|kJ/kg|EU/mL|CFU|LMH|mM|°C|kWh)\b"
+    r"(?<![\w.-])\d+(?:\.\d+)?\s?(?:%|percent|g/L|mg/mL|kDa|Da|kJ/kg|EU/mL|CFU|LMH|mM|°C|kWh|MJ)\b"
 )
 _CITATION = re.compile(
     r"SRC-[A-Z0-9-]+|\bP-[A-Z0-9-]{3,}|\bEQ-[A-Z]+|\bQ-\d{3}|\bR-\d{3}"
@@ -479,8 +495,7 @@ def test_numeric_claims_in_prose_carry_a_citation():
         rel = os.path.relpath(path, ROOT)
         # Generated register pages carry their provenance in columns; the ADR is an
         # architecture argument, not a process claim.
-        if "/registers/" in rel or rel.endswith(("balance/results.md", "balance/impurities.md",
-                                                 "process/streams.md")):
+        if "/registers/" in rel or rel.endswith(("balance/results.md", "process/streams.md")):
             continue
         if "/adr/" in rel:
             continue
@@ -717,8 +732,15 @@ def test_md_table_emits_markdown_only():
     """The register tables are Markdown pipe tables (sorted/filtered client-side over the rendered
     HTML), never hand-emitted HTML. Locks in that decision so md_table cannot start emitting tags."""
     from gen.tables import md_table
-    out = md_table([{"a": "1", "b": "2"}, {"a": "3", "b": "4"}])
-    assert "<" not in out, "md_table must emit Markdown pipe tables, not HTML"
+    # Real register data legitimately contains "<< 1 kDa", "> 0.2 um", "<1 CFU/mL", so a bare
+    # "<" check only passed because it was fed hand-picked synthetic rows. Assert no HTML TAGS,
+    # and assert it against the actual data the generator runs on.
+    for name in ("parameters", "impurities", "streams", "sources"):
+        out = md_table(load_rows(name))
+        assert not re.search(r"<\s*/?\s*[a-zA-Z][^>]*>", out), (
+            f"md_table emitted an HTML tag for {name}.csv; it must emit Markdown pipe tables"
+        )
+        assert out.lstrip().startswith("|"), f"{name}.csv table is not a pipe table"
 
 
 def test_table_enhancers_are_registered():

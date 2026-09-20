@@ -170,18 +170,18 @@ def render():
                'class="bfd-svg" role="img" '
                'aria-label="Block flow diagram of the siRNA drug-substance process">')
     out.append('  <style>')
-    out.append('    .box { fill: none; stroke: #00897b; stroke-width: 2; rx: 6; }')
+    out.append('    .box { fill: none; stroke: #00897b; stroke-width: 2; }')
     out.append('    .util { fill: none; stroke: #8e24aa; stroke-width: 2; stroke-dasharray: 4 3; }')
     out.append('    .lbl { fill: currentColor; font: 600 13px sans-serif; }')
     out.append('    .sub { fill: currentColor; font: 400 10px sans-serif; opacity: 0.8; }')
     out.append('    .sid { fill: #00695c; font: 700 10px sans-serif; }')
     out.append('    .wid { fill: #c62828; font: 700 10px sans-serif; }')
-    out.append('    .flow { stroke: currentColor; stroke-width: 1.8; marker-end: url(#arrow); fill: none; }')
-    out.append('    .wflow { stroke: #c62828; stroke-width: 1.4; marker-end: url(#warr); fill: none; }')
+    out.append('    .flow { stroke: #00897b; stroke-width: 1.8; marker-end: url(#arrow); fill: none; }')
+    out.append('    .wflow { stroke: #c62828; stroke-width: 1.4; stroke-dasharray: 3 3; marker-end: url(#warr); fill: none; }')
     out.append('    .uflow { stroke: #8e24aa; stroke-width: 1.4; stroke-dasharray: 4 3; marker-end: url(#uarr); fill: none; }')
     out.append('  </style>')
     out.append('  <defs>')
-    out.append('    <marker id="arrow" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="currentColor"/></marker>')
+    out.append('    <marker id="arrow" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#00897b"/></marker>')
     out.append('    <marker id="warr" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#c62828"/></marker>')
     out.append('    <marker id="uarr" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#8e24aa"/></marker>')
     out.append('  </defs>')
@@ -224,7 +224,10 @@ def render():
         elif cls == "buffer":
             bcx = _x(buf_col.get(f, 0)) + BOX_W // 2
             tcx = _x(col.get(t, 0)) + BOX_W // 2
-            out.append(f'  <path class="uflow" d="M{bcx},{Y_BUF + BUF_H} V{BUS_Y} H{tcx} V{Y_MAIN}"/>')
+            if tcx == bcx:
+                out.append(f'  <path class="uflow" d="M{bcx},{Y_BUF + BUF_H} V{Y_MAIN}"/>')
+            else:
+                out.append(f'  <path class="uflow" d="M{bcx},{Y_BUF + BUF_H} V{BUS_Y} H{tcx} V{Y_MAIN}"/>')
             if tcx == bcx:
                 out.append(f'  <text class="sid" x="{bcx + 6}" y="{(Y_BUF + BUF_H + BUS_Y) // 2}">{sid}</text>')
             else:

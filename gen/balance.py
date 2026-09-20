@@ -223,7 +223,7 @@ def run_all():
     return [run_scenario(s, params) for s in scns]
 
 
-def purity_floor(block_full_length_pct=None, n_blocks=3):
+def purity_floor(block_full_length_pct=None, n_blocks=None):
     """Internal-limited full-length ceiling = product of per-block FL fractions.
 
     This is the purity that block-internal n-1 fixes and that no size-based
@@ -232,8 +232,16 @@ def purity_floor(block_full_length_pct=None, n_blocks=3):
     block_full_length_pct defaults to the registered P-BLOCK-PUR so the figure quoted in
     the documents and the figure used in code cannot drift apart.
     """
+    params = None
+    if block_full_length_pct is None or n_blocks is None:
+        params = load_params()
     if block_full_length_pct is None:
-        block_full_length_pct = _require(load_params(), "P-BLOCK-PUR")
+        block_full_length_pct = _require(params, "P-BLOCK-PUR")
+    if n_blocks is None:
+        # The block count is a registered design choice (P-N-BLOCKS), not a code default: it is
+        # the exponent of the purity floor, so a hardcoded 3 put the published full-length
+        # ceiling on an unregistered number with no provenance.
+        n_blocks = _require(params, "P-N-BLOCKS")
     f = block_full_length_pct / 100.0
     return (f ** n_blocks) * 100.0
 

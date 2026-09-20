@@ -94,9 +94,9 @@ all. That sensitivity is **computed, not transcribed**: see the *Where evaporati
 table on the [results page](results.md), which varies `P-EXCIP-FRAC-PRE-EVAP` and holds everything
 else at the current placeholders.
 
-(The figures used to be typed into this page by hand and had already drifted away from the model —
-claiming 66.2 L and 158.8 MJ against the model's own output. They are generated now, so they cannot
-drift again.)
+(The figures used to be typed into this page by hand, and had already drifted away from the model's
+own output before anyone noticed — no test could see it, because a hand-written number in prose is
+invisible to a data-layer check. They are generated now, so they cannot drift again.)
 
 With the evaporator outlet anchored just above the UF ceiling, evaporation carries only a modest duty
 in the base case and **none at all once excipient is added upstream** — the retentate already sits at
