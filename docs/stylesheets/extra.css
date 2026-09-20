@@ -16,3 +16,21 @@
 
 /* Diagram sizing */
 .bfd-svg { max-width: 100%; height: auto; }
+
+/* Client-side filter box injected above large register tables (tablefilter.js) */
+.md-typeset .table-filter {
+  display: block;
+  width: 100%;
+  max-width: 22rem;
+  margin: 0.4rem 0;
+  padding: 0.35rem 0.5rem;
+  font-size: 0.72rem;
+  border: 1px solid var(--md-default-fg-color--lighter);
+  border-radius: 4px;
+  background: var(--md-default-bg-color);
+  color: var(--md-default-fg-color);
+}
+.md-typeset .table-filter:focus {
+  outline: none;
+  border-color: var(--md-accent-fg-color);
+}

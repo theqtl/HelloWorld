@@ -6,8 +6,8 @@ from gen.balance import run_all, purity_floor
 
 def test_all_source_keys_resolve():
     sources = {r["source_key"] for r in load_rows("sources")}
-    # parameters and risks reference source_key; blanks allowed
-    for name in ("parameters", "risks"):
+    # parameters, risks and impurities reference source_key; blanks allowed
+    for name in ("parameters", "risks", "impurities"):
         for r in load_rows(name):
             key = (r.get("source_key") or "").strip()
             if key:
@@ -81,7 +81,7 @@ def test_purity_floor_monotonic_and_bounded():
 
 def test_data_files_present():
     for name in ("parameters", "streams", "equipment", "buffers", "utilities",
-                 "risks", "questions", "sources", "scenarios"):
+                 "risks", "questions", "sources", "scenarios", "impurities"):
         assert load_rows(name), f"{name}.csv empty or missing"
 
 
@@ -179,7 +179,7 @@ def test_every_question_reference_exists_in_every_csv():
     qids = {r["question_id"] for r in load_rows("questions")}
     offenders = []
     for name in ("parameters", "scenarios", "risks", "equipment", "buffers", "utilities",
-                 "streams", "sources"):
+                 "streams", "sources", "impurities"):
         for row in load_rows(name):
             for value in row.values():
                 for tok in re.findall(r"Q-\d{3}", value or ""):
@@ -227,6 +227,90 @@ def test_solids_close_between_evaporator_and_dryer():
         )
 
 
+def test_energy_duties_exceed_the_latent_minimum_by_construction():
+    """The latent minimum is a STRICT floor, and it must hold structurally - not because the
+    placeholder values happen to be large enough.
+
+    The previous version of this test asserted the same ordering for a dryer model that
+    contained no latent term at all, so it passed only while P-DRYGAS-RATIO was set high
+    enough (it failed below ~24, and a 120 C inlet broke it). The model now adds only
+    non-negative terms to the latent floor, and the heater duty is the process duty scaled by
+    (T_in - T_amb)/(T_in - T_out) >= 1, so both orderings are guaranteed by the arithmetic.
+    """
+    for r in run_all():
+        assert r.evap_feed_mass_kg > 0
+        assert r.evap_sensible_MJ >= 0
+        assert r.dryer_feed_sensible_MJ >= 0
+        assert r.drying_gas_kg > 0
+        assert r.evap_duty_full_MJ >= r.evap_duty_MJ
+        assert r.dryer_process_duty_MJ >= r.dryer_evap_duty_MJ
+        # the utility load is never below what the process needs
+        assert r.dryer_heater_duty_MJ >= r.dryer_process_duty_MJ
+        assert abs(r.evap_duty_full_MJ / 3.6 - r.evap_duty_full_kWh) < 1e-6
+        assert abs(r.dryer_process_duty_MJ / 3.6 - r.dryer_process_duty_kWh) < 1e-6
+        assert abs(r.dryer_heater_duty_MJ / 3.6 - r.dryer_heater_duty_kWh) < 1e-6
+
+
+def test_the_latent_floor_ordering_survives_adverse_parameters():
+    """The ordering must be structural, so it has to survive values that broke the old model.
+
+    A 120 C inlet and a low outlet-to-ambient span used to make the dryer 'full duty' fall
+    below its own latent floor. Nothing about the registered placeholders may be load-bearing.
+    """
+    from gen.balance import run_scenario
+    scn = load_rows("scenarios")[0]
+    for t_in, t_out, t_amb in ((120, 60, 20), (90, 55, 20), (150, 25, 20), (200, 56, 55)):
+        params = load_params()
+        params["P-DRY-T-IN"]["value"] = str(t_in)
+        params["P-DRY-T-OUT"]["value"] = str(t_out)
+        params["P-DRY-T-AMBIENT"]["value"] = str(t_amb)
+        r = run_scenario(scn, params)
+        assert r.dryer_process_duty_MJ >= r.dryer_evap_duty_MJ, (t_in, t_out, t_amb)
+        assert r.dryer_heater_duty_MJ >= r.dryer_process_duty_MJ, (t_in, t_out, t_amb)
+
+
+def test_an_impossible_operating_point_raises_instead_of_clamping():
+    """An inverted temperature pair is a data error. It used to vanish into max(...,0) and
+    report a silent 0 MJ duty; it must raise, like any other bad input."""
+    import pytest
+    from gen.balance import run_scenario
+    scn = load_rows("scenarios")[0]
+    for pid, bad in (("P-DRY-T-IN", "40"),        # inlet below outlet
+                     ("P-DRY-T-AMBIENT", "90"),   # ambient above outlet
+                     ("P-EVAP-T-FEED", "90")):    # feed above the boiling point
+        params = load_params()
+        params[pid]["value"] = bad
+        with pytest.raises(ValueError):
+            run_scenario(scn, params)
+
+
+def test_the_base_case_actually_evaporates_something():
+    """`evap_water` is clamped at zero for a legitimate reason (UF may already exceed the
+    evaporator target), but that clamp can also absorb a wrong volume basis into a silent zero
+    duty. Assert the registered base case still has evaporation to do, so that cannot pass
+    unnoticed."""
+    for r in run_all():
+        assert r.evap_water_removed_L > 0, (
+            f"{r.scenario_id}: the evaporator removes no water, so its duty is silently zero; "
+            "check the volume basis rather than accepting the clamp"
+        )
+
+
+def test_blanking_a_thermal_constant_refuses():
+    """Every energy-balance input obeys the blank-refusal rule: a gap raises, never
+    silently defaults to a number (same invariant as P-H2O-LHV)."""
+    import pytest
+    from gen.balance import run_scenario
+    scn = load_rows("scenarios")[0]
+    for pid in ("P-CP-SOLN", "P-DRYGAS-CP", "P-EVAP-T-FEED", "P-EVAP-T-BOIL",
+                "P-DRY-T-IN", "P-DRY-T-OUT", "P-DRY-T-AMBIENT", "P-SOLN-DENSITY",
+                "P-HEAT-LOSS-FRAC"):
+        params = load_params()
+        params[pid]["value"] = ""
+        with pytest.raises(ValueError):
+            run_scenario(scn, params)
+
+
 def test_balance_refuses_a_blank_required_input():
     """A gap must raise, never silently become a number. The latent-heat fallback broke this."""
     import pytest
@@ -254,6 +338,84 @@ def test_flowsheet_stream_ids_match_the_register():
     unknown = drawn - registered
     assert not missing, f"stream(s) in the register but absent from the flowsheet: {sorted(missing)}"
     assert not unknown, f"stream(s) drawn but not in the register: {sorted(unknown)}"
+
+
+def test_flowsheet_is_up_to_date():
+    """bfd.svg is generated from data/streams.csv; the committed file must match render().
+
+    CI runs the flowsheet drift tests against the committed SVG BEFORE gen.build
+    regenerates it, so a stale committed file would pass the drift check while showing
+    the wrong picture. This closes that gap: regenerate and commit after any data change.
+    """
+    from gen.flowsheet import render
+    committed = open(os.path.join(ROOT, "docs", "diagrams", "bfd.svg"), encoding="utf-8").read()
+    assert render() == committed, (
+        "docs/diagrams/bfd.svg is stale; run `python -m gen.build` and commit the result"
+    )
+
+
+def test_flowsheet_layout_is_deterministic():
+    """The generator must be a pure function of the data (no dict/order nondeterminism)."""
+    from gen.flowsheet import render
+    assert render() == render()
+
+
+def test_flowsheet_legend_describes_the_actual_styles():
+    """The legend claimed "Teal = product path" while the product arrows were currentColor, and
+    "red dashed = waste" while the waste lines carried no dash pattern - two of three claims
+    false. Inherited from the hand-drawn file, then carried into a GENERATED artifact under the
+    claim that it could no longer drift, so it is now checked against the emitted CSS."""
+    from gen.flowsheet import render
+    svg = render()
+    assert "Teal = product path" in svg and "red dashed = waste" in svg, "legend text changed"
+    flow = re.search(r"\.flow \{[^}]*\}", svg).group(0)
+    wflow = re.search(r"\.wflow \{[^}]*\}", svg).group(0)
+    uflow = re.search(r"\.uflow \{[^}]*\}", svg).group(0)
+    assert "#00897b" in flow, f"legend says teal, but .flow is {flow}"
+    assert "stroke-dasharray" in wflow, f"legend says red DASHED, but .wflow is {wflow}"
+    assert "stroke-dasharray" in uflow, f"legend says purple DASHED, but .uflow is {uflow}"
+
+
+def test_flowsheet_survives_a_non_product_stream(monkeypatch):
+    """A utility/CIP stream must not take down the build.
+
+    Adding one raised KeyError, because only PRODUCT-stream nodes had a column - so the first
+    CIP stream the contamination-control work adds would have broken `gen.build`, CI and the
+    whole site build at once.
+    """
+    from gen import flowsheet
+    extra = [
+        {"stream_id": "S13", "name": "CIP supply", "from_unit": "U00-BUF",
+         "to_unit": "U06-CIP", "stream_class": "utility", "phase": "aqueous",
+         "carries": "cleaning solution", "notes": ""},
+        {"stream_id": "S14", "name": "CIP return (waste)", "from_unit": "U06-CIP",
+         "to_unit": "WASTE", "stream_class": "waste", "phase": "aqueous",
+         "carries": "spent cleaning solution", "notes": ""},
+    ]
+    real = flowsheet.load_rows
+    monkeypatch.setattr(
+        flowsheet, "load_rows",
+        lambda name: (real(name) + extra) if name == "streams" else real(name),
+    )
+    svg = flowsheet.render()
+    assert "S13" in svg and "S14" in svg, "added streams were not drawn"
+    assert "U06" in svg, "the connected CIP unit was silently dropped from the diagram"
+
+
+def test_flowsheet_rejects_a_product_cycle():
+    """A recycle stream must raise, never yield garbage ranks.
+
+    The relaxation loop used to exit silently after N passes, and R-013 requires the
+    evaporator to recirculate, so a recycle stream is a foreseeable data change.
+    """
+    import pytest
+    from gen.flowsheet import _rank_product_nodes
+    cyclic = [
+        {"from_unit": "A", "to_unit": "B", "stream_class": "product"},
+        {"from_unit": "B", "to_unit": "A", "stream_class": "product"},
+    ]
+    with pytest.raises(ValueError):
+        _rank_product_nodes(cyclic)
 
 
 def test_flowsheet_units_resolve_to_equipment():
@@ -313,7 +475,7 @@ def test_every_csv_row_has_the_right_number_of_fields():
 # figure, a vendor titre that existed nowhere, a concentration ceiling belonging to another
 # paper, a film thickness absent from both cited pages.
 _QUANTITY = re.compile(
-    r"(?<![\w.-])\d+(?:\.\d+)?\s?(?:%|percent|g/L|mg/mL|kDa|Da|kJ/kg|EU/mL|CFU|LMH|mM|°C|kWh)\b"
+    r"(?<![\w.-])\d+(?:\.\d+)?\s?(?:%|percent|g/L|mg/mL|kDa|Da|kJ/kg|EU/mL|CFU|LMH|mM|°C|kWh|MJ)\b"
 )
 _CITATION = re.compile(
     r"SRC-[A-Z0-9-]+|\bP-[A-Z0-9-]{3,}|\bEQ-[A-Z]+|\bQ-\d{3}|\bR-\d{3}"
@@ -549,6 +711,142 @@ def test_read_sources_are_not_in_the_unread_census():
     )
 
 
+def test_hbel_stays_a_registered_gap():
+    """The health-based exposure limit is blocked on toxicology data that does not exist publicly,
+    so its value must stay BLANK and registered against an open question - never invented."""
+    params = load_params()
+    row = params.get("P-HBEL-DS")
+    assert row is not None, "P-HBEL-DS is not registered"
+    assert not (row.get("value") or "").strip(), "P-HBEL-DS must have no value (it is a registered gap)"
+    assert "Q-" in (row.get("notes") or ""), "P-HBEL-DS must reference an open question"
+
+
+def test_ccs_cites_the_hbel_method_source():
+    """The contamination-control section must cite the HBEL derivation method, not assert a number."""
+    text = open(os.path.join(ROOT, "docs", "process", "microbial.md"), encoding="utf-8").read()
+    assert "SRC-WHO-TRS1044" in text, "microbial CCS section must cite the HBEL method source"
+    assert "P-HBEL-DS" in text, "microbial CCS section must reference the HBEL gap parameter"
+
+
+def test_md_table_emits_markdown_only():
+    """The register tables are Markdown pipe tables (sorted/filtered client-side over the rendered
+    HTML), never hand-emitted HTML. Locks in that decision so md_table cannot start emitting tags."""
+    from gen.tables import md_table
+    # Real register data legitimately contains "<< 1 kDa", "> 0.2 um", "<1 CFU/mL", so a bare
+    # "<" check only passed because it was fed hand-picked synthetic rows. Assert no HTML TAGS,
+    # and assert it against the actual data the generator runs on.
+    for name in ("parameters", "impurities", "streams", "sources"):
+        out = md_table(load_rows(name))
+        assert not re.search(r"<\s*/?\s*[a-zA-Z][^>]*>", out), (
+            f"md_table emitted an HTML tag for {name}.csv; it must emit Markdown pipe tables"
+        )
+        assert out.lstrip().startswith("|"), f"{name}.csv table is not a pipe table"
+
+
+def test_table_enhancers_are_registered_and_anchored_outside_the_scroll_wrapper():
+    """The sort and filter enhancements must be wired in, AND the filter must be anchored outside
+    Material's horizontal scroll container.
+
+    The previous version of this test only grepped mkdocs.yml and called os.path.exists twice, so
+    it asserted no behaviour at all - it would have passed with an empty file, and it did pass
+    while the filter box was being injected INSIDE `div.md-typeset__scrollwrap`
+    (`overflow-x: auto`), where it scrolled out of view on the widest register tables. Verified in
+    headless Chromium; this guard keeps the anchoring from regressing to `t.parentNode`.
+
+    Browser check (not a pytest dependency - it needs a live port and a browser):
+        mkdocs build && (cd site && python3 -m http.server 8766 &)
+        $CHROME --headless --no-sandbox --virtual-time-budget=5000 \\
+                --dump-dom http://127.0.0.1:8766/registers/parameters/ > dom.html
+    then confirm a `.table-filter` exists and is NOT nested inside `.md-typeset__scrollwrap`.
+    Note the page must be served over HTTP: under file:// Material's JS does not run at all, so a
+    file-based check would falsely report the filter missing.
+    """
+    cfg = open(os.path.join(ROOT, "mkdocs.yml"), encoding="utf-8").read()
+    for asset in ("javascripts/tablesort.js", "javascripts/tablefilter.js"):
+        assert asset in cfg, f"{asset} is not registered in mkdocs.yml extra_javascript"
+        assert os.path.exists(os.path.join(ROOT, "docs", asset)), f"missing asset file {asset}"
+    js = open(os.path.join(ROOT, "docs", "javascripts", "tablefilter.js"), encoding="utf-8").read()
+    assert "md-typeset__scrollwrap" in js, (
+        "the filter must anchor on Material's scroll wrapper, or it lands inside the "
+        "horizontally-scrolling region and scrolls away on wide tables"
+    )
+    assert "t.parentNode.insertBefore" not in js, (
+        "inserting relative to the table puts the input inside the scroll wrapper"
+    )
+
+
+def test_impurity_classes_are_in_the_clearance_matrix():
+    """Every impurity class in the data table must appear in the prose clearance matrix, so the
+    numeric overlay and the qualitative matrix cannot drift apart."""
+    matrix = open(os.path.join(ROOT, "docs", "process", "filtration.md"), encoding="utf-8").read()
+    offenders = []
+    for r in load_rows("impurities"):
+        key = (r.get("matrix_key") or "").strip()
+        if key and key not in matrix:
+            offenders.append(f"{r['impurity_id']} ({key})")
+    assert not offenders, (
+        "impurity class(es) absent from the filtration clearance matrix: " + ", ".join(offenders)
+    )
+
+
+def test_unclearable_impurities_are_not_modelled_as_cleared():
+    """Physical fact (filtration finding 1): neither block-internal n-1 nor the adenylylated
+    dead-end can be removed by any filtration mode, so neither may be modelled as a downstream
+    separation.
+
+    AppN must NOT share the splint's model. The splint is genuinely absent by design (R-006);
+    suppressing AppN is a proposed reaction restaging that is not demonstrated for this process,
+    and the ATP requirement pulls against the concentration that suppresses it (Q-040). Rendering
+    both as "designed out" presented an open gap as a solved problem.
+    """
+    clearing = {"diafiltration", "particulate", "block_clearable"}
+    rows = {r["impurity_id"]: r for r in load_rows("impurities")}
+    assert rows["IMP-N1"]["clearance_model"] == "block_floor", \
+        "n-1 must be floored (block_floor), never modelled as cleared downstream"
+    assert rows["IMP-APPN"]["clearance_model"] == "controlled_at_reaction", \
+        "the adenylylated dead-end is suppressed at the reaction, and is NOT 'designed out'"
+    assert rows["IMP-APPN"]["clearance_model"] != rows["IMP-SPLINT"]["clearance_model"], \
+        "AppN and the splint are not the same kind of claim; see R-010 vs R-006"
+    for iid in ("IMP-N1", "IMP-APPN"):
+        assert rows[iid]["clearance_model"] not in clearing, f"{iid} modelled as cleared"
+
+
+def test_impurity_overlay_is_deterministic_and_scenario_free():
+    """Impurity fate is a fraction picture, independent of annual demand (Q-002): the overlay is a
+    pure function of the parameters, and no throughput-scenario label leaks into it."""
+    from gen.impurity import render
+    out = render()
+    assert out == render()
+    for label in ("Low (illustrative)", "Mid (illustrative)", "High (illustrative)"):
+        assert label not in out
+
+
+def test_equipment_turndown_is_populated_or_flagged():
+    """Turndown was a fully blank column in Tier 1 - a silent sizing stub. Every equipment
+    item must state a turndown basis, or register the gap against an open question (Q-...)."""
+    offenders = []
+    for r in load_rows("equipment"):
+        turndown = (r.get("turndown") or "").strip()
+        notes = r.get("notes") or ""
+        if not turndown and not re.search(r"Q-\d{3}", notes):
+            offenders.append(r["equip_id"])
+    assert not offenders, (
+        "equipment item(s) with a blank turndown and no open-question reference: "
+        + ", ".join(offenders)
+    )
+
+
+def test_equipment_moc_is_committed():
+    """Materials of construction must be a decided candidate for every item, never left blank."""
+    offenders = [
+        r["equip_id"] for r in load_rows("equipment")
+        if not (r.get("moc_candidate") or "").strip()
+    ]
+    assert not offenders, (
+        "equipment item(s) with no materials of construction committed: " + ", ".join(offenders)
+    )
+
+
 def test_no_residence_time_cites_a_batch_cycle_time_trap():
     """No page may state a residence time citing a source whose notes TRAP that figure as a
     batch cycle time (F-002). A window that cites such a source next to 'residence time' must
@@ -572,3 +870,38 @@ def test_no_residence_time_cites_a_batch_cycle_time_trap():
         "residence-time claim(s) citing a batch-cycle-time TRAP source without the correction: "
         + "; ".join(offenders)
     )
+
+
+def test_impurity_clearance_models_are_a_controlled_vocabulary():
+    """A typo in clearance_model must not fall through to a claimed "registered gap".
+
+    sources.csv already established this pattern (ACCESS_VOCAB); the impurity overlay's
+    catch-all return made a misspelling render as a confident statement about the process.
+    """
+    from gen.impurity import CLEARANCE_MODELS
+    offenders = [
+        f"{r['impurity_id']}: {r['clearance_model']!r}" for r in load_rows("impurities")
+        if r["clearance_model"] not in CLEARANCE_MODELS
+    ]
+    assert not offenders, (
+        f"clearance_model outside {sorted(CLEARANCE_MODELS)}: " + "; ".join(offenders)
+    )
+
+
+def test_impurity_gaps_carry_a_registered_reference():
+    """A gap must be shown as REGISTERED, so the reader can reach the register entry.
+
+    Three rows used to render "(see notes)" on a page that has no notes column, and they were
+    the only cells with no Q/R reference at all - so the page's own claim to show "registered
+    gaps" was not delivered.
+    """
+    from gen.impurity import render
+    out = render()
+    assert "see notes" not in out, "the impurity page still points at a notes column it lacks"
+    for r in load_rows("impurities"):
+        if r["clearance_model"] in ("gap", "controlled_at_reaction"):
+            ref = (r.get("gap_ref") or "").strip()
+            assert re.fullmatch(r"[QR]-\d{3}", ref), (
+                f"{r['impurity_id']} is a gap but its gap_ref is {ref!r}"
+            )
+            assert ref in out, f"{r['impurity_id']}'s registered reference {ref} is not rendered"

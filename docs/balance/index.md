@@ -43,12 +43,25 @@ The [results page](results.md) is generated from it; change the CSV inputs, run
 2. **API required at ligation** = DS API per campaign ÷ \(Y\).
 3. **Volumes** at each stage from the stage concentration: ligation at `P-CONC-LIG`,
    UF retentate at `P-CONC-UF`, evaporator outlet at `P-CONC-EVAP`, dryer feed solids at
-   `P-CONC-DRYFEED`.
+   `P-CONC-DRYFEED`. The retentate is sized on the API that **survives** UF/DF, not on the API
+   entering it — sizing it on the inlet described a volume that never exists in the process and
+   overstated the evaporator feed and duty by \(1/Y_\text{UF/DF}\).
 4. **Diafiltration buffer** = diavolumes × UF retentate volume (dominant clean-water and aqueous-waste driver).
-5. **Water removed in evaporation** = UF volume − evaporator outlet volume.
+5. **Water removed in evaporation** = retentate volume − evaporator outlet volume. If ultrafiltration
+   already meets the evaporator target this is zero, the unit is bypassed, and it carries no duty.
 6. **Dryer water** = dryer feed mass − solids (API + excipient).
-7. **Thermal duty** = mass of water removed × latent heat (`P-H2O-LHV`). This is the
-   latent-heat **minimum**; the real duty adds sensible heat, gas heating, and losses (Tier-2).
+7. **Thermal duty** (`EQ-ENERGY`). The **latent-heat minimum** — mass of water removed × latent heat
+   (`P-H2O-LHV`) — is reported as a strict floor, and every term added to it is non-negative, so that
+   ordering holds by construction rather than by luck with the placeholders. The **evaporator** raises
+   the feed *mass* (volume × `P-SOLN-DENSITY`) from `P-EVAP-T-FEED` to the vacuum boiling point
+   `P-EVAP-T-BOIL` at `P-CP-SOLN`, then evaporates, plus one `P-HEAT-LOSS-FRAC` uplift. The **dryer**
+   reports **two different quantities**: the *process* duty (evaporate the water, raise the feed to
+   `P-DRY-T-OUT`, plus losses) and the *heater* duty, which is the utility load — inlet gas heated from
+   `P-DRY-T-AMBIENT` to `P-DRY-T-IN`, exactly what `UT-DRYGAS` is. The drying-gas mass is **derived**
+   from the process duty, not assumed, so no gas:water ratio is carried and nothing is tuned. An
+   impossible operating point (inlet below outlet, ambient above outlet) **raises** rather than
+   reporting a silent zero. Temperatures and the density are assumptions (Q-045, Q-046); MVR recovers
+   most of the evaporator latent load.
 
 !!! warning "Conversion is not yield"
     Per-ligation conversion and overall mass yield are **different quantities, an order of magnitude
@@ -77,29 +90,24 @@ Questions Q-017/Q-018/Q-019 hold the real limits.
 ## Where evaporation earns its place
 
 The excipient decision is not a detail — it largely decides whether there is any evaporation duty at
-all. Holding everything else at the current placeholders and varying only that one input:
+all. That sensitivity is **computed, not transcribed**: see the *Where evaporation earns its place*
+table on the [results page](results.md), which varies `P-EXCIP-FRAC-PRE-EVAP` and holds everything
+else at the current placeholders.
 
-| Excipient in solution at the evaporator | Evaporator outlet solids (kg) | Water removed (L) | Duty (MJ) |
-|---|---|---|---|
-| none (base case, added after evaporation) | 34.0 | 66.2 | 158.8 |
-| half | 51.0 | 0.0 | 0.0 |
-| all (added at final diafiltration) | 68.0 | 0.0 | 0.0 |
+(The figures used to be typed into this page by hand, and had already drifted away from the model's
+own output before anyone noticed — no test could see it, because a hand-written number in prose is
+invisible to a data-layer check. They are generated now, so they cannot drift again.)
 
-*(Per campaign, scenario S1. Figures regenerate from the data layer; the inputs are illustrative
-assumptions, not validated values.)*
-
-With the evaporator outlet now anchored just above the UF ceiling, evaporation carries a modest duty
+With the evaporator outlet anchored just above the UF ceiling, evaporation carries only a modest duty
 in the base case and **none at all once excipient is added upstream** — the retentate already sits at
-or above the evaporator target, so there is nothing to remove. That is the concentration-cascade point
-made concrete: whether evaporation earns its place is decided by resolving Q-017 (how far UF
-concentrates), Q-018 (the real evaporator ceiling) and Q-038 (where excipient enters), not by
-arithmetic on placeholders. Evaporation is a fixed decision for this train, so the question is not
-*whether* it happens but *where it earns its place*.
+or above the evaporator target, so there is nothing to remove and the unit is bypassed. That is the
+concentration-cascade point made concrete: whether evaporation earns its place is decided by resolving
+Q-017 (how far UF concentrates), Q-018 (the real evaporator ceiling) and Q-038 (where excipient
+enters), not by arithmetic on placeholders. Evaporation is a fixed decision for this train, so the
+question is not *whether* it happens but *where it earns its place*.
 
 ## What the balance does not yet do
 
-- Species-resolved impurity tracking (n-1, partials) per stream — Tier 2.
-- Full energy balance with sensible heat and gas loads — Tier 2.
 - Buffer salt mass carried into the powder — depends on the final-matrix design (R-005).
 
 See the [generated results](results.md).

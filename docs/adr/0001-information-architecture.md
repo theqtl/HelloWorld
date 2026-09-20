@@ -68,8 +68,9 @@ MDX parser treats `{` and `<` as syntax, and this content is saturated with `2'-
 
 ## Consequences
 
-Two requirements are **not** met today, and both are orthogonal to the choice of site generator,
-which is the decisive argument against migrating to fix them:
+At the time of this decision two requirements were **not** met, and both were orthogonal to the
+choice of site generator, which is the decisive argument against migrating to fix them. The dated
+update below records what has since closed and what has not:
 
 - **Filterable tables.** The register tables sort but do not filter. This is survivable at today's
   sizes and will not be at Tier 2 sizes. The fix is to emit semantic HTML from `gen/tables.py` and
@@ -83,6 +84,29 @@ A third weakness is structural: the flowsheet is drawn by hand while `data/strea
 holds the topology as an edge list. It is the one artifact that escaped the single-source discipline,
 and it silently lost its product-outlet arrow as a result. A drift test now guards it; generating it
 from the data is the real fix.
+
+### Update — Tier 2, 2026-09-20
+
+Two of the three are closed, and neither needed a different site generator, which is the prediction
+above holding.
+
+- **Filterable tables — met, by a different route than the one proposed.** The fix above assumed
+  `gen/tables.py` would emit semantic HTML. It does not, deliberately: it still emits Markdown pipe
+  tables, and a test asserts the generator emits no HTML tags, which keeps its output diffable and
+  keeps the registers readable on GitHub. The filter is instead progressive enhancement over the
+  rendered table (`docs/javascripts/tablefilter.js`), bound to Material's `document$` so it survives
+  instant navigation, and anchored outside Material's horizontal scroll wrapper — inside it, the
+  control scrolled out of view on exactly the widest registers. Register pages always get a filter;
+  elsewhere only tables large enough to need one, because a row count alone does not make a table a
+  register.
+- **Hand-drawn flowsheet — closed as proposed.** `gen/flowsheet.py` now derives
+  `docs/diagrams/bfd.svg` from the `data/streams.csv` edge list and the equipment register, so the
+  last artifact outside the single-source discipline is inside it. The drift test now guards a
+  generated file rather than a hand-maintained one.
+- **Contribution without git — still open.** Unchanged. There is no edit affordance, and a non-git
+  reader who edits a generated register page is editing a git-ignored build artifact that the next
+  build overwrites. The fix remains an edit action plus structured issue forms mirroring the CSV
+  columns, and ultimately a controlled workbook that opens a pull request.
 
 ## What would reverse this decision
 

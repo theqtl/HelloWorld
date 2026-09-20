@@ -8,9 +8,11 @@ generated: edit data/*.csv, not the generated Markdown.
 import os
 from dataclasses import asdict
 
-from .dataio import load_rows
+from .dataio import load_rows, load_params
 from .tables import md_table
 from .balance import run_all
+from .flowsheet import render as render_flowsheet
+from .impurity import render as render_impurities
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DOCS = os.path.join(ROOT, "docs")
@@ -74,6 +76,34 @@ def _fmt(v):
     return f"{v:,.1f}" if isinstance(v, float) else str(v)
 
 
+def _excipient_sensitivity():
+    """Evaporator duty as a function of WHERE the excipient enters (Q-038).
+
+    This was a hand-written table in docs/balance/index.md and had already drifted from the
+    model (it claimed 66.2 L / 158.8 MJ against the model's own figures). Generated here so it
+    cannot drift again - the exact defect class the data layer exists to prevent.
+    """
+    from .balance import run_scenario
+    params = load_params()
+    scn = load_rows("scenarios")[0]
+    cases = ((0.0, "none (base case, added after evaporation)"),
+             (0.5, "half"),
+             (1.0, "all (added at final diafiltration)"))
+    rows = []
+    for frac, label in cases:
+        p = {k: dict(v) for k, v in params.items()}
+        p["P-EXCIP-FRAC-PRE-EVAP"]["value"] = str(frac)
+        r = run_scenario(scn, p)
+        rows.append({
+            "Excipient in solution at the evaporator": label,
+            "Evaporator outlet solids (kg)": _fmt(r.evap_outlet_solids_kg),
+            "Water removed (L)": _fmt(r.evap_water_removed_L),
+            "Latent minimum (MJ)": _fmt(r.evap_duty_MJ),
+            "Full duty (MJ)": _fmt(r.evap_duty_full_MJ),
+        })
+    return scn["label"], rows
+
+
 def gen_balance():
     results = [asdict(r) for r in run_all()]
     body = BANNER + "# Mass & energy balance (results)\n\n"
@@ -101,10 +131,17 @@ def gen_balance():
         ("evap_outlet_solids_kg", "Evaporator outlet total solids (kg)"),
         ("dryer_feed_mass_kg", "Spray-dryer feed (kg)"),
         ("dryer_water_evaporated_kg", "Dryer water evaporated (kg)"),
+        ("drying_gas_kg", "Drying gas required, derived (kg)"),
         ("wfi_approx_L", "Clean water demand approx (L)"),
         ("aqueous_waste_approx_L", "Aqueous waste approx (L)"),
-        ("evap_duty_MJ", "Evaporation duty (MJ)"),
-        ("dryer_evap_duty_MJ", "Dryer evaporation duty (MJ)"),
+        ("evap_duty_MJ", "Evaporation duty, latent minimum (MJ)"),
+        ("evap_feed_mass_kg", "Evaporator feed mass (kg)"),
+        ("evap_sensible_MJ", "Evaporation sensible heat (MJ)"),
+        ("evap_duty_full_MJ", "Evaporation full duty, sensible+latent+loss (MJ)"),
+        ("dryer_evap_duty_MJ", "Dryer duty, latent minimum (MJ)"),
+        ("dryer_feed_sensible_MJ", "Dryer feed sensible heat (MJ)"),
+        ("dryer_process_duty_MJ", "Dryer process duty, what drying requires (MJ)"),
+        ("dryer_heater_duty_MJ", "Dryer heater duty, inlet gas from ambient (MJ)"),
     ]
     header = ["Quantity"] + [r["label"] for r in results]
     lines = ["| " + " | ".join(header) + " |",
@@ -113,9 +150,29 @@ def gen_balance():
         row = [label] + [_fmt(r[k]) for r in results]
         lines.append("| " + " | ".join(row) + " |")
     body += "\n".join(lines) + "\n\n"
-    body += ("All quantities are per campaign unless labelled per year. Duties are the "
-             "latent-heat minimum (mass of water removed × latent heat); real evaporator and "
-             "dryer duties add sensible heat, gas heating, and losses (Tier-2 energy balance).\n\n"
+    body += ("All quantities are per campaign unless labelled per year. Each unit reports the "
+             "latent-heat **minimum** (mass of water removed × latent heat) as a strict floor, and "
+             "then what is actually required. The evaporator adds sensible heat to raise the feed "
+             "**mass** to its vacuum boiling point, plus one loss uplift (`P-SOLN-DENSITY`, "
+             "`P-CP-SOLN`, `P-EVAP-T-FEED`, `P-EVAP-T-BOIL`, `P-HEAT-LOSS-FRAC`). The dryer reports "
+             "**two different things**: the *process* duty, what drying requires (evaporate the "
+             "water, raise the feed to the outlet temperature, plus losses), and the *heater* duty, "
+             "the utility load — inlet gas heated from ambient, which is what `UT-DRYGAS` is "
+             "(`P-DRYGAS-CP`, `P-DRY-T-IN`, `P-DRY-T-OUT`, `P-DRY-T-AMBIENT`). The drying-gas mass "
+             "is **derived** from the process duty rather than assumed, so no gas:water ratio is "
+             "carried. Operating temperatures are assumptions (Q-045, Q-046); MVR recovers most of "
+             "the evaporator's latent load as recompressed vapour.\n\n")
+
+    label, sens = _excipient_sensitivity()
+    body += ("## Where evaporation earns its place\n\n"
+             "Holding everything else at the current placeholders and varying only where the "
+             f"excipient enters (Q-038), for scenario **{label}**:\n\n")
+    body += md_table(sens)
+    body += ("\nOnce the excipient load is present upstream the retentate already sits at or above "
+             "the evaporator target, so there is nothing left to remove and the duty goes to zero. "
+             "Whether evaporation earns its place is therefore decided by resolving Q-017 (how far "
+             "UF concentrates), Q-018 (the real evaporator ceiling) and Q-038 (where excipient "
+             "enters) — not by arithmetic on placeholders.\n\n"
              "Concentrations up to and including ultrafiltration are on an siRNA basis; the "
              "evaporator outlet is on a total dissolved solids basis. How much excipient is in "
              "solution at the evaporator is an open process choice (`P-EXCIP-FRAC-PRE-EVAP`, "
@@ -129,6 +186,8 @@ def main():
     written += gen_registers()
     written.append(gen_streams_on_process())
     written.append(gen_balance())
+    written.append(_write("balance/impurities.md", render_impurities()))
+    written.append(_write("diagrams/bfd.svg", render_flowsheet()))
     print("Generated:")
     for w in written:
         print("  docs/" + w)

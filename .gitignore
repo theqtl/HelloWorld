@@ -13,6 +13,7 @@ docs/registers/questions.md
 docs/registers/sources.md
 docs/process/streams.md
 docs/balance/results.md
+docs/balance/impurities.md
 
 # Python
 __pycache__/

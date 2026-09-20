@@ -95,9 +95,30 @@ measured nuclease carried by process bioburden in a hold vessel, for any modalit
 half closed — modification does not, on this evidence, make aggressive nuclease control demonstrably
 unnecessary in a manufacturing hold. Right-size against this, do not over- or under-engineer.
 
-## Hard-to-clean equipment
+## Contamination control, CIP/SIP and cleaning validation
 
-The evaporator and spray dryer are hard to clean (wall deposits, cyclone product). CIP/SIP design
-and cleaning validation for low-bioburden operation are Tier-2 and flagged as risk R-008; a
-**health-based exposure limit** for cleaning validation of this shared equipment does not yet exist in
-the registers (risk R-015). Single-use contact is worth evaluating where feasible.
+The whole train is shared, aqueous equipment run for low bioburden, so a **contamination-control
+strategy (CCS)** has to be built from this process's own risk rather than inherited from the modality
+(R-020). It spans the levers above — bioburden-reduction filtration into sanitised vessels, controlled
+hold times (R-009, Q-043), endotoxin-controlled water and reagents (see [utilities](../registers/utilities.md)),
+and a dose-derived endotoxin specification on the drug substance — plus the cleaning of shared
+product-contact surfaces between campaigns.
+
+**CIP/SIP.** The evaporator and spray dryer are the hardest-to-clean items — wall deposits on the
+falling film, product in the cyclone and receiver — so they set the clean-in-place/steam-in-place
+design (risk R-008). CIP loops must reach every product-contact surface at adequate coverage and
+velocity; where a surface cannot be cleaned to a defensible limit, single-use contact is the fallback
+and is worth evaluating item by item. The CIP/SIP system is registered as `U06-CIP` in the
+[equipment register](../registers/equipment.md); its connectivity to each vessel is a P&ID (Tier-3)
+detail rather than a block-flow stream, which is why it does not appear on the flowsheet.
+
+**Cleaning validation needs a health-based exposure limit, and there is not one yet.** Cleaning
+validation is judged against a **health-based exposure limit (HBEL)**: a permitted daily exposure (PDE)
+is derived from toxicology data, then carried into a maximum allowable carryover and per-swab and
+per-rinse acceptance limits (`P-HBEL-DS`, method after
+[SRC-WHO-TRS1044](../registers/sources.md)). **The HBEL value is left blank** against Q-047 rather than
+invented: a PDE cannot be derived without toxicology data, which does not exist in the public record
+for this molecule. That gap is **independent of annual demand (Q-002)** — it is blocked on data, not on
+scale — and it is a named technology-transfer deliverable (risk R-015). Until it exists, cleaning
+acceptance limits for the shared evaporator and dryer cannot be set, so it is a prerequisite for
+qualifying that equipment, not a detail to defer.
