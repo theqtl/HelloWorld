@@ -303,6 +303,48 @@ def test_flowsheet_layout_is_deterministic():
     assert render() == render()
 
 
+def test_flowsheet_survives_a_non_product_stream(monkeypatch):
+    """A utility/CIP stream must not take down the build.
+
+    Adding one raised KeyError, because only PRODUCT-stream nodes had a column - so the first
+    CIP stream the contamination-control work adds would have broken `gen.build`, CI and the
+    whole site build at once.
+    """
+    from gen import flowsheet
+    extra = [
+        {"stream_id": "S13", "name": "CIP supply", "from_unit": "U00-BUF",
+         "to_unit": "U06-CIP", "stream_class": "utility", "phase": "aqueous",
+         "carries": "cleaning solution", "notes": ""},
+        {"stream_id": "S14", "name": "CIP return (waste)", "from_unit": "U06-CIP",
+         "to_unit": "WASTE", "stream_class": "waste", "phase": "aqueous",
+         "carries": "spent cleaning solution", "notes": ""},
+    ]
+    real = flowsheet.load_rows
+    monkeypatch.setattr(
+        flowsheet, "load_rows",
+        lambda name: (real(name) + extra) if name == "streams" else real(name),
+    )
+    svg = flowsheet.render()
+    assert "S13" in svg and "S14" in svg, "added streams were not drawn"
+    assert "U06" in svg, "the connected CIP unit was silently dropped from the diagram"
+
+
+def test_flowsheet_rejects_a_product_cycle():
+    """A recycle stream must raise, never yield garbage ranks.
+
+    The relaxation loop used to exit silently after N passes, and R-013 requires the
+    evaporator to recirculate, so a recycle stream is a foreseeable data change.
+    """
+    import pytest
+    from gen.flowsheet import _rank_product_nodes
+    cyclic = [
+        {"from_unit": "A", "to_unit": "B", "stream_class": "product"},
+        {"from_unit": "B", "to_unit": "A", "stream_class": "product"},
+    ]
+    with pytest.raises(ValueError):
+        _rank_product_nodes(cyclic)
+
+
 def test_flowsheet_units_resolve_to_equipment():
     """Every from_unit/to_unit must be a real equipment id or a declared boundary sentinel."""
     sentinels = {"SUPPLY", "WASTE", "DS-STORE"}

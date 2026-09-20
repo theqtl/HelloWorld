@@ -1,14 +1,18 @@
 """Generate the block-flow diagram docs/diagrams/bfd.svg from data/streams.csv.
 
-The flowsheet is DERIVED from the stream edge list (data/streams.csv) and the
-equipment register (data/equipment.csv), so it cannot silently drift from the data
-- the defect that lost the product-outlet arrow in Tier 1. Layout is deterministic:
-process units are ranked by longest path along the PRODUCT streams (x); a
-buffer/utility unit (one whose every outgoing stream is a buffer) sits in a top row
-and feeds down; streams to the WASTE sink drop to a bottom stub. The same data always
-renders byte-identical SVG, which a test enforces against the committed file.
+The flowsheet is DERIVED from the stream edge list (data/streams.csv) and the equipment
+register (data/equipment.csv), so it cannot silently drift from the data - the defect that
+lost the product-outlet arrow in Tier 1.
 
-`render()` returns the SVG string; gen/build.py writes it. Do not hand-edit bfd.svg -
+Layout is deterministic. Process units are ranked by longest path along the PRODUCT streams,
+which fixes the x column of the product spine. Every OTHER node touched by a stream then
+inherits a column from its ranked neighbours, so a utility or cleaning stream can be added to
+the data without the generator failing. Rows are assigned by role: the product spine in the
+middle, buffer/utility feeds in a top bus, auxiliary units (anything connected but off the
+product path, e.g. a CIP skid) in a lower row, and streams to the WASTE sink as bottom stubs.
+
+The same data always renders byte-identical SVG, which a test enforces against the committed
+file. `render()` returns the SVG string; gen/build.py writes it. Do not hand-edit bfd.svg -
 edit data/streams.csv (and data/equipment.csv) and run `python -m gen.build`.
 """
 from .dataio import load_rows
@@ -22,8 +26,9 @@ BOX_W, BOX_H = 120, 60
 Y_MAIN = 180            # top of the process-row boxes
 CY = Y_MAIN + BOX_H // 2
 Y_BUF, BUF_H, BUF_W = 30, 46, 140
-BUS_Y = 150            # horizontal bus that buffer feeds run along
-WASTE_Y = 300          # where waste stubs end
+Y_AUX = 330             # auxiliary row: connected units off the product path
+BUS_Y = 150             # horizontal bus that buffer feeds run along
+WASTE_Y = 300           # where waste stubs end
 VIEW_W, VIEW_H = 1160, 460
 
 # Short display labels; fall back to the equipment name / id for anything unmapped.
@@ -44,24 +49,61 @@ UNIT_SUBLABELS = {
 
 
 def _rank_product_nodes(streams):
-    """Longest-path rank of each node along PRODUCT streams -> its x column index."""
+    """Longest-path rank of each node along PRODUCT streams -> its x column index.
+
+    Raises on a cycle rather than returning garbage ranks: the layout needs a DAG, and a
+    recycle stream (R-013 requires evaporator recirculation) is a foreseeable data change.
+    """
     edges = [(r["from_unit"], r["to_unit"]) for r in streams
              if r["stream_class"] == "product"]
     nodes = {n for e in edges for n in e}
     rank = {n: 0 for n in nodes}
-    for _ in range(len(nodes)):          # relax; a DAG settles in <= |nodes| passes
+    for _ in range(len(nodes) + 1):      # a DAG settles in <= |nodes| passes
         changed = False
         for f, t in edges:
             if rank[t] < rank[f] + 1:
                 rank[t] = rank[f] + 1
                 changed = True
         if not changed:
+            return rank
+    raise ValueError(
+        "product streams contain a cycle, so the flowsheet has no longest-path layout; "
+        "model a recycle as a separate stream class or split the unit"
+    )
+
+
+def _columns(streams, rank):
+    """A column index for EVERY node touched by a stream, not just the product-ranked ones.
+
+    Product ranks are authoritative; anything else (a buffer skid, a CIP system, a utility
+    sink) inherits a column from its nearest ranked neighbour. Without this an added
+    utility stream raised KeyError and took down the whole build.
+    """
+    col = dict(rank)
+    touched = {r[k] for r in streams for k in ("from_unit", "to_unit")}
+    for _ in range(len(touched) + 1):
+        changed = False
+        for r in streams:
+            f, t = r["from_unit"], r["to_unit"]
+            if f in col and t not in col:
+                col[t] = col[f] + 1
+                changed = True
+            elif t in col and f not in col:
+                col[f] = max(col[t] - 1, 0)
+                changed = True
+        if not changed:
             break
-    return rank
+    unplaced = sorted(touched - set(col))
+    if unplaced:
+        raise ValueError(
+            "stream endpoint(s) with no path to the product spine, so no column can be "
+            f"derived: {unplaced}; connect them or give them a product stream"
+        )
+    return col
 
 
-def _x(rank):
-    return MARGIN_X + rank * PITCH
+def _x(col):
+    return MARGIN_X + col * PITCH
 
 
 def _label(unit, equip):
@@ -77,10 +119,22 @@ def _label(unit, equip):
     return main, sub
 
 
+def _box(out, unit, x, y, w, h, equip, util=False):
+    cx = x + w // 2
+    main, sub = _label(unit, equip)
+    cls = "util" if util else "box"
+    dy1, dy2 = (20, 36) if util else (27, 43)
+    out.append(f'  <rect class="{cls}" x="{x}" y="{y}" width="{w}" height="{h}" rx="6"/>')
+    out.append(f'  <text class="lbl" x="{cx}" y="{y + dy1}" text-anchor="middle">{main}</text>')
+    if sub:
+        out.append(f'  <text class="sub" x="{cx}" y="{y + dy2}" text-anchor="middle">{sub}</text>')
+
+
 def render():
     streams = load_rows("streams")
     equip = {r["equip_id"]: r for r in load_rows("equipment")}
     rank = _rank_product_nodes(streams)
+    col = _columns(streams, rank)
 
     # Buffer/utility node: equipment whose every outgoing stream is a buffer.
     out_classes = {}
@@ -91,8 +145,23 @@ def render():
     )
     buf_col = {}
     for b in buffer_nodes:
-        targets = [rank.get(r["to_unit"], 0) for r in streams if r["from_unit"] == b]
+        targets = [col.get(r["to_unit"], 0) for r in streams if r["from_unit"] == b]
         buf_col[b] = min(targets) if targets else 0
+
+    # Auxiliary nodes: connected, but off the product path and not a buffer feed. WASTE is a
+    # sink drawn as stubs, never as a box.
+    touched = {r[k] for r in streams for k in ("from_unit", "to_unit")}
+    aux_nodes = sorted(touched - set(rank) - set(buffer_nodes) - {"WASTE"})
+
+    # Row (box top y) and width per drawn node, so edge routing is role-agnostic.
+    geom = {}
+    for n in rank:
+        geom[n] = (_x(col[n]), Y_MAIN, BOX_W, BOX_H)
+    for b in buffer_nodes:
+        bx = _x(buf_col[b]) + BOX_W // 2 - BUF_W // 2
+        geom[b] = (bx, Y_BUF, BUF_W, BUF_H)
+    for a in aux_nodes:
+        geom[a] = (_x(col[a]), Y_AUX, BOX_W, BOX_H)
 
     out = []
     out.append('<!-- GENERATED by gen/flowsheet.py from data/streams.csv - do not edit '
@@ -119,23 +188,18 @@ def render():
 
     # Process-row boxes (product-ranked nodes), left to right.
     for n in sorted(rank, key=lambda n: (rank[n], n)):
-        x = _x(rank[n])
-        cx = x + BOX_W // 2
-        main, sub = _label(n, equip)
-        out.append(f'  <rect class="box" x="{x}" y="{Y_MAIN}" width="{BOX_W}" height="{BOX_H}" rx="6"/>')
-        out.append(f'  <text class="lbl" x="{cx}" y="{Y_MAIN + 27}" text-anchor="middle">{main}</text>')
-        if sub:
-            out.append(f'  <text class="sub" x="{cx}" y="{Y_MAIN + 43}" text-anchor="middle">{sub}</text>')
+        x, y, w, h = geom[n]
+        _box(out, n, x, y, w, h, equip)
 
     # Buffer/utility boxes (top row).
     for b in buffer_nodes:
-        cx = _x(buf_col[b]) + BOX_W // 2
-        bx = cx - BUF_W // 2
-        main, sub = _label(b, equip)
-        out.append(f'  <rect class="util" x="{bx}" y="{Y_BUF}" width="{BUF_W}" height="{BUF_H}" rx="6"/>')
-        out.append(f'  <text class="lbl" x="{cx}" y="{Y_BUF + 20}" text-anchor="middle">{main}</text>')
-        if sub:
-            out.append(f'  <text class="sub" x="{cx}" y="{Y_BUF + 36}" text-anchor="middle">{sub}</text>')
+        x, y, w, h = geom[b]
+        _box(out, b, x, y, w, h, equip, util=True)
+
+    # Auxiliary boxes (lower row): connected units off the product path.
+    for a in aux_nodes:
+        x, y, w, h = geom[a]
+        _box(out, a, x, y, w, h, equip, util=True)
 
     # Edges, grouped by (from, to) so parallel streams share one arrow (e.g. S01/S02).
     order, grouped = [], {}
@@ -151,24 +215,35 @@ def render():
         sid = "/".join(r["stream_id"] for r in rows)
         cls = rows[0]["stream_class"]
         if t == "WASTE":
-            scx = _x(rank[f]) + BOX_W // 2
+            fx, fy, fw, fh = geom[f]
+            scx = fx + fw // 2
             name = rows[0]["name"].replace("(waste)", "").strip()
             tag = name.split()[-1] if name.split() else ""
-            out.append(f'  <path class="wflow" d="M{scx},{Y_MAIN + BOX_H} V{WASTE_Y}"/>')
-            out.append(f'  <text class="wid" x="{scx + 6}" y="{(Y_MAIN + BOX_H + WASTE_Y) // 2}">{sid} {tag}</text>')
+            out.append(f'  <path class="wflow" d="M{scx},{fy + fh} V{WASTE_Y}"/>')
+            out.append(f'  <text class="wid" x="{scx + 6}" y="{(fy + fh + WASTE_Y) // 2}">{sid} {tag}</text>')
         elif cls == "buffer":
             bcx = _x(buf_col.get(f, 0)) + BOX_W // 2
-            tcx = _x(rank.get(t, 0)) + BOX_W // 2
+            tcx = _x(col.get(t, 0)) + BOX_W // 2
             out.append(f'  <path class="uflow" d="M{bcx},{Y_BUF + BUF_H} V{BUS_Y} H{tcx} V{Y_MAIN}"/>')
             if tcx == bcx:
                 out.append(f'  <text class="sid" x="{bcx + 6}" y="{(Y_BUF + BUF_H + BUS_Y) // 2}">{sid}</text>')
             else:
                 out.append(f'  <text class="sid" x="{(bcx + tcx) // 2}" y="{BUS_Y - 4}">{sid}</text>')
         else:
-            fx = _x(rank[f]) + BOX_W
-            tx = _x(rank[t])
-            out.append(f'  <path class="flow" d="M{fx},{CY} L{tx},{CY}"/>')
-            out.append(f'  <text class="sid" x="{fx + 6}" y="{CY - 7}">{sid}</text>')
+            fx, fy, fw, fh = geom[f]
+            tx, ty, tw, th = geom[t]
+            if fy == ty:
+                # same row: straight horizontal connector between the two boxes
+                ax, bx = fx + fw, tx
+                out.append(f'  <path class="flow" d="M{ax},{fy + fh // 2} L{bx},{ty + th // 2}"/>')
+                out.append(f'  <text class="sid" x="{ax + 6}" y="{fy + fh // 2 - 7}">{sid}</text>')
+            else:
+                # different rows: drop out of the source, run across, then into the target
+                scx, tcx = fx + fw // 2, tx + tw // 2
+                sy = fy + fh if ty > fy else fy
+                mid = (sy + (ty if ty > fy else ty + th)) // 2
+                out.append(f'  <path class="flow" d="M{scx},{sy} V{mid} H{tcx} V{ty if ty > fy else ty + th}"/>')
+                out.append(f'  <text class="sid" x="{(scx + tcx) // 2}" y="{mid - 4}">{sid}</text>')
 
     out.append(f'  <text class="sub" x="{MARGIN_X}" y="450">Teal = product path '
                '&#183; purple dashed = buffer/utility &#183; red dashed = waste. '
