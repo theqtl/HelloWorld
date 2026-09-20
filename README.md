@@ -52,13 +52,17 @@ so the same class of error fails the build rather than shipping.
 
 ## Status
 
-Tier 1: architecture, data model, executable balance across illustrative scenarios, the two
-headline findings (filtration closure; duplex survival in spray drying), and seeded registers.
-Unit-op depth, full energy balance, CIP/SIP, and the facility capital concept are Tier 2/3, marked
-as stubs or registered gaps.
+Tier 1 established the architecture, the data model, the executable balance across illustrative
+scenarios, the two headline findings (filtration closure; duplex survival in spray drying), and the
+seeded registers. Tier 2 added the full energy balance (sensible heat, drying-gas heating and plant
+losses), species-resolved impurity fate, the contamination-control strategy with CIP/SIP and a
+health-based exposure limit, filterable register tables, a flowsheet generated from
+`data/streams.csv`, and a per-item sizing basis, materials of construction and turndown basis in the
+equipment register. The facility capital concept, process flow diagrams with instrument tags, and
+the control strategy remain Tier 3, marked as stubs or registered gaps.
 
 The information-architecture decision is recorded in
 [`docs/adr/0001-information-architecture.md`](docs/adr/0001-information-architecture.md), including
-the options rejected and what would reverse the choice. Two requirements it does not yet meet —
-filterable register tables, and a contribution path for people who do not use git — are documented
-there as open consequences.
+the options rejected and what would reverse the choice. Of the requirements it did not meet at the
+time, one is still open — a contribution path for people who do not use git — and is documented
+there, alongside a dated update recording what Tier 2 closed.
