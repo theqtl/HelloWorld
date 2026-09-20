@@ -743,13 +743,36 @@ def test_md_table_emits_markdown_only():
         assert out.lstrip().startswith("|"), f"{name}.csv table is not a pipe table"
 
 
-def test_table_enhancers_are_registered():
-    """The sort and filter enhancements must be wired into the site, or the register tables lose
-    them silently. Guards against the asset existing but never being loaded."""
+def test_table_enhancers_are_registered_and_anchored_outside_the_scroll_wrapper():
+    """The sort and filter enhancements must be wired in, AND the filter must be anchored outside
+    Material's horizontal scroll container.
+
+    The previous version of this test only grepped mkdocs.yml and called os.path.exists twice, so
+    it asserted no behaviour at all - it would have passed with an empty file, and it did pass
+    while the filter box was being injected INSIDE `div.md-typeset__scrollwrap`
+    (`overflow-x: auto`), where it scrolled out of view on the widest register tables. Verified in
+    headless Chromium; this guard keeps the anchoring from regressing to `t.parentNode`.
+
+    Browser check (not a pytest dependency - it needs a live port and a browser):
+        mkdocs build && (cd site && python3 -m http.server 8766 &)
+        $CHROME --headless --no-sandbox --virtual-time-budget=5000 \\
+                --dump-dom http://127.0.0.1:8766/registers/parameters/ > dom.html
+    then confirm a `.table-filter` exists and is NOT nested inside `.md-typeset__scrollwrap`.
+    Note the page must be served over HTTP: under file:// Material's JS does not run at all, so a
+    file-based check would falsely report the filter missing.
+    """
     cfg = open(os.path.join(ROOT, "mkdocs.yml"), encoding="utf-8").read()
     for asset in ("javascripts/tablesort.js", "javascripts/tablefilter.js"):
         assert asset in cfg, f"{asset} is not registered in mkdocs.yml extra_javascript"
         assert os.path.exists(os.path.join(ROOT, "docs", asset)), f"missing asset file {asset}"
+    js = open(os.path.join(ROOT, "docs", "javascripts", "tablefilter.js"), encoding="utf-8").read()
+    assert "md-typeset__scrollwrap" in js, (
+        "the filter must anchor on Material's scroll wrapper, or it lands inside the "
+        "horizontally-scrolling region and scrolls away on wide tables"
+    )
+    assert "t.parentNode.insertBefore" not in js, (
+        "inserting relative to the table puts the input inside the scroll wrapper"
+    )
 
 
 def test_impurity_classes_are_in_the_clearance_matrix():
