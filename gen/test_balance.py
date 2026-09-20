@@ -767,13 +767,25 @@ def test_impurity_classes_are_in_the_clearance_matrix():
 
 
 def test_unclearable_impurities_are_not_modelled_as_cleared():
-    """Physical fact (finding 1): block-internal n-1 is floored at the blocks, and the adenylylated
-    dead-end is controlled at the reaction. Neither may be modelled as a downstream separation."""
+    """Physical fact (filtration finding 1): neither block-internal n-1 nor the adenylylated
+    dead-end can be removed by any filtration mode, so neither may be modelled as a downstream
+    separation.
+
+    AppN must NOT share the splint's model. The splint is genuinely absent by design (R-006);
+    suppressing AppN is a proposed reaction restaging that is not demonstrated for this process,
+    and the ATP requirement pulls against the concentration that suppresses it (Q-040). Rendering
+    both as "designed out" presented an open gap as a solved problem.
+    """
+    clearing = {"diafiltration", "particulate", "block_clearable"}
     rows = {r["impurity_id"]: r for r in load_rows("impurities")}
     assert rows["IMP-N1"]["clearance_model"] == "block_floor", \
         "n-1 must be floored (block_floor), never modelled as cleared downstream"
-    assert rows["IMP-APPN"]["clearance_model"] == "designed_out", \
-        "the adenylylated dead-end must be controlled at the reaction (designed_out)"
+    assert rows["IMP-APPN"]["clearance_model"] == "controlled_at_reaction", \
+        "the adenylylated dead-end is suppressed at the reaction, and is NOT 'designed out'"
+    assert rows["IMP-APPN"]["clearance_model"] != rows["IMP-SPLINT"]["clearance_model"], \
+        "AppN and the splint are not the same kind of claim; see R-010 vs R-006"
+    for iid in ("IMP-N1", "IMP-APPN"):
+        assert rows[iid]["clearance_model"] not in clearing, f"{iid} modelled as cleared"
 
 
 def test_impurity_overlay_is_deterministic_and_scenario_free():
@@ -835,3 +847,38 @@ def test_no_residence_time_cites_a_batch_cycle_time_trap():
         "residence-time claim(s) citing a batch-cycle-time TRAP source without the correction: "
         + "; ".join(offenders)
     )
+
+
+def test_impurity_clearance_models_are_a_controlled_vocabulary():
+    """A typo in clearance_model must not fall through to a claimed "registered gap".
+
+    sources.csv already established this pattern (ACCESS_VOCAB); the impurity overlay's
+    catch-all return made a misspelling render as a confident statement about the process.
+    """
+    from gen.impurity import CLEARANCE_MODELS
+    offenders = [
+        f"{r['impurity_id']}: {r['clearance_model']!r}" for r in load_rows("impurities")
+        if r["clearance_model"] not in CLEARANCE_MODELS
+    ]
+    assert not offenders, (
+        f"clearance_model outside {sorted(CLEARANCE_MODELS)}: " + "; ".join(offenders)
+    )
+
+
+def test_impurity_gaps_carry_a_registered_reference():
+    """A gap must be shown as REGISTERED, so the reader can reach the register entry.
+
+    Three rows used to render "(see notes)" on a page that has no notes column, and they were
+    the only cells with no Q/R reference at all - so the page's own claim to show "registered
+    gaps" was not delivered.
+    """
+    from gen.impurity import render
+    out = render()
+    assert "see notes" not in out, "the impurity page still points at a notes column it lacks"
+    for r in load_rows("impurities"):
+        if r["clearance_model"] in ("gap", "controlled_at_reaction"):
+            ref = (r.get("gap_ref") or "").strip()
+            assert re.fullmatch(r"[QR]-\d{3}", ref), (
+                f"{r['impurity_id']} is a gap but its gap_ref is {ref!r}"
+            )
+            assert ref in out, f"{r['impurity_id']}'s registered reference {ref} is not rendered"
