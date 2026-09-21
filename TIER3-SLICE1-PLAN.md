@@ -19,6 +19,17 @@ cannot affect the strict build — the same reason `RESEARCH-QUEUE.md` sits here
 >    is registered instead — in Q-050's notes and in `U02-CF` — because adding the vessel would
 >    half-commit to a branch nobody has chosen. A guard enforces this only *while Q-050 is open*.
 >
+> **4. SUPERSEDED, 2026-09-21: the `not_measurable` treatment in §B and §E is wrong.** The
+>    plan's centrepiece rested on Q-042's reading that variable-pathlength slope spectroscopy "is
+>    at-line, not in-line". That inference is FALSE - the technique is used in-line on UF/DF in the
+>    peer-reviewed literature (SRC-ROLINGER-2023). The defensible claim is narrower and
+>    quantitative: at `P-CONC-UF` the pathlength a reading needs falls below the published in-line
+>    floor (`P-VPE-PATHLENGTH-MIN`), so the constraint is OURS and belongs to THIS stream. C-013 is
+>    therefore `control_type=at_line_only`, a type this plan does not contain, and `not_measurable`
+>    has no rows. The guard §E specifies under "No `in_line` claim for concentration or UV" encoded
+>    the false invariant and was replaced by one that computes the arithmetic. Read §B and §E with
+>    that correction in mind.
+>
 > **The "Branch and landing" section below is STALE.** It says to restart the branch from
 > `origin/main`; doing so would discard the work. Ignore it.
 

@@ -68,10 +68,14 @@ def gen_registers():
         ("controls", "registers/controls.md", "Control register",
          "The raw CPP-to-CQA rows. The readable view, grouped by quality attribute, is the "
          "[control strategy matrix](../process/controls.md). `control_type` says how a control "
-         "acts; `not_measurable` means no instrument can measure the quantity at process "
-         "conditions, and such a row renders as a registered gap rather than as a control. A "
-         "blank `acceptance_basis` is an unfilled gap carrying a live reference, never an "
-         "invented limit.", None),
+         "acts, and three of its values describe something other than a closed loop: "
+         "`at_line_only` means the quantity **is** measurable but not in line on its own stream, "
+         "so the endpoint is judged on a withdrawn sample and the loop stays open; "
+         "`not_measurable` means no instrument can measure it at process conditions **at all** "
+         "(currently no row uses it — see Q-042, which turned out to be the former rather than "
+         "the latter); and `gap` means no control is defined yet. The last two render as "
+         "registered gaps rather than as controls. A blank `acceptance_basis` is an unfilled gap "
+         "carrying a live reference, never an invented limit.", None),
     ]
     for name, rel, title, intro, cols in specs:
         rows = load_rows(name)

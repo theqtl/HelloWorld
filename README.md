@@ -66,10 +66,19 @@ instrument the concept implies with its measurement mode, and a generated CPP→
 every control names the parameter it acts on, the instrument that enforces it and the question that
 blocks it. Most acceptance bases in it are assumption-flagged placeholders — the deliverable is a
 **checkable structure**, not a control strategy a contract manufacturer could execute. It also makes
-two things representable that prose could not: a control for a quantity nobody can measure at process
-conditions (`not_measurable`, Q-042), and an enzyme-clearance route carried as two branches with
+two things representable that prose could not: a measurement that exists but cannot close a loop on
+its own stream (`at_line_only`, Q-042), and an enzyme-clearance route carried as two branches with
 neither chosen (Q-050). The facility capital concept and process flow diagrams with instrument tags
 remain Tier 3, marked as stubs or registered gaps.
+
+The slice also got something wrong and is worth reading for that. Its first version held that
+variable-pathlength slope spectroscopy is inherently at-line, wrote that into a question, a control
+row and a *guard*, and shipped green. The technique is in fact used in-line; what is true is narrower
+and quantitative — at our own registered retentate concentration the pathlength the reading needs
+falls below the published floor for an in-line cell. The control type is therefore `at_line_only`
+rather than `not_measurable`, and the decision is now **computed** from two registered parameters so
+it self-corrects if either moves. A guard is only as good as the claim it encodes, and a green suite
+says nothing about whether that claim is true.
 
 The information-architecture decision is recorded in
 [`docs/adr/0001-information-architecture.md`](docs/adr/0001-information-architecture.md), including
