@@ -13,6 +13,7 @@ from .tables import md_table
 from .balance import run_all
 from .flowsheet import render as render_flowsheet
 from .impurity import render as render_impurities
+from .controls import render as render_controls, tag_scheme_markdown
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DOCS = os.path.join(ROOT, "docs")
@@ -52,6 +53,29 @@ def gen_registers():
          "(real annual demand) drive the architecture and all sizing.", None),
         ("sources", "registers/sources.md", "Sources & reachability log",
          "Every citation with reachability and the scale/system it applies to.", None),
+        ("instruments", "registers/instruments.md", "Instrument register",
+         "Every instrument the concept implies, control-enforcing and monitoring-only alike, "
+         "with tags keyed to the unit operation and, where it applies, to a stream. "
+         "`measurement_mode` is the column that matters: **in_line** (sensor in the stream, no "
+         "sample removed), **on_line** (sample diverted, may be returned), **at_line** (sample "
+         "removed, measured close by) or **off_line** (sample to a remote laboratory). It is "
+         "required on every row, because the control strategy contains a quantity that cannot be "
+         "read in line **on its own stream** (Q-042) and that case is only expressible if every "
+         "other row states its mode too. There is deliberately **no `control_loop` column**: "
+         "`controls.instrument_ref` is the single authoritative link, and a monitoring-only "
+         "instrument is simply one that no control references.\n\n"
+         + tag_scheme_markdown(), None),
+        ("controls", "registers/controls.md", "Control register",
+         "The raw CPP-to-CQA rows. The readable view, grouped by quality attribute, is the "
+         "[control strategy matrix](../process/controls.md). `control_type` says how a control "
+         "acts, and three of its values describe something other than a closed loop: "
+         "`at_line_only` means the quantity **is** measurable but not in line on its own stream, "
+         "so the endpoint is judged on a withdrawn sample and the loop stays open; "
+         "`not_measurable` means no instrument can measure it at process conditions **at all** "
+         "(currently no row uses it — see Q-042, which turned out to be the former rather than "
+         "the latter); and `gap` means no control is defined yet. The last two render as "
+         "registered gaps rather than as controls. A blank `acceptance_basis` is an unfilled gap "
+         "carrying a live reference, never an invented limit.", None),
     ]
     for name, rel, title, intro, cols in specs:
         rows = load_rows(name)
@@ -187,6 +211,7 @@ def main():
     written.append(gen_streams_on_process())
     written.append(gen_balance())
     written.append(_write("balance/impurities.md", render_impurities()))
+    written.append(_write("process/controls.md", render_controls()))
     written.append(_write("diagrams/bfd.svg", render_flowsheet()))
     print("Generated:")
     for w in written:

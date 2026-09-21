@@ -5,16 +5,16 @@ cGMP facility: filtration-led purification, evaporation, spray drying, microbial
 aqueous, no solvents.
 
 The presentation layer is **generated from a single structured data layer**. Every parameter,
-stream, equipment item, buffer, risk, question, and citation lives once in `data/*.csv`. A Python
-layer (`gen/`) computes the mass and energy balance and emits the Markdown pages; a
+stream, equipment item, buffer, risk, question, instrument, control and citation lives once in
+`data/*.csv`. A Python layer (`gen/`) computes the mass and energy balance and emits the Markdown pages; a
 [MkDocs Material](https://squidfunk.github.io/mkdocs-material/) site publishes them to GitHub Pages.
 
 ## Layout
 
 | Path | Contents |
 |---|---|
-| `data/*.csv` | Single source of truth: parameters, streams, equipment, buffers, utilities, risks, questions, sources, scenarios. |
-| `gen/` | Generation + executable mass/energy balance (`balance.py`) and tests (`test_balance.py`). Standard library only. |
+| `data/*.csv` | Single source of truth: parameters, streams, equipment, buffers, utilities, risks, questions, sources, scenarios, impurities, instruments, controls. |
+| `gen/` | Generation + executable mass/energy balance (`balance.py`), the impurity-fate overlay (`impurity.py`), the flowsheet (`flowsheet.py`), the CPP→CQA control matrix (`controls.py`), and tests (`test_balance.py`). Standard library only. |
 | `docs/` | Site sources: findings, process pages, equations, diagrams, facility, registers. |
 | `mkdocs.yml` | Site configuration. |
 | `.github/workflows/pages.yml` | CI: test, generate, build, deploy to Pages. |
@@ -28,8 +28,9 @@ python -m gen.build          # generate register + balance pages from data/
 mkdocs serve                 # preview at http://127.0.0.1:8000
 ```
 
-Generated Markdown (register pages, `balance/results.md`, `process/streams.md`) is git-ignored;
-`python -m gen.build` recreates it. Edit the CSVs, never the generated pages.
+Generated Markdown (register pages, `balance/results.md`, `balance/impurities.md`, `process/streams.md`,
+`process/controls.md`) and `diagrams/bfd.svg` are produced by `python -m gen.build`; the Markdown is
+git-ignored, file by file, in `.gitignore`. Edit the CSVs, never the generated pages.
 
 ## Publishing to GitHub Pages
 
@@ -58,8 +59,26 @@ seeded registers. Tier 2 added the full energy balance (sensible heat, drying-ga
 losses), species-resolved impurity fate, the contamination-control strategy with CIP/SIP and a
 health-based exposure limit, filterable register tables, a flowsheet generated from
 `data/streams.csv`, and a per-item sizing basis, materials of construction and turndown basis in the
-equipment register. The facility capital concept, process flow diagrams with instrument tags, and
-the control strategy remain Tier 3, marked as stubs or registered gaps.
+equipment register.
+
+The first Tier-3 slice added the **control strategy as data**: an instrument register carrying every
+instrument the concept implies with its measurement mode, and a generated CPP→CQA matrix in which
+every control names the parameter it acts on, the instrument that enforces it and the question that
+blocks it. Most acceptance bases in it are assumption-flagged placeholders — the deliverable is a
+**checkable structure**, not a control strategy a contract manufacturer could execute. It also makes
+two things representable that prose could not: a measurement that exists but cannot close a loop on
+its own stream (`at_line_only`, Q-042), and an enzyme-clearance route carried as two branches with
+neither chosen (Q-050). The facility capital concept and process flow diagrams with instrument tags
+remain Tier 3, marked as stubs or registered gaps.
+
+The slice also got something wrong and is worth reading for that. Its first version held that
+variable-pathlength slope spectroscopy is inherently at-line, wrote that into a question, a control
+row and a *guard*, and shipped green. The technique is in fact used in-line; what is true is narrower
+and quantitative — at our own registered retentate concentration the pathlength the reading needs
+falls below the published floor for an in-line cell. The control type is therefore `at_line_only`
+rather than `not_measurable`, and the decision is now **computed** from two registered parameters so
+it self-corrects if either moves. A guard is only as good as the claim it encodes, and a green suite
+says nothing about whether that claim is true.
 
 The information-architecture decision is recorded in
 [`docs/adr/0001-information-architecture.md`](docs/adr/0001-information-architecture.md), including

@@ -6,8 +6,8 @@ from gen.balance import run_all, purity_floor
 
 def test_all_source_keys_resolve():
     sources = {r["source_key"] for r in load_rows("sources")}
-    # parameters, risks and impurities reference source_key; blanks allowed
-    for name in ("parameters", "risks", "impurities"):
+    # parameters, risks, impurities, controls and instruments reference source_key; blanks allowed
+    for name in ("parameters", "risks", "impurities", "controls", "instruments"):
         for r in load_rows(name):
             key = (r.get("source_key") or "").strip()
             if key:
@@ -81,7 +81,8 @@ def test_purity_floor_monotonic_and_bounded():
 
 def test_data_files_present():
     for name in ("parameters", "streams", "equipment", "buffers", "utilities",
-                 "risks", "questions", "sources", "scenarios", "impurities"):
+                 "risks", "questions", "sources", "scenarios", "impurities",
+                 "controls", "instruments"):
         assert load_rows(name), f"{name}.csv empty or missing"
 
 
@@ -179,7 +180,7 @@ def test_every_question_reference_exists_in_every_csv():
     qids = {r["question_id"] for r in load_rows("questions")}
     offenders = []
     for name in ("parameters", "scenarios", "risks", "equipment", "buffers", "utilities",
-                 "streams", "sources", "impurities"):
+                 "streams", "sources", "impurities", "controls", "instruments"):
         for row in load_rows(name):
             for value in row.values():
                 for tok in re.findall(r"Q-\d{3}", value or ""):
@@ -735,7 +736,10 @@ def test_md_table_emits_markdown_only():
     # Real register data legitimately contains "<< 1 kDa", "> 0.2 um", "<1 CFU/mL", so a bare
     # "<" check only passed because it was fed hand-picked synthetic rows. Assert no HTML TAGS,
     # and assert it against the actual data the generator runs on.
-    for name in ("parameters", "impurities", "streams", "sources"):
+    # controls.csv and instruments.csv carry the longest free-text notes in the repo, which is
+    # exactly where '|' escaping matters most - a single unescaped pipe would split a cell and
+    # shift every column after it, silently, on a rendered page nobody diffs.
+    for name in ("parameters", "impurities", "streams", "sources", "controls", "instruments"):
         out = md_table(load_rows(name))
         assert not re.search(r"<\s*/?\s*[a-zA-Z][^>]*>", out), (
             f"md_table emitted an HTML tag for {name}.csv; it must emit Markdown pipe tables"
@@ -905,3 +909,496 @@ def test_impurity_gaps_carry_a_registered_reference():
                 f"{r['impurity_id']} is a gap but its gap_ref is {ref!r}"
             )
             assert ref in out, f"{r['impurity_id']}'s registered reference {ref} is not rendered"
+
+
+# ---------------------------------------------------------------------------
+# Tier-3 slice 1: control strategy (data/controls.csv) and instrumentation
+# (data/instruments.csv), added 2026-09-21.
+#
+# The three prose "control strategy anchor points" on the tech-transfer page were
+# the CPP->CQA argument, and prose cannot be checked. Nothing in the repo could
+# catch a control whose measurement does not exist on the stream it is claimed for,
+# and the repo contained exactly that case: Q-042 records that in-line UV saturates
+# on a 21-mer at process concentration, while the tech-transfer page advertised
+# in-line UV on UF/DF as PAT.
+#
+# One correction is recorded here because it is instructive. The first version of
+# that case said variable-pathlength slope spectroscopy IS at-line, and a guard was
+# written to enforce it. That was a false invariant: the technique is used in-line
+# (SRC-ROLINGER-2023), and what is actually true is arithmetic about OUR stream
+# (test_the_at_line_decision_follows_from_the_arithmetic). A guard is only as good
+# as the claim it encodes, and a green suite says nothing about whether that claim
+# is true.
+#
+# Each guard below is written from its invariant, and several were written BEFORE the
+# rows they check. That ordering is deliberate: a guard written last gets shaped to fit
+# whatever rows already exist, which is the mirror image of the P-DRYGAS-RATIO failure
+# (a value tuned until a test passed).
+# ---------------------------------------------------------------------------
+
+#: Controlled vocabulary for risks.csv. Neither column was enforced before, so a new
+#: risk row could ship an invalid unit_op or category silently and simply never be
+#: found by anyone filtering the register.
+RISK_UNIT_OPS = {"All", "Cleaning", "Evaporation", "Filtration", "Ligation",
+                 "Spray drying", "UF/DF"}
+RISK_CATEGORIES = {"formulation", "microbial", "process", "product", "purity", "quality"}
+
+
+def test_risk_unit_op_and_category_are_a_controlled_vocabulary():
+    """A risk filed under a misspelt unit operation or category is invisible to anyone
+    filtering the register, and nothing detected that before this guard."""
+    offenders = []
+    for r in load_rows("risks"):
+        if r["unit_op"] not in RISK_UNIT_OPS:
+            offenders.append(f"{r['risk_id']}: unit_op {r['unit_op']!r}")
+        if r["category"] not in RISK_CATEGORIES:
+            offenders.append(f"{r['risk_id']}: category {r['category']!r}")
+    assert not offenders, (
+        f"risks.csv value(s) outside the vocabulary "
+        f"(unit_op {sorted(RISK_UNIT_OPS)}, category {sorted(RISK_CATEGORIES)}): "
+        + "; ".join(offenders)
+    )
+
+
+# --- C. The instrument register ---------------------------------------------
+
+
+def test_instrument_vocabularies_are_controlled():
+    """`measured_variable` and `measurement_mode` are controlled for the same reason as
+    `access` in sources.csv: a misspelling makes the row invisible to anyone filtering the
+    register, and invisible to the in-line guard below - which is the one that carries Q-042."""
+    from gen.controls import MEASURED_VARIABLES, MEASUREMENT_MODES
+    offenders = []
+    for r in load_rows("instruments"):
+        if r["measured_variable"] not in MEASURED_VARIABLES:
+            offenders.append(f"{r['instrument_id']}: measured_variable {r['measured_variable']!r}")
+        if r["measurement_mode"] not in MEASUREMENT_MODES:
+            offenders.append(f"{r['instrument_id']}: measurement_mode {r['measurement_mode']!r}")
+    assert not offenders, (
+        f"instruments.csv value(s) outside the vocabulary (measured_variable "
+        f"{sorted(MEASURED_VARIABLES)}, measurement_mode {sorted(MEASUREMENT_MODES)}): "
+        + "; ".join(offenders)
+    )
+
+
+def test_measurement_mode_is_never_blank():
+    """Stated separately from the vocabulary guard because it is a different invariant: a blank
+    would also fail the vocabulary check, but the reason it must not be blank is that the whole
+    Q-042 argument is an in-line/at-line distinction. An instrument with no mode cannot take part
+    in it, so the register would silently stop carrying the argument."""
+    blanks = [r["instrument_id"] for r in load_rows("instruments")
+              if not (r.get("measurement_mode") or "").strip()]
+    assert not blanks, (
+        "instrument(s) with no measurement_mode; the in-line/at-line distinction is the point "
+        "of this register (Q-042): " + ", ".join(blanks)
+    )
+
+
+def test_an_in_line_optical_concentration_claim_cites_a_source():
+    """An in-line optical concentration reading must be justified, not asserted.
+
+    This guard's ORIGINAL rationale was wrong and is worth recording, because the error is the
+    kind this repository exists to catch. It claimed such a reading was impossible - that
+    variable-pathlength slope spectroscopy "is at-line, not in-line". That is a property of the
+    benchtop SoloVPE, not of the technique: FlowVPE publishes 5 um to 8 mm and is used IN-LINE on
+    UF/DF in the peer-reviewed literature (SRC-ROLINGER-2023). The guard's BEHAVIOUR was always
+    defensible - demand a citation - so only the reasoning changes here, and it is no longer
+    categorical: whether a reading is geometrically possible is arithmetic, and
+    test_the_at_line_decision_follows_from_the_arithmetic below checks the arithmetic itself.
+    """
+    from gen.controls import OPTICAL_CONCENTRATION_VARIABLES
+    offenders = []
+    for r in load_rows("instruments"):
+        if r["measured_variable"] not in OPTICAL_CONCENTRATION_VARIABLES:
+            continue
+        if r["measurement_mode"] != "in_line":
+            continue
+        if not (r.get("source_key") or "").strip():
+            offenders.append(f"{r['instrument_id']} ({r['measured_variable']} on {r['unit_op']})")
+    assert not offenders, (
+        "instrument(s) claiming an IN-LINE optical concentration reading with no source "
+        "establishing it is geometrically possible on that stream (Q-042, Q-051): "
+        + "; ".join(offenders)
+    )
+
+
+def test_the_at_line_decision_follows_from_the_arithmetic():
+    """C-013 is `at_line_only` BECAUSE of a number, and this is that number.
+
+    The at-line choice used to rest on a categorical claim about the technique, which was false.
+    It now rests on Beer-Lambert against two registered parameters, so it has to stay true by
+    construction: if P-CONC-UF falls, or P-VPE-PATHLENGTH-MIN is corrected downward once the
+    vendor answers Q-051, an in-line reading becomes possible and C-013 must be re-examined
+    rather than left as a stale decision. That is what this test forces.
+    """
+    from gen.controls import required_pathlength_um, in_line_optical_possible
+    params = load_params()
+
+    conc = param_value(params, "P-CONC-UF")
+    assert conc, "P-CONC-UF is blank; the at-line decision has no basis"
+    band = required_pathlength_um(params, conc)
+    assert band is not None, "P-EPS-260 must carry a range for the pathlength arithmetic to run"
+    lo, hi = band
+    assert lo < hi, f"pathlength band is not ordered: {band}"
+
+    floor = param_value(params, "P-VPE-PATHLENGTH-MIN")
+    assert floor, "P-VPE-PATHLENGTH-MIN is blank; nothing to compare the requirement against"
+
+    assert in_line_optical_possible(params, conc) is False, (
+        f"the required pathlength band at P-CONC-UF is {lo:.2f}-{hi:.2f} um against a published "
+        f"in-line floor of {floor:g} um, so an in-line reading now looks POSSIBLE. C-013 is "
+        f"recorded as at_line_only on the opposite finding - re-examine it rather than leaving "
+        f"the control type stale (Q-042, Q-051)."
+    )
+
+    ctypes = {r["control_id"]: r["control_type"] for r in load_rows("controls")}
+    assert ctypes.get("C-013") == "at_line_only", (
+        f"C-013 is {ctypes.get('C-013')!r}; the arithmetic above says at_line_only"
+    )
+
+
+def test_instrument_tags_are_unique():
+    """A duplicated tag on a P&ID is a drawing error that propagates into the control narrative;
+    a free-text tag makes the register unsortable. Both ids and tags must be unique."""
+    rows = load_rows("instruments")
+    for col in ("instrument_id", "tag"):
+        seen = {}
+        for r in rows:
+            seen.setdefault(r[col], 0)
+            seen[r[col]] += 1
+        dupes = [k for k, n in seen.items() if n > 1]
+        assert not dupes, f"duplicate {col} in instruments.csv: " + ", ".join(sorted(dupes))
+
+
+def test_instrument_tag_letters_are_legal_in_the_position_they_appear():
+    """Tag letters are checked BY POSITION against the declared scheme, not against a list of the
+    prefixes that happen to exist.
+
+    The guard this replaced held `(TI|TIC|PI|PIC|FI|FIC|AI|QI|MI|LI|DPI)-\\d{4}` - an allow-list
+    derived from the rows already in the file - so it could only ever bless them, and it did: `DPI`
+    is wrong (D is a variable MODIFIER and cannot lead; differential pressure is PDI) and the guard
+    asserted in its own failure message that the result was "ISA-style". A guard assembled from its
+    data cannot find a fault in that data. This one is assembled from gen/controls.py's declared
+    letter scheme instead, so a wrong letter fails wherever it appears.
+
+    The scheme is THIS PROJECT'S, not a reproduction of any ISA table: the current edition was not
+    retrieved and conformance is an open question (Q-053, SRC-ISA-5-1-2024).
+    """
+    from gen.controls import tag_letter_error
+    offenders = [f"{r['instrument_id']} {r['tag']}: {tag_letter_error(r['tag'])}"
+                 for r in load_rows("instruments") if tag_letter_error(r["tag"])]
+    assert not offenders, (
+        "instrument tag(s) using a letter that is not declared for the position it occupies "
+        "(see TAG_FIRST_LETTERS in gen/controls.py, and Q-053): " + "; ".join(offenders)
+    )
+
+
+def test_the_declared_tag_scheme_does_not_claim_to_be_isa():
+    """The scheme must say what it is, because saying otherwise is the defect that produced it.
+
+    Every letter in use has to be declared, the two user's-choice assignments have to be marked as
+    ours, and nothing in the module may present the table as ISA's - ISA-5.1-2024 is unread and
+    reproducing its table here is prohibited anyway.
+    """
+    from gen.controls import TAG_FIRST_LETTERS, TAG_VARIABLE_MODIFIERS
+    src = open(os.path.join(ROOT, "gen", "controls.py"), encoding="utf-8").read()
+
+    used = {r["tag"].split("-")[0][0] for r in load_rows("instruments")}
+    missing = sorted(used - set(TAG_FIRST_LETTERS))
+    assert not missing, f"first letter(s) in use but not declared: {missing}"
+
+    for letter in ("M", "Q"):
+        assert "user's-choice" in TAG_FIRST_LETTERS.get(letter, ""), (
+            f"{letter} is a user's-choice letter and must be labelled as this project's own "
+            f"assignment, not left looking like a standard one"
+        )
+    assert "D" in TAG_VARIABLE_MODIFIERS and "D" not in TAG_FIRST_LETTERS, (
+        "D must be a variable modifier and never a first letter, or DPI becomes legal again"
+    )
+    assert "UNVERIFIED" in src and "Q-053" in src, (
+        "gen/controls.py must record that conformance to the current ISA edition is unverified"
+    )
+
+
+# --- B/E. The control matrix, and referential integrity across both new files ---
+
+PROVENANCE_VOCAB = {"fact", "inference", "assumption"}
+
+
+def _refs(value):
+    """A reference cell holds one id, or several separated by ';'.
+
+    Two control rows legitimately rest on a PAIR of parameters - the glass transition only means
+    something at the moisture it was measured at, and the dryer outlet limit only means something
+    against a melting temperature - so a single-valued column would have pushed the second half of
+    each pair into free text where nothing could resolve it.
+    """
+    return [t.strip() for t in (value or "").split(";") if t.strip()]
+
+
+def _equation_ids():
+    text = open(os.path.join(ROOT, "docs", "equations", "index.md"), encoding="utf-8").read()
+    return set(re.findall(r"^##\s*(EQ-[A-Z]+)", text, re.M))
+
+
+def test_control_types_are_a_controlled_vocabulary():
+    """Same invariant as CLEARANCE_MODELS: a typo must not fall through to a claimed control."""
+    from gen.controls import CONTROL_TYPES
+    offenders = [f"{r['control_id']}: {r['control_type']!r}" for r in load_rows("controls")
+                 if r["control_type"] not in CONTROL_TYPES]
+    assert not offenders, (
+        f"control_type outside {sorted(CONTROL_TYPES)}: " + "; ".join(offenders)
+    )
+
+
+def test_control_param_ref_is_conditional_on_control_type():
+    """The guard this slice exists for, and the only one with a NEGATIVE case worth proving.
+
+    "Every non-blank param_ref resolves" is too weak: it permits a control row that names no
+    parameter at all, which is precisely the defect - a control asserted in prose with nothing
+    behind it. So the rule runs both ways.
+
+      * A row that claims to control something (anything but `gap` / `not_measurable`) MUST name
+        a parameter, and every id it names must resolve.
+      * A `not_measurable` or `gap` row MUST leave param_ref blank. You cannot name the parameter
+        for a quantity nobody can measure, and naming one would dress a gap up as a control.
+      * A `not_measurable` row must additionally carry a gap reference, so the unmeasurable
+        quantity is registered rather than merely asserted.
+    """
+    from gen.controls import PARAM_FORBIDDEN_TYPES
+    params = load_params()
+    offenders = []
+    for r in load_rows("controls"):
+        cid, ctype = r["control_id"], r["control_type"]
+        refs = _refs(r.get("param_ref"))
+        if ctype in PARAM_FORBIDDEN_TYPES:
+            if refs:
+                offenders.append(
+                    f"{cid}: control_type={ctype} must leave param_ref blank, found {refs}")
+            if ctype == "not_measurable" and not _refs(r.get("gap_ref")):
+                offenders.append(f"{cid}: not_measurable with no gap_ref")
+        else:
+            if not refs:
+                offenders.append(f"{cid}: control_type={ctype} names no parameter")
+            for pid in refs:
+                if pid not in params:
+                    offenders.append(f"{cid}: param_ref {pid} does not resolve")
+    assert not offenders, "control param_ref rule violated: " + "; ".join(offenders)
+
+
+def test_control_and_instrument_references_resolve():
+    """Referential integrity across the two new files.
+
+    Registers that point at each other by free-text id drift the moment one of them is edited;
+    the flowsheet already lost an arrow that way in Tier 1. Every cross-reference in these two
+    files resolves to a row that exists, or the build fails.
+    """
+    from gen.flowsheet import SENTINELS
+    units = {r["equip_id"] for r in load_rows("equipment")} | set(SENTINELS)
+    streams = {r["stream_id"] for r in load_rows("streams")}
+    risks = {r["risk_id"] for r in load_rows("risks")}
+    questions = {r["question_id"] for r in load_rows("questions")}
+    instruments = {r["instrument_id"] for r in load_rows("instruments")}
+    equations = _equation_ids()
+
+    offenders = []
+
+    def check(where, label, values, universe):
+        for v in values:
+            if v not in universe:
+                offenders.append(f"{where}: {label} {v} does not resolve")
+
+    for r in load_rows("controls"):
+        cid = r["control_id"]
+        check(cid, "unit_op", [r["unit_op"]], units)
+        check(cid, "equation_ref", _refs(r.get("equation_ref")), equations)
+        check(cid, "risk_ref", _refs(r.get("risk_ref")), risks)
+        check(cid, "instrument_ref", _refs(r.get("instrument_ref")), instruments)
+        check(cid, "gap_ref", _refs(r.get("gap_ref")), questions | risks)
+        if r["provenance"] not in PROVENANCE_VOCAB:
+            offenders.append(f"{cid}: provenance {r['provenance']!r}")
+
+    for r in load_rows("instruments"):
+        iid = r["instrument_id"]
+        check(iid, "unit_op", [r["unit_op"]], units)
+        check(iid, "stream_ref", _refs(r.get("stream_ref")), streams)
+        check(iid, "gap_ref", _refs(r.get("gap_ref")), questions | risks)
+        if r["provenance"] not in PROVENANCE_VOCAB:
+            offenders.append(f"{iid}: provenance {r['provenance']!r}")
+
+    assert not offenders, "unresolved reference(s): " + "; ".join(offenders)
+
+
+def test_a_control_that_acts_names_the_instrument_that_enforces_it():
+    """A control strategy with no instrument behind it is a sentence, not a control.
+
+    Blank is legitimate for exactly four types: a supplier specification has no in-facility
+    instrument, a formulation choice is not an on-line measurement, and a `gap` or a
+    `not_measurable` row has by definition nothing enforcing it.
+    """
+    from gen.controls import INSTRUMENT_OPTIONAL_TYPES
+    offenders = [
+        f"{r['control_id']} ({r['control_type']})" for r in load_rows("controls")
+        if r["control_type"] not in INSTRUMENT_OPTIONAL_TYPES and not _refs(r.get("instrument_ref"))
+    ]
+    assert not offenders, (
+        "control row(s) that act on the process but name no instrument: " + "; ".join(offenders)
+    )
+
+
+def test_every_control_row_carries_an_acceptance_basis_or_a_registered_gap():
+    """Never both blank. A row with neither is an empty assertion, and the whole point of this
+    slice is that a placeholder must be visible AS a placeholder."""
+    offenders = []
+    for r in load_rows("controls"):
+        basis = (r.get("acceptance_basis") or "").strip()
+        gap = _refs(r.get("gap_ref"))
+        if not basis and not gap:
+            offenders.append(f"{r['control_id']}: no acceptance basis and no gap reference")
+        # A basis that states a number must say which registered parameter the number is,
+        # for the same reason prose numbers must carry a citation.
+        if basis and re.search(r"\d", basis) and not re.search(r"\bP-[A-Z0-9-]{3,}", basis):
+            offenders.append(
+                f"{r['control_id']}: acceptance_basis states a number with no parameter id")
+    assert not offenders, "; ".join(offenders)
+
+
+def test_control_gaps_render_as_registered_gaps():
+    """A `gap` or `not_measurable` row must reach the reader AS a registered gap, with a
+    reference they can follow - the same defect the impurity overlay had when three rows said
+    "(see notes)" on a page with no notes column."""
+    from gen.controls import render
+    out = render()
+    for r in load_rows("controls"):
+        if r["control_type"] not in ("gap", "not_measurable"):
+            continue
+        for ref in _refs(r.get("gap_ref")):
+            assert re.fullmatch(r"[QR]-\d{3}", ref), (
+                f"{r['control_id']} is a gap but its gap_ref is {ref!r}")
+            assert ref in out, (
+                f"{r['control_id']}'s registered reference {ref} is not rendered")
+
+
+def test_the_matrix_page_renders_its_id_columns():
+    """The matrix page is NOT exempt from the prose-citation lint, and it passes that lint
+    because every row carries a P-/Q-/R-/EQ- token on its own line. That claim is only true while
+    the renderer actually emits the id columns - without this guard it would quietly degrade from
+    a property into a coincidence the first time someone tidied the table."""
+    from gen.controls import render
+    out = render()
+    missing = []
+    for r in load_rows("controls"):
+        tokens = (_refs(r.get("param_ref")) + _refs(r.get("equation_ref"))
+                  + _refs(r.get("gap_ref")) + _refs(r.get("risk_ref"))
+                  + _refs(r.get("instrument_ref")))
+        assert tokens, f"{r['control_id']} carries no reference of any kind"
+        for t in tokens:
+            if t not in out:
+                missing.append(f"{r['control_id']}: {t}")
+    assert not missing, (
+        "reference(s) present in controls.csv but not rendered on the matrix page: "
+        + "; ".join(missing)
+    )
+
+
+def test_control_matrix_is_deterministic_and_scenario_free():
+    """Control strategy is a set of limits and does not move with annual demand (Q-002)."""
+    from gen.controls import render
+    a, b = render(), render()
+    assert a == b, "gen.controls.render() is not deterministic"
+    for scn in load_rows("scenarios"):
+        assert scn["label"] not in a, (
+            f"the control matrix mentions scenario {scn['label']!r}; it must be scenario-free")
+
+
+def test_the_enzyme_fork_renders_as_a_fork_and_not_as_a_decision():
+    """Enzyme form is undecided (Q-050) and the register must not quietly decide it.
+
+    Both clearance branches must render, both with a BLANK acceptance basis and a live gap
+    reference, and neither may read as the selected route. This is the guard that keeps the
+    'decisions taken' from becoming a decision nobody took.
+    """
+    from gen.controls import render
+    out = render()
+    branches = [r for r in load_rows("controls") if r["control_type"] == "downstream_removal"]
+    assert len(branches) >= 2, (
+        "enzyme clearance must be carried as TWO branches, neither asserted as chosen")
+    for r in branches:
+        cid = r["control_id"]
+        assert not (r.get("acceptance_basis") or "").strip(), (
+            f"{cid}: an enzyme-clearance branch must have a BLANK acceptance basis - "
+            f"P-ENZ-CLEARANCE-LRV is blank for both branches (Q-032)")
+        refs = _refs(r.get("gap_ref"))
+        assert refs, f"{cid}: enzyme-clearance branch with no gap reference"
+        for ref in refs:
+            assert ref in out, f"{cid}: gap reference {ref} is not rendered"
+    assert "Q-050" in out, "the matrix must show that enzyme form is open (Q-050)"
+
+
+def test_enzyme_parameters_stay_registered_gaps():
+    """P-HBEL-DS has a guard stopping anyone from quietly filling in a value the world does not
+    have. These two need the same protection and for a sharper reason: a number in either one
+    would silently CHOOSE an enzyme form, and enzyme form is the open question (Q-050) the whole
+    clearance argument forks on.
+
+    P-LIG-ENZ-LOAD: the only cited loading is a cell-free-extract loading, i.e. a whole proteome.
+    P-ENZ-CLEARANCE-LRV: no ppm, log-reduction or immunoassay figure exists publicly for EITHER
+    branch, which is what makes the chromatography-free thesis unproven rather than proven.
+    """
+    params = load_params()
+    for pid in ("P-LIG-ENZ-LOAD", "P-ENZ-CLEARANCE-LRV"):
+        row = params.get(pid)
+        assert row is not None, f"{pid} is not registered"
+        assert not (row.get("value") or "").strip(), (
+            f"{pid} must have no value - it is a registered gap, and a value in it would decide "
+            f"Q-050 by implication")
+        assert "Q-050" in (row.get("notes") or ""), (
+            f"{pid} must reference the enzyme-form question it is blocked by")
+
+
+def test_the_clarification_item_stays_branch_aware():
+    """U02-CF's sizing basis and notes used to presume an immobilised enzyme ("or centrifuge if
+    immobilised enzyme"), which presupposed the answer to Q-050 in the equipment register while
+    the question register called it open. Both fields must now name the fork, so the register
+    cannot drift back to presuming one branch.
+
+    It must also keep saying that the 85 C denature hold the soluble branch needs has NO unit
+    here: this item is single-use depth media. That absence is registered rather than invented,
+    because adding the vessel would half-commit to a branch nobody has chosen.
+    """
+    row = [r for r in load_rows("equipment") if r["equip_id"] == "U02-CF"]
+    assert row, "U02-CF is not in the equipment register"
+    row = row[0]
+    blob = row["sizing_basis"] + " " + row["notes"]
+    for tok in ("Q-050", "R-021", "R-002", "R-017"):
+        assert tok in blob, f"U02-CF must reference {tok} to stay branch-aware; it does not"
+    assert "Q-050" in row["sizing_basis"], (
+        "U02-CF's SIZING BASIS must name the fork too - the notes alone let the sizing argument "
+        "quietly keep presuming one branch")
+
+
+def test_no_equipment_item_performs_the_denature_hold_while_q050_is_open():
+    """The soluble branch of Q-050 needs a heated vessel or exchanger that is not in this concept.
+
+    The failure mode this guards is subtle: someone reads the soluble branch, notices it needs a
+    thermal step, and attaches that duty to the nearest existing item rather than registering the
+    gap - which would make an unchosen branch look executable, and would put an 85 C duty on
+    single-use depth media.
+
+    The rule is deliberately CONDITIONAL on Q-050 still being open, not permanent. Once the
+    enzyme form is actually chosen, a denature unit is the right thing to add and this guard
+    stands aside on its own; what it refuses is a unit that appears while the question that would
+    justify it is unanswered. It scans `name` and `unit_op` rather than the prose fields, because
+    an item that performs the hold is NAMED for it - the prose fields are where the register
+    legitimately says the opposite.
+    """
+    q050 = [r for r in load_rows("questions") if r["question_id"] == "Q-050"]
+    assert q050, "Q-050 is not registered"
+    if q050[0]["status"] != "open":
+        return  # the fork has been resolved; a denature unit is now a legitimate entry
+    offenders = [r["equip_id"] for r in load_rows("equipment")
+                 if re.search(r"denatur|heat.kill", r["name"] + " " + r["unit_op"], re.I)]
+    assert not offenders, (
+        "equipment item(s) performing the enzyme denature hold while Q-050 - which decides "
+        "whether that step exists at all - is still open: " + ", ".join(offenders)
+    )

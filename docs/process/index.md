@@ -5,13 +5,18 @@ blocks to a dried DS powder.
 
 1. **[Enzymatic ligation](ligation.md)** — dsRNA ligase joins blocks into the strand(s),
    with annealing interleaved so the duplex is co-assembled.
-2. **Clarification / enzyme separation** — remove particulates and, with an immobilised
-   ligase, the enzyme.
+2. **Clarification / enzyme separation** — remove particulates, and remove the ligase. *How*
+   depends on the enzyme form, and that is open (Q-050): an immobilised ligase is separated
+   here, while a soluble one must be denatured first — a step whose 85 °C hold sits above any
+   plausible duplex melting band (R-021) and whose vessel is not in the equipment register.
+   Both branches are carried in the [control strategy](controls.md); neither is chosen.
 3. **[Filtration & UF/DF](filtration.md)** — desalt, exchange buffer, concentrate, and clear
    whole-block and particulate impurities.
 4. **[Evaporation](evaporation.md)** — concentrate further toward the dryer feed.
 5. **[Spray drying](spray-drying.md)** — produce the DS powder.
 6. **[Microbial control](microbial.md)** — spans the whole train.
+7. **[Control strategy](controls.md)** — the CPP → CQA matrix and the instruments behind it;
+   also spans the whole train.
 
 See the [block flow diagram](../diagrams/index.md) and the [stream table](streams.md).
 

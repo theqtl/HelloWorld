@@ -108,6 +108,31 @@ above holding.
   build overwrites. The fix remains an edit action plus structured issue forms mirroring the CSV
   columns, and ultimately a controlled workbook that opens a pull request.
 
+### Update — Tier 3 slice 1, 2026-09-21
+
+The control strategy moved from prose into `data/controls.csv` and `data/instruments.csv`, and the
+CPP → CQA matrix became a generated page like the registers and the balance. This is the decision
+above being used for what it was chosen for rather than extended: no new mechanism, one more
+generator module, three more generated pages.
+
+It did surface one thing the ADR did not anticipate. The argument this repository most needed to
+make checkable was a **negative** one — that a control claimed in prose could not be enforced as
+claimed. A knowledge base built on "every value lives once, flagged" has no natural place for an
+assertion about something that does *not* exist. The answer was to give absence its own vocabulary —
+control types for a measurement that cannot close a loop (`at_line_only`) and for one that cannot be
+made at all (`not_measurable`), plus a required `measurement_mode` on every instrument — so that the
+gap is a row rather than a silence. That generalises: the data layer earns its keep most when it can
+represent what the package is missing, not only what it has.
+
+There is a second lesson, learned the hard way on the same row. The first version of that negative
+argument used `not_measurable` and justified it with a *categorical* claim: that the measurement
+technique was inherently at-line. The claim was false, and because it had been written into a guard,
+the suite defended it. What replaced it is arithmetic over registered parameters — the pathlength a
+reading needs at our own concentration, against a published instrument floor — so the conclusion is
+recomputed rather than asserted, and it fails loudly if either input moves. A vocabulary for absence
+is only half the job; the *reason* for the absence has to be checkable too, or the data layer just
+stores a confident error in a tidier place.
+
 ## What would reverse this decision
 
 - An issued, revision-controlled document becomes the primary deliverable rather than a browsable
