@@ -13,7 +13,7 @@ from .tables import md_table
 from .balance import run_all
 from .flowsheet import render as render_flowsheet
 from .impurity import render as render_impurities
-from .controls import render as render_controls
+from .controls import render as render_controls, tag_scheme_markdown
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DOCS = os.path.join(ROOT, "docs")
@@ -55,15 +55,16 @@ def gen_registers():
          "Every citation with reachability and the scale/system it applies to.", None),
         ("instruments", "registers/instruments.md", "Instrument register",
          "Every instrument the concept implies, control-enforcing and monitoring-only alike, "
-         "with ISA-style tags keyed to the unit operation and, where it applies, to a stream. "
+         "with tags keyed to the unit operation and, where it applies, to a stream. "
          "`measurement_mode` is the column that matters: **in_line** (sensor in the stream, no "
          "sample removed), **on_line** (sample diverted, may be returned), **at_line** (sample "
          "removed, measured close by) or **off_line** (sample to a remote laboratory). It is "
          "required on every row, because the control strategy contains a quantity that cannot be "
-         "measured in line at all (Q-042) and that case is only expressible if every other row "
-         "states its mode too. There is deliberately **no `control_loop` column**: "
+         "read in line **on its own stream** (Q-042) and that case is only expressible if every "
+         "other row states its mode too. There is deliberately **no `control_loop` column**: "
          "`controls.instrument_ref` is the single authoritative link, and a monitoring-only "
-         "instrument is simply one that no control references.", None),
+         "instrument is simply one that no control references.\n\n"
+         + tag_scheme_markdown(), None),
         ("controls", "registers/controls.md", "Control register",
          "The raw CPP-to-CQA rows. The readable view, grouped by quality attribute, is the "
          "[control strategy matrix](../process/controls.md). `control_type` says how a control "

@@ -917,9 +917,18 @@ def test_impurity_gaps_carry_a_registered_reference():
 #
 # The three prose "control strategy anchor points" on the tech-transfer page were
 # the CPP->CQA argument, and prose cannot be checked. Nothing in the repo could
-# catch a control claimed for a quantity nobody can measure, and the repo contained
-# exactly that case: Q-042 records that in-line UV saturates on a 21-mer at process
-# concentration, while the tech-transfer page advertised in-line UV on UF/DF as PAT.
+# catch a control whose measurement does not exist on the stream it is claimed for,
+# and the repo contained exactly that case: Q-042 records that in-line UV saturates
+# on a 21-mer at process concentration, while the tech-transfer page advertised
+# in-line UV on UF/DF as PAT.
+#
+# One correction is recorded here because it is instructive. The first version of
+# that case said variable-pathlength slope spectroscopy IS at-line, and a guard was
+# written to enforce it. That was a false invariant: the technique is used in-line
+# (SRC-ROLINGER-2023), and what is actually true is arithmetic about OUR stream
+# (test_the_at_line_decision_follows_from_the_arithmetic). A guard is only as good
+# as the claim it encodes, and a green suite says nothing about whether that claim
+# is true.
 #
 # Each guard below is written from its invariant, and several were written BEFORE the
 # rows they check. That ordering is deliberate: a guard written last gets shaped to fit
@@ -985,48 +994,129 @@ def test_measurement_mode_is_never_blank():
     )
 
 
-def test_no_instrument_claims_an_in_line_concentration_or_uv_reading():
-    """Q-042 as a GUARD, not a note.
+def test_an_in_line_optical_concentration_claim_cites_a_source():
+    """An in-line optical concentration reading must be justified, not asserted.
 
-    In-line UV saturates on a 21-mer at process concentration - the required path length is
-    ~10 um - and the answer deployed in the field is variable-pathlength slope spectroscopy,
-    which is AT-line. The tech-transfer page advertised 'in-line UV/conductivity on UF/DF' as
-    PAT for two tiers while Q-042 said the opposite in the same repository, and nothing could
-    see the contradiction. Now an in-line UV or concentration row fails unless a source is
-    cited that establishes it for this molecule at this concentration.
+    This guard's ORIGINAL rationale was wrong and is worth recording, because the error is the
+    kind this repository exists to catch. It claimed such a reading was impossible - that
+    variable-pathlength slope spectroscopy "is at-line, not in-line". That is a property of the
+    benchtop SoloVPE, not of the technique: FlowVPE publishes 5 um to 8 mm and is used IN-LINE on
+    UF/DF in the peer-reviewed literature (SRC-ROLINGER-2023). The guard's BEHAVIOUR was always
+    defensible - demand a citation - so only the reasoning changes here, and it is no longer
+    categorical: whether a reading is geometrically possible is arithmetic, and
+    test_the_at_line_decision_follows_from_the_arithmetic below checks the arithmetic itself.
     """
-    from gen.controls import NOT_IN_LINE_VARIABLES
+    from gen.controls import OPTICAL_CONCENTRATION_VARIABLES
     offenders = []
     for r in load_rows("instruments"):
-        if r["measured_variable"] not in NOT_IN_LINE_VARIABLES:
+        if r["measured_variable"] not in OPTICAL_CONCENTRATION_VARIABLES:
             continue
         if r["measurement_mode"] != "in_line":
             continue
         if not (r.get("source_key") or "").strip():
             offenders.append(f"{r['instrument_id']} ({r['measured_variable']} on {r['unit_op']})")
     assert not offenders, (
-        "instrument(s) claiming an IN-LINE reading of a quantity Q-042 says cannot be read "
-        "in-line, with no source establishing it: " + "; ".join(offenders)
+        "instrument(s) claiming an IN-LINE optical concentration reading with no source "
+        "establishing it is geometrically possible on that stream (Q-042, Q-051): "
+        + "; ".join(offenders)
     )
 
 
-def test_instrument_tags_are_unique_and_isa_shaped():
+def test_the_at_line_decision_follows_from_the_arithmetic():
+    """C-013 is `at_line_only` BECAUSE of a number, and this is that number.
+
+    The at-line choice used to rest on a categorical claim about the technique, which was false.
+    It now rests on Beer-Lambert against two registered parameters, so it has to stay true by
+    construction: if P-CONC-UF falls, or P-VPE-PATHLENGTH-MIN is corrected downward once the
+    vendor answers Q-051, an in-line reading becomes possible and C-013 must be re-examined
+    rather than left as a stale decision. That is what this test forces.
+    """
+    from gen.controls import required_pathlength_um, in_line_optical_possible
+    params = load_params()
+
+    conc = param_value(params, "P-CONC-UF")
+    assert conc, "P-CONC-UF is blank; the at-line decision has no basis"
+    band = required_pathlength_um(params, conc)
+    assert band is not None, "P-EPS-260 must carry a range for the pathlength arithmetic to run"
+    lo, hi = band
+    assert lo < hi, f"pathlength band is not ordered: {band}"
+
+    floor = param_value(params, "P-VPE-PATHLENGTH-MIN")
+    assert floor, "P-VPE-PATHLENGTH-MIN is blank; nothing to compare the requirement against"
+
+    assert in_line_optical_possible(params, conc) is False, (
+        f"the required pathlength band at P-CONC-UF is {lo:.2f}-{hi:.2f} um against a published "
+        f"in-line floor of {floor:g} um, so an in-line reading now looks POSSIBLE. C-013 is "
+        f"recorded as at_line_only on the opposite finding - re-examine it rather than leaving "
+        f"the control type stale (Q-042, Q-051)."
+    )
+
+    ctypes = {r["control_id"]: r["control_type"] for r in load_rows("controls")}
+    assert ctypes.get("C-013") == "at_line_only", (
+        f"C-013 is {ctypes.get('C-013')!r}; the arithmetic above says at_line_only"
+    )
+
+
+def test_instrument_tags_are_unique():
     """A duplicated tag on a P&ID is a drawing error that propagates into the control narrative;
     a free-text tag makes the register unsortable. Both ids and tags must be unique."""
     rows = load_rows("instruments")
     for col in ("instrument_id", "tag"):
         seen = {}
-        dupes = []
         for r in rows:
             seen.setdefault(r[col], 0)
             seen[r[col]] += 1
         dupes = [k for k, n in seen.items() if n > 1]
         assert not dupes, f"duplicate {col} in instruments.csv: " + ", ".join(sorted(dupes))
-    bad = [r["instrument_id"] for r in rows
-           if not re.fullmatch(r"(TI|TIC|PI|PIC|FI|FIC|AI|QI|MI|LI|DPI)-\d{4}", r["tag"])]
-    assert not bad, (
-        "instrument tag(s) not in the ISA-style form <letters>-<unit><loop>, letters one of "
-        "TI/TIC/PI/PIC/FI/FIC/AI/QI/MI/LI/DPI: " + ", ".join(bad)
+
+
+def test_instrument_tag_letters_are_legal_in_the_position_they_appear():
+    """Tag letters are checked BY POSITION against the declared scheme, not against a list of the
+    prefixes that happen to exist.
+
+    The guard this replaced held `(TI|TIC|PI|PIC|FI|FIC|AI|QI|MI|LI|DPI)-\\d{4}` - an allow-list
+    derived from the rows already in the file - so it could only ever bless them, and it did: `DPI`
+    is wrong (D is a variable MODIFIER and cannot lead; differential pressure is PDI) and the guard
+    asserted in its own failure message that the result was "ISA-style". A guard assembled from its
+    data cannot find a fault in that data. This one is assembled from gen/controls.py's declared
+    letter scheme instead, so a wrong letter fails wherever it appears.
+
+    The scheme is THIS PROJECT'S, not a reproduction of any ISA table: the current edition was not
+    retrieved and conformance is an open question (Q-053, SRC-ISA-5-1-2024).
+    """
+    from gen.controls import tag_letter_error
+    offenders = [f"{r['instrument_id']} {r['tag']}: {tag_letter_error(r['tag'])}"
+                 for r in load_rows("instruments") if tag_letter_error(r["tag"])]
+    assert not offenders, (
+        "instrument tag(s) using a letter that is not declared for the position it occupies "
+        "(see TAG_FIRST_LETTERS in gen/controls.py, and Q-053): " + "; ".join(offenders)
+    )
+
+
+def test_the_declared_tag_scheme_does_not_claim_to_be_isa():
+    """The scheme must say what it is, because saying otherwise is the defect that produced it.
+
+    Every letter in use has to be declared, the two user's-choice assignments have to be marked as
+    ours, and nothing in the module may present the table as ISA's - ISA-5.1-2024 is unread and
+    reproducing its table here is prohibited anyway.
+    """
+    from gen.controls import TAG_FIRST_LETTERS, TAG_VARIABLE_MODIFIERS
+    src = open(os.path.join(ROOT, "gen", "controls.py"), encoding="utf-8").read()
+
+    used = {r["tag"].split("-")[0][0] for r in load_rows("instruments")}
+    missing = sorted(used - set(TAG_FIRST_LETTERS))
+    assert not missing, f"first letter(s) in use but not declared: {missing}"
+
+    for letter in ("M", "Q"):
+        assert "user's-choice" in TAG_FIRST_LETTERS.get(letter, ""), (
+            f"{letter} is a user's-choice letter and must be labelled as this project's own "
+            f"assignment, not left looking like a standard one"
+        )
+    assert "D" in TAG_VARIABLE_MODIFIERS and "D" not in TAG_FIRST_LETTERS, (
+        "D must be a variable modifier and never a first letter, or DPI becomes legal again"
+    )
+    assert "UNVERIFIED" in src and "Q-053" in src, (
+        "gen/controls.py must record that conformance to the current ISA edition is unverified"
     )
 
 
