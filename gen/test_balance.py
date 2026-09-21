@@ -905,3 +905,43 @@ def test_impurity_gaps_carry_a_registered_reference():
                 f"{r['impurity_id']} is a gap but its gap_ref is {ref!r}"
             )
             assert ref in out, f"{r['impurity_id']}'s registered reference {ref} is not rendered"
+
+
+# ---------------------------------------------------------------------------
+# Tier-3 slice 1: control strategy (data/controls.csv) and instrumentation
+# (data/instruments.csv), added 2026-09-21.
+#
+# The three prose "control strategy anchor points" on the tech-transfer page were
+# the CPP->CQA argument, and prose cannot be checked. Nothing in the repo could
+# catch a control claimed for a quantity nobody can measure, and the repo contained
+# exactly that case: Q-042 records that in-line UV saturates on a 21-mer at process
+# concentration, while the tech-transfer page advertised in-line UV on UF/DF as PAT.
+#
+# Each guard below is written from its invariant, and several were written BEFORE the
+# rows they check. That ordering is deliberate: a guard written last gets shaped to fit
+# whatever rows already exist, which is the mirror image of the P-DRYGAS-RATIO failure
+# (a value tuned until a test passed).
+# ---------------------------------------------------------------------------
+
+#: Controlled vocabulary for risks.csv. Neither column was enforced before, so a new
+#: risk row could ship an invalid unit_op or category silently and simply never be
+#: found by anyone filtering the register.
+RISK_UNIT_OPS = {"All", "Cleaning", "Evaporation", "Filtration", "Ligation",
+                 "Spray drying", "UF/DF"}
+RISK_CATEGORIES = {"formulation", "microbial", "process", "product", "purity", "quality"}
+
+
+def test_risk_unit_op_and_category_are_a_controlled_vocabulary():
+    """A risk filed under a misspelt unit operation or category is invisible to anyone
+    filtering the register, and nothing detected that before this guard."""
+    offenders = []
+    for r in load_rows("risks"):
+        if r["unit_op"] not in RISK_UNIT_OPS:
+            offenders.append(f"{r['risk_id']}: unit_op {r['unit_op']!r}")
+        if r["category"] not in RISK_CATEGORIES:
+            offenders.append(f"{r['risk_id']}: category {r['category']!r}")
+    assert not offenders, (
+        f"risks.csv value(s) outside the vocabulary "
+        f"(unit_op {sorted(RISK_UNIT_OPS)}, category {sorted(RISK_CATEGORIES)}): "
+        + "; ".join(offenders)
+    )
