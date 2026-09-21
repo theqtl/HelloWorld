@@ -3,6 +3,25 @@
 **Created 2026-09-21.** This file is deliberately outside `docs/` so it is not a site page and
 cannot affect the strict build — the same reason `RESEARCH-QUEUE.md` sits here.
 
+> **Status, 2026-09-21: APPLIED.** Sections A–F are implemented on
+> `claude/sirna-evidence-research-k8btv0`. The paragraph below describes the state when the plan
+> was written and is kept for context; it is no longer true. Three things diverged from the plan
+> as written, deliberately:
+>
+> 1. **`P-LIG-TIME` carries the band 16–24 h, not the 1–20 h §A names.** Re-sourced to a T4-mutant
+>    lineage (`SRC-USPTO-10640812`, `SRC-NAR-2025`) to match the candidate Q-050 actually records.
+> 2. **The AppN row is `control_type=gap`, not `in_reaction`.** §B's shorthand put `gap` in the
+>    *param_ref* slot, which §E's conditional rule forbids outright — a row that claims to control
+>    something must name a parameter. `gap` is also the truthful reading: Q-040 says the ATP
+>    requirement and the AppN suppression pull in opposite directions, so no control is *defined*.
+>    Where §B and §E disagreed, §E won, because §E is the audited invariant.
+> 3. **The denature unit was NOT added to `data/equipment.csv`.** §D offered a choice; its absence
+>    is registered instead — in Q-050's notes and in `U02-CF` — because adding the vessel would
+>    half-commit to a branch nobody has chosen. A guard enforces this only *while Q-050 is open*.
+>
+> **The "Branch and landing" section below is STALE.** It says to restart the branch from
+> `origin/main`; doing so would discard the work. Ignore it.
+
 **Nothing in this plan has been applied.** No `data/*.csv`, no `gen/` module and no page under
 `docs/` has been changed for it. The repo is at Tier 2 (`ef256a8`, 51 tests) and this file is the
 only addition.

@@ -12,6 +12,8 @@ what already exists here.
 - Governing equations with terms, assumptions, and transferability notes ([equations](../equations/index.md)).
 - Equipment, stream, buffer, utility, risk, and question registers.
 - A cited source log with reachability and scale/system tags.
+- An [instrument register](../registers/instruments.md) — every instrument the concept implies, control-enforcing and monitoring-only alike, each with an ISA-style tag and, crucially, its **measurement mode** (in-line / on-line / at-line / off-line).
+- A generated [CPP → CQA control strategy matrix](../process/controls.md): each control names the registered parameter it acts on, the instrument that could enforce it, and the open question that blocks it — including the controls that **cannot exist**, which are rendered as registered gaps rather than omitted.
 
 ## To be produced
 
@@ -22,9 +24,17 @@ what already exists here.
 - **Equipment specifications and sizing basis** per item (the [equipment register](../registers/equipment.md)
   now carries a sizing basis, materials of construction, and a turndown basis per item; absolute sizes
   remain a function of demand, Q-002).
-- **Instrumentation and PAT** per unit operation (e.g. in-line UV/conductivity on UF/DF, outlet
-  temperature and residual moisture on the dryer).
-- **Control strategy** linking critical process parameters to critical quality attributes.
+- **Instrumentation and PAT** per unit operation. The register above now names them; what is still
+  missing is vendor selection, loop tuning and qualification. **One correction belongs here:** earlier
+  tiers of this page advertised *in-line* UV on UF/DF as PAT, while Q-042 recorded the opposite in the
+  same repository. In-line UV saturates on a 21-mer at process concentration, so retentate
+  concentration is read **at-line** by variable-pathlength slope spectroscopy (`AI-0306`, Q-042).
+  In-line **conductivity** is unaffected and remains the diafiltration endpoint (`AI-0305`, `EQ-DIAF`);
+  dryer outlet temperature is in-line (`TIC-0502`) and residual moisture is at-line (`MI-0507`, Q-039).
+- **Control strategy** linking critical process parameters to critical quality attributes. The
+  structure now exists and is generated from data; what is missing is the data to fill it. Almost
+  every acceptance basis in the matrix is an assumption tied to an open question, and two rows have
+  no acceptance basis at all because no public figure exists for either (`P-ENZ-CLEARANCE-LRV`, Q-032).
 - **Standards:** ICH Q8–Q11 (development, risk, quality systems, development/manufacture of DS),
   ICH Q6/Q7 (specs, GMP), and the relevant engineering codes at **current editions** — ASME BPE-2026,
   ASTM E2500-25, NFPA 660-2025 and IEC 60079-10-2:2026 (<span class="prov-fact">fact</span>;
@@ -46,15 +56,32 @@ itemised list a contract manufacturer works from (<span class="prov-fact">fact</
   toxicology data exists.
 - **No forced-degradation stability data.**
 - **No side-by-side comparison** of premises, equipment, instruments, materials, procedures and
-  methods between the sending and receiving units.
+  methods between the sending and receiving units. *Partly addressable since Tier 3:* the
+  **instruments** column of that comparison now has a receiving-unit side to it (the
+  [instrument register](../registers/instruments.md)), and the equipment column has had one since
+  Tier 2. There is still no sending unit to compare against, and premises, materials, procedures
+  and methods are untouched — so this gap narrows, it does not close.
 - **No acceptance criteria for a successful transfer, and no gap analysis.**
 
 ## Control strategy anchor points (from the findings)
 
+These three bullets are the argument in narrative form. Each one is now also **generated as data**,
+row by row, in the [control strategy matrix](../process/controls.md) — with the registered
+parameter, the enforcing instrument, the acceptance basis (or the registered gap standing in for
+one) and the question that blocks it. Read them here; check them there.
+
 - Purity is controlled **at the block stage** and the **ligation reaction**, not by downstream
   polishing — so incoming-block specs and in-reaction controls (ATP, enzyme, temperature/time) are
-  critical.
+  critical (`C-001`–`C-007`).
 - Duplex integrity is controlled first by the **moisture-shifted glass transition** (the binding
   limit, on drying and storage), then by the **spray-dryer outlet temperature** below Tm (the looser
-  limit), and by the **final matrix**.
-- Enzyme clearance depends on **immobilisation** performance.
+  limit), and by the **final matrix** (`C-008`–`C-010`).
+- Enzyme clearance has **no chosen route**, and this bullet used to say it depended on
+  immobilisation performance. That presupposed the answer to a question nobody has answered: the
+  enzyme form is open (Q-050), so clearance is carried as **two branches, neither selected** —
+  denature-then-filter for a soluble enzyme, retention on the carrier for an immobilised one
+  (`C-011`, `C-012`). Both have a **blank** acceptance basis, because no clearance figure exists
+  publicly for either (`P-ENZ-CLEARANCE-LRV`, Q-032). The soluble branch is not the cheap way out:
+  its 85 °C denature hold sits above any plausible duplex melting band, trading an enzyme-clearance
+  gap for a product-integrity risk (R-021, Q-030), and it needs a heated vessel that is not in the
+  equipment register at all.

@@ -108,6 +108,22 @@ above holding.
   build overwrites. The fix remains an edit action plus structured issue forms mirroring the CSV
   columns, and ultimately a controlled workbook that opens a pull request.
 
+### Update — Tier 3 slice 1, 2026-09-21
+
+The control strategy moved from prose into `data/controls.csv` and `data/instruments.csv`, and the
+CPP → CQA matrix became a generated page like the registers and the balance. This is the decision
+above being used for what it was chosen for rather than extended: no new mechanism, one more
+generator module, three more generated pages.
+
+It did surface one thing the ADR did not anticipate. The argument this repository most needed to
+make checkable was a **negative** one — that a control claimed in prose could not be enforced,
+because no instrument can measure the quantity at process conditions. A knowledge base built on
+"every value lives once, flagged" has no natural place for an assertion about something that does
+*not* exist. The answer was to give absence its own vocabulary — a `not_measurable` control type
+and a required `measurement_mode` on every instrument — so that the gap is a row rather than a
+silence. That generalises: the data layer earns its keep most when it can represent what the
+package is missing, not only what it has.
+
 ## What would reverse this decision
 
 - An issued, revision-controlled document becomes the primary deliverable rather than a browsable

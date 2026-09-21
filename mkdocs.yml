@@ -83,6 +83,7 @@ nav:
       - Evaporation: process/evaporation.md
       - Spray drying: process/spray-drying.md
       - Microbial control: process/microbial.md
+      - Control strategy: process/controls.md
   - Mass & energy balance:
       - Method: balance/index.md
       - Results: balance/results.md
@@ -101,6 +102,8 @@ nav:
       - Risks: registers/risks.md
       - Open questions: registers/questions.md
       - Sources: registers/sources.md
+      - Instruments: registers/instruments.md
+      - Controls: registers/controls.md
   - Reading list: sources/reading-list.md
   - Decisions:
       - ADR 0001 — Information architecture: adr/0001-information-architecture.md
