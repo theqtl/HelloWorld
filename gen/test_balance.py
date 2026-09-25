@@ -324,10 +324,20 @@ def test_balance_refuses_a_blank_required_input():
 
 
 def test_purity_floor_defaults_to_the_registered_block_purity():
-    """The figure quoted in the documents and the one used in code must be the same figure."""
+    """The figure quoted in the documents and the one used in code must be the same figure.
+
+    The exponent is read from P-N-BLOCKS rather than written as a literal. It used to be a
+    hardcoded 3, which made the guard agree with the code only for as long as the register
+    happened to say 3 - so the one thing it was supposed to prove, that nothing drifts from
+    the register, was the thing it stopped checking the moment the register moved.
+    """
     from gen.balance import purity_floor
-    registered = param_value(load_params(), "P-BLOCK-PUR")
-    assert abs(purity_floor() - purity_floor(registered, 3)) < 1e-9
+    params = load_params()
+    f = param_value(params, "P-BLOCK-PUR")
+    k = param_value(params, "P-N-BLOCKS")
+    assert f is not None and k is not None, (
+        "P-BLOCK-PUR and P-N-BLOCKS must both carry values - purity_floor() reads both")
+    assert abs(purity_floor() - purity_floor(f, k)) < 1e-9
 
 
 def test_flowsheet_stream_ids_match_the_register():

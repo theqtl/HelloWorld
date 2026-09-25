@@ -224,3 +224,50 @@ def test_mutation_the_access_vocabulary_still_refuses_a_typo(mutate):
     mutate("sources", "source_key", "SRC-ALMAC-2023", access="partial-read")
     with pytest.raises(AssertionError, match="controlled vocabulary"):
         guard()
+
+
+# ---------------------------------------------------------------------------
+# test_purity_floor_defaults_to_the_registered_block_purity
+#
+# The guard used to hardcode the exponent as 3, so it agreed with the code only while the
+# register happened to say 3. Now it reads P-N-BLOCKS. The mutation that proves the
+# difference is moving the block count: the old form would have passed.
+# ---------------------------------------------------------------------------
+
+def test_mutation_the_purity_floor_guard_follows_the_registered_block_count(mutate):
+    """Move P-N-BLOCKS and the guard must still agree with the code.
+
+    This is the POSITIVE case, and it is the whole point: with the exponent hardcoded at 3
+    this guard failed on a register that legitimately said 2. Passing here proves it now
+    tracks the register instead of a literal.
+    """
+    from gen.test_balance import (
+        test_purity_floor_defaults_to_the_registered_block_purity as guard)
+    mutate("parameters", "param_id", "P-N-BLOCKS", value="2")
+    guard()
+
+
+def test_mutation_a_blank_block_count_is_caught(mutate):
+    """purity_floor() reads both inputs, so a blank must be reported, not silently defaulted."""
+    from gen.test_balance import (
+        test_purity_floor_defaults_to_the_registered_block_purity as guard)
+    mutate("parameters", "param_id", "P-N-BLOCKS", value="")
+    with pytest.raises(AssertionError, match="must both carry values"):
+        guard()
+
+
+def test_mutation_the_floor_moves_with_the_corrected_block_purity(mutate):
+    """The correction from the misread 92 to the measured 93.6 must actually reach the floor.
+
+    Guards the specific defect this slice fixed: a yield read as a purity. If the floor did
+    not move when P-BLOCK-PUR moved, the register and the published ceiling would be
+    decoupled and the correction would be cosmetic.
+    """
+    from gen.balance import purity_floor
+    before = purity_floor()
+    mutate("parameters", "param_id", "P-BLOCK-PUR", value="92")
+    after = purity_floor()
+    assert after < before, (
+        f"purity_floor did not follow P-BLOCK-PUR: {before:.2f}% -> {after:.2f}%")
+    assert abs(before - 82.0) < 0.05, f"corrected floor should be 82.0%, got {before:.2f}%"
+    assert abs(after - 77.87) < 0.05, f"the old misread gave 77.87%, got {after:.2f}%"
