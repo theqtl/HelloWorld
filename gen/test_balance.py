@@ -532,6 +532,15 @@ def test_numeric_claims_in_prose_carry_a_citation():
 ACCESS_VOCAB = {
     "full-text-read",   # the complete article or document was read
     "web-page-read",    # a web page, blog, vendor note, standard or patent read in full
+    "partial-text-read",  # retrieved and readable in full; SPECIFIED SECTIONS read, not all
+                        # of it. Added because the vocabulary could not express the true
+                        # state of a long guideline whose text layer was searched entirely
+                        # but whose body was read in part: `full-text-read` over-claims and
+                        # `record-only` under-claims so far that it misleads. Three
+                        # independent research passes reported the same gap and each
+                        # refused to force a value. A row using this MUST enumerate the
+                        # sections read and the page count in `notes` - see
+                        # test_a_partial_read_says_what_was_read.
     "abstract-only",    # only the abstract, or an abstract-equivalent record summary
     "record-only",      # only bibliographic metadata confirmed; no abstract read
     "redacted",         # obtainable and read, but the numbers we need are withheld in it
@@ -561,6 +570,44 @@ def test_access_values_are_in_the_controlled_vocabulary():
     assert not offenders, (
         "source(s) with an access value outside the controlled vocabulary "
         f"{sorted(ACCESS_VOCAB)}: " + "; ".join(offenders)
+    )
+
+
+def test_a_partial_read_says_what_was_read():
+    """`partial-text-read` is only honest if it states WHICH part was read.
+
+    The value exists so a 49-page guideline whose text layer was searched entirely but
+    whose body was read in sections is not forced to choose between over-claiming
+    (`full-text-read`) and misleading (`record-only`). That is only an improvement if the
+    row says what the sections were - otherwise it is `full-text-read` with a softer name,
+    and the register has gained a hiding place rather than a distinction.
+
+    So a partial read must name its extent: a section or clause reference, or a page
+    count. The check is on the SHAPE of the claim, not on particular wording, because
+    prescribing the phrasing would just move the problem into the phrasing.
+    """
+    import re as _re
+    extent = _re.compile(
+        r"(?:\bs(?:ec|ection)?\.?\s*\d)"      # section 4, s4, sec. 4
+        r"|(?:§\s*\d)"                     # a section sign followed by a number
+        r"|(?:\b\d+\s*(?:of|/)\s*\d+\s*(?:pp?\.?|pages?)\b)"   # 20 of 49 pages
+        r"|(?:\b\d+\s*(?:pp\.?|pages?)\b)"     # 27 pages
+        r"|(?:\bAnnex\s+[IVXA-Z0-9])"          # Annex II
+        r"|(?:\bTable\s+[A-Z0-9])"             # Table A.2.1
+        r"|(?:\bchapter\s+\d)",
+        _re.I,
+    )
+    offenders = []
+    for r in load_rows("sources"):
+        if (r.get("access") or "").strip() != "partial-text-read":
+            continue
+        blob = (r.get("notes") or "") + " " + (r.get("verified") or "")
+        if not extent.search(blob):
+            offenders.append(r["source_key"])
+    assert not offenders, (
+        "source(s) marked partial-text-read that do not say which part was read. Name the "
+        "sections or the page count in notes/verified, or use a different access value: "
+        + ", ".join(offenders)
     )
 
 
@@ -628,12 +675,22 @@ def test_unread_sources_cited_from_findings_are_on_the_reading_list():
 # ---------------------------------------------------------------------------
 
 def test_band_parameters_carry_an_explicit_range():
-    """A parameter that is a band must not hide as a bare point value (F-018, F-019).
+    """A band must not hide as a bare point value, and must say WHAT KIND of band it is.
 
-    Convention: a band parameter flags itself with the token 'BAND:' in its notes and
-    must then populate range_low/range_high; and any parameter carrying a range must
-    keep its point value inside it.
+    REPLACES the version that classified a band by the literal substring 'BAND:' in the
+    free-text notes. That classifier was unreliable and could be shown to be: ten rows
+    carry a range and only NINE carry the token, because P-YIELD-OVERALL-PUB writes
+    'BAND (vendor-published):' with no colon after BAND. The old guard could not see it,
+    because it only ever checked one direction - 'flagged but unranged' - and never
+    'ranged but unflagged'. A one-directional guard on a two-directional claim, which is
+    the failure test_the_unread_census_is_complete already records.
+
+    The classifier is now the `range_kind` COLUMN, and the check runs both ways:
+    a range implies a kind, and a kind implies a range. The prose token is still policed
+    in the direction it can be wrong (prose claiming a band the columns do not carry),
+    but it is no longer what identifies a band.
     """
+    from gen.dataio import RANGE_KINDS
     params = load_params()
     offenders = []
     for r in load_rows("parameters"):
@@ -641,20 +698,75 @@ def test_band_parameters_carry_an_explicit_range():
         notes = r.get("notes") or ""
         lo = (r.get("range_low") or "").strip()
         hi = (r.get("range_high") or "").strip()
-        if "BAND:" in notes and not (lo and hi):
-            offenders.append(f"{pid}: notes flag a BAND but range_low/range_high are empty")
-            continue
+        kind = (r.get("range_kind") or "").strip()
+        banded = bool(lo and hi)
+
         if lo or hi:
-            if not (lo and hi):
+            if not banded:
                 offenders.append(f"{pid}: only one of range_low/range_high is set")
                 continue
-            flo, fhi = float(lo), float(hi)
+            try:
+                flo, fhi = float(lo), float(hi)
+            except ValueError:
+                offenders.append(f"{pid}: range bound is not numeric: {lo!r}, {hi!r}")
+                continue
             if flo > fhi:
                 offenders.append(f"{pid}: range_low {flo} > range_high {fhi}")
             v = param_value(params, pid)
             if v is not None and not (flo <= v <= fhi):
                 offenders.append(f"{pid}: value {v} outside its range [{flo}, {fhi}]")
+
+        # Direction 1 - a range must declare what kind of claim it is. This is the
+        # direction nothing checked, and the direction P-YIELD-OVERALL-PUB slipped.
+        if banded and not kind:
+            offenders.append(
+                f"{pid}: carries a range but no range_kind - a band without a kind does not "
+                f"say whether it is evidence, an argument, or a commitment")
+        # Direction 2 - a kind must have a range to describe.
+        if kind and not banded:
+            offenders.append(f"{pid}: declares range_kind={kind!r} but carries no range")
+        if kind and kind not in RANGE_KINDS:
+            offenders.append(
+                f"{pid}: range_kind {kind!r} outside {sorted(RANGE_KINDS)}")
+        # The legacy prose token, policed only where it can lie: prose asserting a band
+        # the columns do not carry. Its ABSENCE no longer means anything.
+        if "BAND:" in notes and not banded:
+            offenders.append(f"{pid}: notes flag a BAND but range_low/range_high are empty")
     assert not offenders, "band/range defect(s): " + "; ".join(offenders)
+
+
+def test_an_ich_range_kind_is_not_claimed_without_demonstration():
+    """Two range_kind values are ICH terms of art. Using one is a regulatory claim.
+
+    `design_space` means, in ICH Q8(R2)'s own words, a combination of variables "that
+    have been DEMONSTRATED to provide assurance of quality" and that is "subject to
+    regulatory assessment and approval". `proven_acceptable_range` means a range WE have
+    characterised, holding the other parameters constant. Nothing in this concept is
+    either: every band here is literature, argument, or a sizing commitment.
+
+    Both sets are EMPTY today and this guard is therefore proven by mutation rather than
+    by a live row - the same standing as `not_measurable` in gen/controls.py. It exists so
+    that a later slice cannot quietly promote a literature band to a design space, which
+    would be the ISA-conformance over-claim in a different register. If a real design space
+    is ever established, this guard is what has to be argued with first.
+    """
+    from gen.dataio import RANGE_KINDS_ICH
+    offenders = []
+    for r in load_rows("parameters"):
+        kind = (r.get("range_kind") or "").strip()
+        if kind not in RANGE_KINDS_ICH:
+            continue
+        prov = (r.get("provenance") or "").strip()
+        if prov != "fact":
+            offenders.append(
+                f"{r['param_id']}: claims ICH term {kind!r} on provenance={prov!r}; an ICH "
+                f"range is demonstrated, so it cannot rest on an assumption or an inference")
+        if not (r.get("source_key") or "").strip():
+            offenders.append(
+                f"{r['param_id']}: claims ICH term {kind!r} with no source_key")
+    assert not offenders, (
+        "parameter(s) claiming an ICH range term without the demonstration it asserts. "
+        "Re-examine the claim rather than relaxing this test: " + "; ".join(offenders))
 
 
 #: Tokens in a source's scale_system that name a molecule class other than our
