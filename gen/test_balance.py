@@ -82,7 +82,8 @@ def test_purity_floor_monotonic_and_bounded():
 def test_data_files_present():
     for name in ("parameters", "streams", "equipment", "buffers", "utilities",
                  "risks", "questions", "sources", "scenarios", "impurities",
-                 "controls", "instruments"):
+                 "controls", "instruments", "envelopes", "couplings", "infoneeds",
+                 "verdicts"):
         assert load_rows(name), f"{name}.csv empty or missing"
 
 
@@ -180,7 +181,8 @@ def test_every_question_reference_exists_in_every_csv():
     qids = {r["question_id"] for r in load_rows("questions")}
     offenders = []
     for name in ("parameters", "scenarios", "risks", "equipment", "buffers", "utilities",
-                 "streams", "sources", "impurities", "controls", "instruments"):
+                 "streams", "sources", "impurities", "controls", "instruments",
+                 "envelopes", "couplings", "infoneeds", "verdicts"):
         for row in load_rows(name):
             for value in row.values():
                 for tok in re.findall(r"Q-\d{3}", value or ""):
@@ -1917,3 +1919,144 @@ def test_no_published_page_claims_the_tag_scheme_is_isa():
         "own and conformance to the current edition is unverified (Q-053); ISA-5.1-2024 and "
         "ISA-TR5.1.02-2024 are unread and may not be reproduced: " + ", ".join(offenders)
     )
+
+
+# ---------------------------------------------------------------------------
+# Tier-3 slice 3: the ligation design envelope (gen/envelope.py), added 2026-09-25.
+#
+# Three claims this repository was making could not be checked while they were prose, and every
+# one of them had already failed silently:
+#
+#   * that a band's two endpoints were two INDEPENDENT citations. `parameters.csv` carries one
+#     `source_key` per row, so a range whose ends came from one document looked identical to one
+#     bracketed by two. `P-BLOCK-PUR` was that defect at its worst - both ends from one patent, one
+#     of them a 6.00 g bench datum sitting inside a band labelled 145-258 g, and its point value a
+#     YIELD misread as a purity.
+#   * that a set of bands describes a REGION. Two parameters can each sit inside their band while
+#     the corner they form together is unreachable.
+#   * that an information requirement was ANCHORED. Almost none is, for an enzymatic step: `enzym`
+#     and `biocatal` return zero hits across ICH Q11 and Q7.
+#
+# The acceptance panel then found the same class of defect in the slice that introduced the guards
+# against it - four checklist rows citing an ICH Q11 "s4.3" that does not exist, and two envelope
+# rows whose verdict claimed a measured endpoint their own notes denied. Both holes are now closed
+# by the guards below, which is why several of them check a row against ITS OWN data rather than
+# against a vocabulary.
+# ---------------------------------------------------------------------------
+
+def test_the_new_registers_pass_their_own_vocabularies():
+    """One call, because gen/envelope.py raises with every problem it found rather than the first.
+
+    Strict on vocabulary for the reason gen/controls.py gives: a typo must not fall through to a
+    confident statement about the process. What makes this more than a spell-check is the set of
+    cross-checks inside it - a verdict that contradicts its own endpoints, a point value with no
+    argument behind it, an anchor clause its own source row never records reading.
+    """
+    from gen.envelope import validate
+    validate()
+
+
+def test_a_refused_bracket_is_not_written_as_a_range():
+    """The user's standing rule, made mechanical.
+
+    A bracket that fails the two-independent-endpoints test does not get written as a range: the
+    parameter keeps a blank or a clearly-labelled single point, and the failure becomes a registered
+    question naming what second source would fix it. So a `not_a_range` verdict in envelopes.csv and
+    a numeric range in parameters.csv are a direct contradiction between two registers.
+
+    The live case is the ligation concentration, whose two ends are a demonstrated SUCCESS and a
+    reported FAILURE - different kinds of claim, so no width between them is a window of operation.
+    """
+    from gen.envelope import range_written_where_refused
+    offenders = range_written_where_refused()
+    assert not offenders, (
+        "parameter(s) carrying a range that envelopes.csv rules is not one; blank the range and "
+        "register the question instead: " + "; ".join(offenders)
+    )
+
+
+def test_every_band_has_an_endpoint_audit():
+    """A number a reader can use must say whether its two ends are two claims or one.
+
+    Added after the acceptance panel pointed out that `one_source_both_ends` was disclosed only in
+    envelopes.csv, so the disclosure never reached whoever read the band off the parameter register.
+    The fix is not a second column - carrying a relation on both sides lets the two disagree with
+    nothing to detect it, which is why instruments.csv has no `control_loop` column. It is to
+    require that the audit EXISTS and to render it beside the parameter at build time.
+
+    One-directional on purpose: three envelope rows legitimately have no parameter counterpart, and
+    two of them exist precisely to record spans that must NOT be written as ranges.
+    """
+    from gen.envelope import unaudited_bands
+    offenders = unaudited_bands()
+    assert not offenders, (
+        "band(s) in parameters.csv with no endpoint audit in envelopes.csv: " + "; ".join(offenders)
+    )
+
+
+def test_no_design_intent_band_spans_an_unreachable_corner():
+    """ICH Q8(R2) Appendix 2 sanctions an INSCRIBED box, never a circumscribed one.
+
+    Where one parameter's acceptable range depends on another's, an applicant may report the true
+    curved region or a smaller box - and every corner of that box has to be simultaneously
+    attainable. A box drawn round the region claims operation at corners nobody has reached.
+
+    No live row trips this, and that is expected rather than a weakness: the only `design_intent`
+    band in the register is the evaporator's, which no coupling touches. Its evidence is the
+    mutation case, the same standing as `not_measurable` in gen/controls.py - kept because the
+    distinction is real and the next such case needs it.
+    """
+    from gen.envelope import corner_rule_offenders
+    offenders = corner_rule_offenders()
+    assert not offenders, (
+        "design_intent band(s) spanning a corner a coupling declares unreachable: "
+        + "; ".join(offenders)
+    )
+
+
+def test_no_published_page_presents_the_panel_as_qualified_signoff():
+    """The panel is four reviews this project ran itself. It is not a sign-off, and no page may read
+    as though it were.
+
+    In the idiom of test_no_published_page_claims_the_tag_scheme_is_isa (:1893), and for the same
+    reason: a claim fixed in one file survives one directory away, so the sweep has to run over
+    everything that publishes. It matches claim SHAPES rather than vocabulary, and it carves out any
+    line carrying a negation - because saying what the panel is NOT has to stay sayable, and a guard
+    that refused the disclaimer would create pressure to delete it.
+
+    Four independent REJECTs on four different questions are a publishable result. A package that
+    reads as though it had been signed off is a misrepresentation, and a worse one than any single
+    wrong number, because it invites a reader to stop checking.
+    """
+    from gen.envelope import signoff_claim_offenders
+    offenders = signoff_claim_offenders(_doc_files())
+    assert not offenders, (
+        "published page(s) presenting the acceptance panel as qualified engineering sign-off. It is "
+        "this project's own role-based review, run by four reviewers who could not see each other, "
+        "and it approves nothing: " + "; ".join(os.path.relpath(o, ROOT) for o in offenders)
+    )
+
+
+def test_the_panel_publishes_disagreement_rather_than_a_consensus():
+    """Disagreement is published, not reconciled - so the page must show every verdict.
+
+    The failure mode is a summary that averages four reviews into a tone. Each reviewer's verdict,
+    their single binding blocker and what would change it must all reach the page, and each blocker
+    must resolve to a question this repository already tracks - otherwise the panel is generating
+    new work rather than judging the register it was given.
+    """
+    from gen.envelope import render
+    out = render()
+    rows = load_rows("verdicts")
+    assert rows, "the acceptance panel register is empty"
+    qids = {r["question_id"] for r in load_rows("questions")}
+    for r in rows:
+        assert r["blocker_ref"] in qids, (
+            f"{r['verdict_id']}: blocker {r['blocker_ref']} is not a registered question")
+        assert r["blocker_ref"] in out, f"{r['verdict_id']}'s blocker is not rendered"
+        assert r["verdict"] in out, f"{r['verdict_id']}'s verdict is not rendered"
+        assert r["reviewer_role"] in out, f"{r['verdict_id']}'s role is not rendered"
+    blockers = {r["blocker_ref"] for r in rows}
+    assert len(blockers) > 1 or len(rows) == 1, (
+        "every reviewer named the same blocker, which is a result worth stating explicitly rather "
+        "than one to assert by accident - check the panel really ran independently")

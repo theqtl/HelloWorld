@@ -271,3 +271,255 @@ def test_mutation_the_floor_moves_with_the_corrected_block_purity(mutate):
         f"purity_floor did not follow P-BLOCK-PUR: {before:.2f}% -> {after:.2f}%")
     assert abs(before - 82.0) < 0.05, f"corrected floor should be 82.0%, got {before:.2f}%"
     assert abs(after - 77.87) < 0.05, f"the old misread gave 77.87%, got {after:.2f}%"
+
+
+# ---------------------------------------------------------------------------
+# Tier-3 slice 3: the four new registers.
+#
+# `gen/envelope.py` raises ValueError with EVERY problem it found rather than the first, so each
+# case below asserts on the phrase belonging to the guard it is proving. Several of these guards
+# check a row against ITS OWN data rather than against a vocabulary, and those are the ones worth
+# having: the acceptance panel found two envelope rows whose verdict claimed a measured endpoint
+# their own notes denied, and a vocabulary check could never have seen it.
+# ---------------------------------------------------------------------------
+
+def _validate():
+    from gen.envelope import validate
+    return validate
+
+
+def test_mutation_an_unknown_bracket_verdict_is_caught(mutate):
+    mutate("envelopes", "envelope_id", "ENV-003", bracket_verdict="two_indepedent")
+    with pytest.raises(ValueError, match="not in the controlled vocabulary"):
+        _validate()()
+
+
+def test_mutation_two_independent_endpoints_citing_one_source_is_caught(mutate):
+    """THE case the whole register exists for, in the direction that flatters a band.
+
+    A range whose ends came from one document, labelled as two independent ones, is the defect
+    `P-BLOCK-PUR` shipped with. If this passes, the register has a verdict column and no teeth.
+    """
+    mutate("envelopes", "envelope_id", "ENV-003", high_source_key="SRC-HONGENE-BROCHURE-2025")
+    with pytest.raises(ValueError, match="verdict contradicts its own data"):
+        _validate()()
+
+
+def test_mutation_one_source_both_ends_citing_two_is_caught(mutate):
+    """And the opposite direction, because a one-directional guard ships the other one."""
+    mutate("envelopes", "envelope_id", "ENV-001", high_source_key="SRC-KELLY-OPRD-2025")
+    with pytest.raises(ValueError, match="ONE named source at both ends"):
+        _validate()()
+
+
+def test_mutation_a_sourceless_verdict_carrying_a_source_is_caught(mutate):
+    """The hole the acceptance panel walked through, now closed.
+
+    `P-EPS-260` is bracketed by argument and says so - "NO SOURCE AT EITHER END, by construction".
+    A verdict on that row that implies a citation overstates the standing of the band which decides
+    the in-line/at-line question, and the first version of this register did exactly that.
+    """
+    mutate("envelopes", "envelope_id", "ENV-012", low_source_key="SRC-MALEK-2019")
+    with pytest.raises(ValueError, match="must not carry a citation"):
+        _validate()()
+
+
+def test_mutation_a_single_point_spanning_an_interval_is_caught(mutate):
+    """The per-branch enzyme loadings are points in incommensurable units, not bands."""
+    mutate("envelopes", "envelope_id", "ENV-007", high="2")
+    with pytest.raises(ValueError, match="a point that spans an interval is a band"):
+        _validate()()
+
+
+def test_mutation_an_ich_range_kind_in_the_envelope_register_is_caught(mutate):
+    """Both ICH kinds are empty by design, and the emptiness has to be defended in BOTH registers.
+
+    gen/test_balance.py guards parameters.csv. Without this case, envelopes.csv would be a second
+    door into the same over-claim - which is how the ISA claim survived one directory away.
+    """
+    mutate("envelopes", "envelope_id", "ENV-013", range_kind="design_space")
+    with pytest.raises(ValueError, match="is an ICH term of art"):
+        _validate()()
+
+
+def test_mutation_an_unresolvable_endpoint_source_is_caught(mutate):
+    mutate("envelopes", "envelope_id", "ENV-005", high_source_key="SRC-NOT-A-SOURCE")
+    with pytest.raises(ValueError, match="is not in the source register"):
+        _validate()()
+
+
+def test_mutation_an_endpoint_driving_nothing_that_exists_is_caught(mutate):
+    """An endpoint that sizes nothing is a literature note; one that sizes a thing which does not
+    exist is worse, because it reads as a link to the plant."""
+    mutate("envelopes", "envelope_id", "ENV-005", high_drives_ref="UT-NOPE")
+    with pytest.raises(ValueError, match="resolves to no equipment"):
+        _validate()()
+
+
+def test_mutation_a_refused_bracket_written_as_a_range_is_caught(mutate):
+    """The user's standing rule, proven: a `not_a_range` span must not appear as a range.
+
+    Mutating the PARAMETER rather than the envelope, because that is the direction the defect comes
+    from - someone fills in a band because the two numbers are sitting there.
+    """
+    from gen.envelope import range_written_where_refused
+    mutate("parameters", "param_id", "P-LIG-SEG-CONC",
+           range_low="1.5", range_high="10", range_kind="evidence")
+    offenders = range_written_where_refused()
+    assert offenders, (
+        "range_written_where_refused did not see a not_a_range span written as a range in "
+        "parameters.csv - the standing rule is unenforced")
+    assert "P-LIG-SEG-CONC" in offenders[0]
+
+
+def test_mutation_a_band_losing_its_endpoint_audit_is_caught(mutate):
+    """Every number a reader can use off parameters.csv must have an audit saying whose claims its
+    two ends are. Proven by moving an envelope row off its parameter."""
+    from gen.envelope import unaudited_bands
+    mutate("envelopes", "envelope_id", "ENV-010", param_id="P-MW-NT")
+    offenders = unaudited_bands()
+    assert offenders and any("P-DS-TM" in o for o in offenders), (
+        f"unaudited_bands missed a band with no audit: {offenders}")
+
+
+def test_mutation_a_design_intent_band_over_an_unreachable_corner_is_caught(mutate):
+    """The inscribed-box rule, and it has NO live row - this case is its entire evidence.
+
+    Points a coupling that declares its corner unreachable at the one parameter carrying a
+    `design_intent` band, so both sides of the corner are design intent and the pair asserts
+    operation where nobody has operated.
+    """
+    from gen.envelope import corner_rule_offenders
+    mutate("couplings", "coupling_id", "CPL-005",
+           param_a="P-EVAP-T-BOIL", param_b="P-EVAP-T-BOIL")
+    offenders = corner_rule_offenders()
+    assert offenders, (
+        "corner_rule_offenders did not see a design_intent band spanning a corner declared "
+        "unreachable - the only guard in the slice with no live row is blind")
+    assert "CPL-005" in offenders[0]
+
+
+def test_mutation_an_unknown_coupling_vocabulary_is_caught(mutate):
+    mutate("couplings", "coupling_id", "CPL-001", corner_reachable="maybe")
+    with pytest.raises(ValueError, match="corner_reachable"):
+        _validate()()
+
+
+def test_mutation_a_point_value_with_no_argument_is_caught(mutate):
+    """A bare point value is a claim that the variable does not matter, and that claim needs
+    defending in writing. This is the guard that makes the four-way split mean something."""
+    mutate("infoneeds", "need_id", "IN-002", point_argument="")
+    with pytest.raises(ValueError, match="bare point"):
+        _validate()()
+
+
+def test_mutation_an_argument_for_a_point_that_is_not_there_is_caught(mutate):
+    """The reverse: an argument on a row carrying no point value will be read as justifying one."""
+    mutate("infoneeds", "need_id", "IN-003",
+           point_argument="25 C is fine because both examples agreed")
+    with pytest.raises(ValueError, match="justifying something it does not"):
+        _validate()()
+
+
+def test_mutation_an_anchor_clause_nobody_read_is_caught(mutate):
+    """THE defect the acceptance panel found in this slice: four rows cited an ICH Q11 "s4.3" that
+    does not exist, and 105 green tests never resolved a clause against its document.
+
+    The guard couples the two registers - a clause an information need cites must appear in its
+    source row's `clauses_read` - so a fabricated section number now fails the build.
+
+    Note the clause used here. "s4.3" is the exact string the panel found, and it is also the string
+    that defeated the FIRST version of this guard: that version searched the source's prose, and the
+    corrective sentence added to SRC-ICH-Q11 ("there is no s4.1, s4.2 or s4.3 to cite") contains it,
+    so the guard found the clause and passed. Keeping "s4.3" here is deliberate - it is the one input
+    that proves the check is reading the delimited field and not the prose.
+    """
+    mutate("infoneeds", "need_id", "IN-001", anchor_clause="s4.3")
+    with pytest.raises(ValueError, match="clauses_read does not list it"):
+        _validate()()
+
+
+def test_mutation_an_unknown_disposition_or_anchor_strength_is_caught(mutate):
+    mutate("infoneeds", "need_id", "IN-005", disposition="unknowable")
+    with pytest.raises(ValueError, match="not in the controlled vocabulary"):
+        _validate()()
+
+
+def test_mutation_an_anchor_strength_typo_is_caught(mutate):
+    mutate("infoneeds", "need_id", "IN-005", anchor_strength="generic-anchor")
+    with pytest.raises(ValueError, match="anchor_strength"):
+        _validate()()
+
+
+def test_mutation_a_blocker_that_is_not_a_registered_question_is_caught(mutate):
+    """A reviewer's binding blocker has to be something this repository already tracks, or the panel
+    is generating new work rather than judging the register it was handed."""
+    mutate("verdicts", "verdict_id", "V-001", blocker_ref="Q-999")
+    with pytest.raises(ValueError, match="not a registered question id"):
+        _validate()()
+
+
+def test_mutation_a_verdict_outside_accept_reject_is_caught(mutate):
+    """Deliberately binary and deliberately not averaged."""
+    mutate("verdicts", "verdict_id", "V-002", verdict="ACCEPT_WITH_COMMENTS")
+    with pytest.raises(ValueError, match="verdict"):
+        _validate()()
+
+
+def test_mutation_a_verdict_that_cannot_be_moved_is_caught(mutate):
+    mutate("verdicts", "verdict_id", "V-003", what_would_change_it="")
+    with pytest.raises(ValueError, match="cannot be moved"):
+        _validate()()
+
+
+def test_mutation_a_page_claiming_the_panel_signed_off_is_caught(tmp_path):
+    """The honesty sweep, proven both ways.
+
+    Not routed through the CSV harness: this guard sweeps published pages, so its mutation is a
+    page. Both directions matter - a guard that only catches the false claim would be satisfied by
+    deleting the disclaimer, and a guard that refuses the disclaimer creates pressure to do exactly
+    that.
+    """
+    from gen.envelope import signoff_claim_offenders
+    bad = tmp_path / "bad.md"
+    bad.write_text(
+        "# Concept\n"
+        "This package has been reviewed by a licensed professional engineer.\n"
+        "The panel has approved the concept for construction.\n",
+        encoding="utf-8")
+    offenders = signoff_claim_offenders([str(bad)])
+    assert len(offenders) == 2, f"the sweep missed a sign-off claim: {offenders}"
+
+    good = tmp_path / "good.md"
+    good.write_text(
+        "# Concept\n"
+        "These are four role-based reviews this project ran itself.\n"
+        "They are **not** a design review by licensed engineers and approve nothing.\n"
+        "Nothing here has been reviewed or approved by a qualified person or a regulator.\n",
+        encoding="utf-8")
+    assert not signoff_claim_offenders([str(good)]), (
+        "the sweep refused an honest disclaimer, which would push a writer to delete it")
+
+
+def test_mutation_the_purity_sensitivity_follows_the_registered_block_count(mutate):
+    """The published ceiling moves with the register, so the sensitivity that discloses it must too.
+
+    The acceptance panel's process reviewer made this table the condition of acceptance: an
+    exclusion whose cost is not shown is indistinguishable from one made because it flatters the
+    route. If the table were typed in rather than computed, it would go stale the moment anyone
+    moved the block count - which is the defect the data layer exists to prevent.
+    """
+    from gen.envelope import purity_ceiling_sensitivity
+    n3, rows3 = purity_ceiling_sensitivity()
+    assert n3 == "3"
+    mutate("parameters", "param_id", "P-N-BLOCKS", value="2")
+    n2, rows2 = purity_ceiling_sensitivity()
+    assert n2 == "2", "the sensitivity table did not follow P-N-BLOCKS"
+    key3 = [k for k in rows3[0] if k.startswith("DS full-length ceiling")][0]
+    key2 = [k for k in rows2[0] if k.startswith("DS full-length ceiling")][0]
+    assert key3 != key2, "the column header must name the block count it was computed at"
+    # Fewer ligations, so fewer blocks compounding: every ceiling must rise.
+    for a, b in zip(rows3, rows2):
+        lo = float(a[key3].strip("* %"))
+        hi = float(b[key2].strip("* %"))
+        assert hi > lo, f"ceiling did not rise when the block count fell: {lo} -> {hi}"

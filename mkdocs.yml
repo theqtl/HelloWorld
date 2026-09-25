@@ -84,6 +84,7 @@ nav:
       - Spray drying: process/spray-drying.md
       - Microbial control: process/microbial.md
       - Control strategy: process/controls.md
+      - Ligation design envelope: process/ligation-envelope.md
   - Mass & energy balance:
       - Method: balance/index.md
       - Results: balance/results.md
