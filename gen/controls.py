@@ -159,6 +159,25 @@ def tag_letter_error(tag):
     return None
 
 
+def tag_declares_control(tag):
+    """Whether `tag` claims an active control function, from the letters alone.
+
+    The PFD needs this because a control loop has to be DERIVED rather than read off a list.
+    `controls.instrument_ref` is the authoritative link for the CPP->CQA matrix, but it is scoped
+    to controls with a critical quality attribute behind them, so it is not the set of loops in
+    the plant - nine tags declare control and only two are in that register (Q-056). Asking the
+    tag instead means the drawing follows a rule over the declared scheme, not an enumeration of
+    whichever rows happen to exist, which is the mistake the old `DPI` allow-list guard made.
+
+    An illegal tag returns False rather than raising: `tag_letter_error` is the function whose job
+    is to complain about it, and two functions reporting the same fault would let them disagree.
+    """
+    if tag_letter_error(tag):
+        return False
+    succeeding = set(tag.split("-")[0][1:])
+    return bool(succeeding & TAG_CONTROL_OUTPUT_LETTERS)
+
+
 def tag_scheme_markdown():
     """The declared tag scheme, rendered for the instrument register.
 
@@ -283,6 +302,22 @@ TAG_OUTPUT_LETTERS = {"C": "control", "T": "transmit"}
 #: them - so the four-digit <unit><loop> block below is this project's own and must not be
 #: attributed to ISA (Q-053).
 TAG_PATTERN = r"[A-Z]{2,4}-\d{4}"
+
+#: The output letters that declare an ACTIVE control function, derived from TAG_OUTPUT_LETTERS
+#: rather than written out again: `C` controls, `T` only transmits. Deriving it means the two
+#: cannot drift apart, and adding an output letter to the scheme automatically classifies it.
+TAG_CONTROL_OUTPUT_LETTERS = frozenset(
+    k for k, v in TAG_OUTPUT_LETTERS.items() if "control" in v
+)
+
+#: Measurement modes in which a reading is continuously available to a controller: the sensor is
+#: in the stream (in_line) or a sample is diverted automatically and may be returned (on_line).
+#: The other two modes mean a human carries a sample somewhere, so no loop can close on them -
+#: that is the whole content of the Q-042 case, expressed as a set rather than as a sentence.
+LOOP_CAPABLE_MODES = frozenset({"in_line", "on_line"})
+
+#: The complement: a reading that exists only because a sample was withdrawn.
+WITHDRAWN_MODES = frozenset(MEASUREMENT_MODES - LOOP_CAPABLE_MODES)
 
 
 #: How each control type reads on the page. A control that does not act must not LOOK like one,

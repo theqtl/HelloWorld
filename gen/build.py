@@ -14,6 +14,12 @@ from .balance import run_all
 from .flowsheet import render as render_flowsheet
 from .impurity import render as render_impurities
 from .controls import render as render_controls, tag_scheme_markdown
+from .envelope import render as render_envelope
+from .pfd import (
+    UNITS as PFD_UNITS,
+    render_page as render_pfd_page,
+    render_svg as render_pfd_svg,
+)
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DOCS = os.path.join(ROOT, "docs")
@@ -37,7 +43,13 @@ def gen_registers():
          "Every numeric input lives here once. `provenance` is one of **fact** "
          "(from a cited source), **inference** (our reasoning/arithmetic), or "
          "**assumption** (illustrative placeholder, registered as a gap). "
-         "Blank values are unfilled gaps, never invented.", None),
+         "Blank values are unfilled gaps, never invented. The last column is **joined from "
+         "`data/envelopes.csv`** and is not stored here: it says whether a band's two endpoints are "
+         "two independent citations or one document wearing two, which a single `source_key` per "
+         "row cannot express. `one_source_both_ends` is not a defect - a band may be the honest "
+         "summary of what one study measured - but it has to be disclosed where the number is read, "
+         "and the full endpoint-by-endpoint audit with each end's own scale is on the "
+         "[ligation design envelope](../process/ligation-envelope.md) page.", None),
         ("streams", "registers/streams.md", "Stream register",
          "Stream numbers tie to the block-flow diagram and the mass balance.", None),
         ("equipment", "registers/equipment.md", "Equipment register",
@@ -79,12 +91,43 @@ def gen_registers():
     ]
     for name, rel, title, intro, cols in specs:
         rows = load_rows(name)
+        if name == "parameters":
+            rows = _with_bracket_verdicts(rows)
         body = BANNER + f"# {title}\n\n"
         if intro:
             body += intro + "\n\n"
         body += md_table(rows, columns=cols)
         written.append(_write(rel, body))
     return written
+
+
+def _with_bracket_verdicts(rows):
+    """Render each band's endpoint verdict beside the band, JOINED from envelopes.csv.
+
+    The acceptance panel's process reviewer found that `one_source_both_ends` was disclosed only in
+    envelopes.csv, so a reader taking a band off the parameter register was never told its two ends
+    are one document. Three live bands were in that position.
+
+    Joined at build time rather than copied into a `bracket_verdict` column of parameters.csv,
+    because carrying a relation on both sides lets the two disagree with nothing to detect it - the
+    reason instruments.csv deliberately has no `control_loop` column. The coverage guard
+    (gen/envelope.py `unaudited_bands`) makes the join total: a band with no audit fails the build,
+    so this column can never be silently empty.
+    """
+    from .envelope import verdict_for
+    out = []
+    for r in rows:
+        r = dict(r)
+        lo = (r.get("range_low") or "").strip()
+        hi = (r.get("range_high") or "").strip()
+        kind = (r.get("range_kind") or "").strip()
+        if lo and hi:
+            v = verdict_for(r["param_id"], kind)
+            r["bracket_verdict (from envelopes.csv)"] = v or "**no audit**"
+        else:
+            r["bracket_verdict (from envelopes.csv)"] = ""
+        out.append(r)
+    return out
 
 
 def gen_streams_on_process():
@@ -212,7 +255,13 @@ def main():
     written.append(gen_balance())
     written.append(_write("balance/impurities.md", render_impurities()))
     written.append(_write("process/controls.md", render_controls()))
+    written.append(_write("process/ligation-envelope.md", render_envelope()))
     written.append(_write("diagrams/bfd.svg", render_flowsheet()))
+    # One PFD per unit operation: 49 instruments on one sheet is unreadable, and every
+    # instrument row declares a unit_op while only 39 of 49 declare a stream_ref.
+    for unit in PFD_UNITS:
+        written.append(_write(f"diagrams/pfd-{unit.lower()}.svg", render_pfd_svg(unit)))
+    written.append(_write("diagrams/pfd.md", render_pfd_page()))
     print("Generated:")
     for w in written:
         print("  docs/" + w)

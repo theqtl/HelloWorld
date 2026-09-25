@@ -422,6 +422,12 @@ answer.
 | [SRC-OPRD-2025] | record only | Nothing any more — both figures previously attributed to it have been traced to other sources | Microbial process page |
 | [SRC-MORISON-2006] | record only | Nothing directly; its numbers reach us through [SRC-HUGHES-2024], which was read | Provenance chain only |
 | [SRC-XIA-1998] | record only | Nothing directly; its parameters reach us through [SRC-NNDB-TURNER], which was read | Provenance chain only |
+| [SRC-BHANGALE-2022] | abstract only | Corroborates the MODALITY only — that variable-pathlength UV is used in-line — behind the at-line decision (Q-042). No number is taken from it | Control strategy, instrument register, Q-042 |
+| [SRC-ISA-5-1-2024] | not retrieved | Nothing. Named so the instrument tag scheme can state what it is **not** based on; paywalled, and ISA prohibits reproducing it here | Instrument register tag scheme, Q-053 |
+| [SRC-ISA-TR5-1-02-2024] | not retrieved | Nothing. The 2024 split moved the identification guidance into this report, so a conformance claim needs it too | Instrument register tag scheme, Q-053 |
+| [SRC-DEXPI-2-0] | abstract only | Nothing. Registered as context: it unifies the P&ID and Process specifications and makes "DEXPI XML" the standard BFD/PFD serialization. Front matter and Chapter 1 read; the model reference was not | Context for the PFD generator only |
+| [SRC-DEXPI-PID-1-4] | abstract only | Nothing. Covers P&IDs, i.e. the plant model, not PFDs — so it is not what a process flow diagram anchors to. Overview page only | Context for the PFD generator only |
+| [SRC-ISO-10628-1] | not retrieved | Nothing, and that is the point: it is **the** standard specifying what a BFD and PFD must contain, so it is what would settle whether the generated diagrams conform. Buy it into document control | Process flow diagrams, Q-054 |
 
 **How to read this table.** Five of these eight are genuinely load-bearing and unread. Two are
 provenance-chain entries whose numbers reach us through an open source that *was* read in full, so

@@ -12,12 +12,14 @@ what already exists here.
 - Governing equations with terms, assumptions, and transferability notes ([equations](../equations/index.md)).
 - Equipment, stream, buffer, utility, risk, and question registers.
 - A cited source log with reachability and scale/system tags.
-- An [instrument register](../registers/instruments.md) — every instrument the concept implies, control-enforcing and monitoring-only alike, each with an ISA-style tag and, crucially, its **measurement mode** (in-line / on-line / at-line / off-line).
+- An [instrument register](../registers/instruments.md) — every instrument the concept implies, control-enforcing and monitoring-only alike, each with a tag from [this project's own declared letter scheme](../registers/instruments.md) — conformance to the current ANSI/ISA-5.1 edition is **unverified** and registered as Q-053, so the scheme is not presented as ISA's — and, crucially, its **measurement mode** (in-line / on-line / at-line / off-line).
 - A generated [CPP → CQA control strategy matrix](../process/controls.md): each control names the registered parameter it acts on, the instrument that could enforce it, and the open question that blocks it — including the controls that **cannot exist**, which are rendered as registered gaps rather than omitted.
+
+- **[Process flow diagrams](../diagrams/pfd.md)**, one per unit operation, generated from the registers above: each instrument drawn at its sensing point, with closed control loops distinguished from withdrawn-sample measurements by a rule over the measurement mode and the declared tag letters rather than by assertion. What they do **not** carry is registered rather than silent: the final control element each loop manipulates is not in any register (Q-055), no standard this project has read specifies the symbol set (Q-054), and seven tags declaring a control function appear in no control row (Q-056).
 
 ## To be produced
 
-- **Process flow diagrams (PFDs)** with instrument tags and control loops.
+- **A P&ID, equipment layout and a stream table on the drawings.** The PFDs stop short of all three. Piping, valve specification and line numbering are P&ID-level work; layout and a plot plan are a facility exercise tied to Q-002; stream quantities stay in the [balance](../balance/results.md) rather than being copied onto an SVG where they could drift.
 - **Measured inputs for the mass & energy balance.** The balance now computes the full evaporator and
   drying-gas duties and the species-resolved impurity fate, but on assumption-flagged inputs; the
   package still needs measured thermal (Q-045, Q-046) and clearance (Q-036) data to replace them.

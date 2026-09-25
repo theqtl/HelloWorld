@@ -82,7 +82,8 @@ def test_purity_floor_monotonic_and_bounded():
 def test_data_files_present():
     for name in ("parameters", "streams", "equipment", "buffers", "utilities",
                  "risks", "questions", "sources", "scenarios", "impurities",
-                 "controls", "instruments"):
+                 "controls", "instruments", "envelopes", "couplings", "infoneeds",
+                 "verdicts"):
         assert load_rows(name), f"{name}.csv empty or missing"
 
 
@@ -180,7 +181,8 @@ def test_every_question_reference_exists_in_every_csv():
     qids = {r["question_id"] for r in load_rows("questions")}
     offenders = []
     for name in ("parameters", "scenarios", "risks", "equipment", "buffers", "utilities",
-                 "streams", "sources", "impurities", "controls", "instruments"):
+                 "streams", "sources", "impurities", "controls", "instruments",
+                 "envelopes", "couplings", "infoneeds", "verdicts"):
         for row in load_rows(name):
             for value in row.values():
                 for tok in re.findall(r"Q-\d{3}", value or ""):
@@ -324,10 +326,20 @@ def test_balance_refuses_a_blank_required_input():
 
 
 def test_purity_floor_defaults_to_the_registered_block_purity():
-    """The figure quoted in the documents and the one used in code must be the same figure."""
+    """The figure quoted in the documents and the one used in code must be the same figure.
+
+    The exponent is read from P-N-BLOCKS rather than written as a literal. It used to be a
+    hardcoded 3, which made the guard agree with the code only for as long as the register
+    happened to say 3 - so the one thing it was supposed to prove, that nothing drifts from
+    the register, was the thing it stopped checking the moment the register moved.
+    """
     from gen.balance import purity_floor
-    registered = param_value(load_params(), "P-BLOCK-PUR")
-    assert abs(purity_floor() - purity_floor(registered, 3)) < 1e-9
+    params = load_params()
+    f = param_value(params, "P-BLOCK-PUR")
+    k = param_value(params, "P-N-BLOCKS")
+    assert f is not None and k is not None, (
+        "P-BLOCK-PUR and P-N-BLOCKS must both carry values - purity_floor() reads both")
+    assert abs(purity_floor() - purity_floor(f, k)) < 1e-9
 
 
 def test_flowsheet_stream_ids_match_the_register():
@@ -532,6 +544,15 @@ def test_numeric_claims_in_prose_carry_a_citation():
 ACCESS_VOCAB = {
     "full-text-read",   # the complete article or document was read
     "web-page-read",    # a web page, blog, vendor note, standard or patent read in full
+    "partial-text-read",  # retrieved and readable in full; SPECIFIED SECTIONS read, not all
+                        # of it. Added because the vocabulary could not express the true
+                        # state of a long guideline whose text layer was searched entirely
+                        # but whose body was read in part: `full-text-read` over-claims and
+                        # `record-only` under-claims so far that it misleads. Three
+                        # independent research passes reported the same gap and each
+                        # refused to force a value. A row using this MUST enumerate the
+                        # sections read and the page count in `notes` - see
+                        # test_a_partial_read_says_what_was_read.
     "abstract-only",    # only the abstract, or an abstract-equivalent record summary
     "record-only",      # only bibliographic metadata confirmed; no abstract read
     "redacted",         # obtainable and read, but the numbers we need are withheld in it
@@ -561,6 +582,44 @@ def test_access_values_are_in_the_controlled_vocabulary():
     assert not offenders, (
         "source(s) with an access value outside the controlled vocabulary "
         f"{sorted(ACCESS_VOCAB)}: " + "; ".join(offenders)
+    )
+
+
+def test_a_partial_read_says_what_was_read():
+    """`partial-text-read` is only honest if it states WHICH part was read.
+
+    The value exists so a 49-page guideline whose text layer was searched entirely but
+    whose body was read in sections is not forced to choose between over-claiming
+    (`full-text-read`) and misleading (`record-only`). That is only an improvement if the
+    row says what the sections were - otherwise it is `full-text-read` with a softer name,
+    and the register has gained a hiding place rather than a distinction.
+
+    So a partial read must name its extent: a section or clause reference, or a page
+    count. The check is on the SHAPE of the claim, not on particular wording, because
+    prescribing the phrasing would just move the problem into the phrasing.
+    """
+    import re as _re
+    extent = _re.compile(
+        r"(?:\bs(?:ec|ection)?\.?\s*\d)"      # section 4, s4, sec. 4
+        r"|(?:§\s*\d)"                     # a section sign followed by a number
+        r"|(?:\b\d+\s*(?:of|/)\s*\d+\s*(?:pp?\.?|pages?)\b)"   # 20 of 49 pages
+        r"|(?:\b\d+\s*(?:pp\.?|pages?)\b)"     # 27 pages
+        r"|(?:\bAnnex\s+[IVXA-Z0-9])"          # Annex II
+        r"|(?:\bTable\s+[A-Z0-9])"             # Table A.2.1
+        r"|(?:\bchapter\s+\d)",
+        _re.I,
+    )
+    offenders = []
+    for r in load_rows("sources"):
+        if (r.get("access") or "").strip() != "partial-text-read":
+            continue
+        blob = (r.get("notes") or "") + " " + (r.get("verified") or "")
+        if not extent.search(blob):
+            offenders.append(r["source_key"])
+    assert not offenders, (
+        "source(s) marked partial-text-read that do not say which part was read. Name the "
+        "sections or the page count in notes/verified, or use a different access value: "
+        + ", ".join(offenders)
     )
 
 
@@ -628,12 +687,22 @@ def test_unread_sources_cited_from_findings_are_on_the_reading_list():
 # ---------------------------------------------------------------------------
 
 def test_band_parameters_carry_an_explicit_range():
-    """A parameter that is a band must not hide as a bare point value (F-018, F-019).
+    """A band must not hide as a bare point value, and must say WHAT KIND of band it is.
 
-    Convention: a band parameter flags itself with the token 'BAND:' in its notes and
-    must then populate range_low/range_high; and any parameter carrying a range must
-    keep its point value inside it.
+    REPLACES the version that classified a band by the literal substring 'BAND:' in the
+    free-text notes. That classifier was unreliable and could be shown to be: ten rows
+    carry a range and only NINE carry the token, because P-YIELD-OVERALL-PUB writes
+    'BAND (vendor-published):' with no colon after BAND. The old guard could not see it,
+    because it only ever checked one direction - 'flagged but unranged' - and never
+    'ranged but unflagged'. A one-directional guard on a two-directional claim, which is
+    the failure test_the_unread_census_is_complete already records.
+
+    The classifier is now the `range_kind` COLUMN, and the check runs both ways:
+    a range implies a kind, and a kind implies a range. The prose token is still policed
+    in the direction it can be wrong (prose claiming a band the columns do not carry),
+    but it is no longer what identifies a band.
     """
+    from gen.dataio import RANGE_KINDS
     params = load_params()
     offenders = []
     for r in load_rows("parameters"):
@@ -641,20 +710,75 @@ def test_band_parameters_carry_an_explicit_range():
         notes = r.get("notes") or ""
         lo = (r.get("range_low") or "").strip()
         hi = (r.get("range_high") or "").strip()
-        if "BAND:" in notes and not (lo and hi):
-            offenders.append(f"{pid}: notes flag a BAND but range_low/range_high are empty")
-            continue
+        kind = (r.get("range_kind") or "").strip()
+        banded = bool(lo and hi)
+
         if lo or hi:
-            if not (lo and hi):
+            if not banded:
                 offenders.append(f"{pid}: only one of range_low/range_high is set")
                 continue
-            flo, fhi = float(lo), float(hi)
+            try:
+                flo, fhi = float(lo), float(hi)
+            except ValueError:
+                offenders.append(f"{pid}: range bound is not numeric: {lo!r}, {hi!r}")
+                continue
             if flo > fhi:
                 offenders.append(f"{pid}: range_low {flo} > range_high {fhi}")
             v = param_value(params, pid)
             if v is not None and not (flo <= v <= fhi):
                 offenders.append(f"{pid}: value {v} outside its range [{flo}, {fhi}]")
+
+        # Direction 1 - a range must declare what kind of claim it is. This is the
+        # direction nothing checked, and the direction P-YIELD-OVERALL-PUB slipped.
+        if banded and not kind:
+            offenders.append(
+                f"{pid}: carries a range but no range_kind - a band without a kind does not "
+                f"say whether it is evidence, an argument, or a commitment")
+        # Direction 2 - a kind must have a range to describe.
+        if kind and not banded:
+            offenders.append(f"{pid}: declares range_kind={kind!r} but carries no range")
+        if kind and kind not in RANGE_KINDS:
+            offenders.append(
+                f"{pid}: range_kind {kind!r} outside {sorted(RANGE_KINDS)}")
+        # The legacy prose token, policed only where it can lie: prose asserting a band
+        # the columns do not carry. Its ABSENCE no longer means anything.
+        if "BAND:" in notes and not banded:
+            offenders.append(f"{pid}: notes flag a BAND but range_low/range_high are empty")
     assert not offenders, "band/range defect(s): " + "; ".join(offenders)
+
+
+def test_an_ich_range_kind_is_not_claimed_without_demonstration():
+    """Two range_kind values are ICH terms of art. Using one is a regulatory claim.
+
+    `design_space` means, in ICH Q8(R2)'s own words, a combination of variables "that
+    have been DEMONSTRATED to provide assurance of quality" and that is "subject to
+    regulatory assessment and approval". `proven_acceptable_range` means a range WE have
+    characterised, holding the other parameters constant. Nothing in this concept is
+    either: every band here is literature, argument, or a sizing commitment.
+
+    Both sets are EMPTY today and this guard is therefore proven by mutation rather than
+    by a live row - the same standing as `not_measurable` in gen/controls.py. It exists so
+    that a later slice cannot quietly promote a literature band to a design space, which
+    would be the ISA-conformance over-claim in a different register. If a real design space
+    is ever established, this guard is what has to be argued with first.
+    """
+    from gen.dataio import RANGE_KINDS_ICH
+    offenders = []
+    for r in load_rows("parameters"):
+        kind = (r.get("range_kind") or "").strip()
+        if kind not in RANGE_KINDS_ICH:
+            continue
+        prov = (r.get("provenance") or "").strip()
+        if prov != "fact":
+            offenders.append(
+                f"{r['param_id']}: claims ICH term {kind!r} on provenance={prov!r}; an ICH "
+                f"range is demonstrated, so it cannot rest on an assumption or an inference")
+        if not (r.get("source_key") or "").strip():
+            offenders.append(
+                f"{r['param_id']}: claims ICH term {kind!r} with no source_key")
+    assert not offenders, (
+        "parameter(s) claiming an ICH range term without the demonstration it asserts. "
+        "Re-examine the claim rather than relaxing this test: " + "; ".join(offenders))
 
 
 #: Tokens in a source's scale_system that name a molecule class other than our
@@ -1402,3 +1526,537 @@ def test_no_equipment_item_performs_the_denature_hold_while_q050_is_open():
         "equipment item(s) performing the enzyme denature hold while Q-050 - which decides "
         "whether that step exists at all - is still open: " + ", ".join(offenders)
     )
+
+
+# ---------------------------------------------------------------------------
+# Tier-3 slice 2: the process flow diagrams (gen/pfd.py), added 2026-09-25.
+#
+# docs/diagrams/index.md promised "a stream-numbered process flow diagram (PFD) with
+# instrument tags" in a "Not yet drawn" admonition, and three other pages - both front
+# pages among them - carried the same claim. The instruments existed as a register but
+# nothing drew them, so nothing could catch a drawing that contradicted the register.
+#
+# The invariant these guards protect is that the drawing is DERIVED, never decorated.
+# In particular the difference between a control loop and a laboratory result has to fall
+# out of measurement_mode and the declared tag letters, because that distinction is the
+# whole content of the Q-042 case and C-013 is the row that must not look like a control.
+# Deriving it from `controls.instrument_ref` instead would have been an enumeration of the
+# rows that happen to exist - the DPI mistake again - and would also have been WRONG:
+# nine tags declare control and only two are in that register (Q-056).
+# ---------------------------------------------------------------------------
+
+PFD_DIR = os.path.join(ROOT, "docs", "diagrams")
+
+
+def _pfd_path(unit):
+    return os.path.join(PFD_DIR, "pfd-" + unit.lower() + ".svg")
+
+
+def _generated_svgs():
+    """Every generated SVG in the repository: the BFD and one PFD per unit operation."""
+    from gen.pfd import UNITS
+    return ([os.path.join(PFD_DIR, "bfd.svg")]
+            + [_pfd_path(u) for u in UNITS])
+
+
+def test_pfd_is_up_to_date():
+    """Each committed PFD must equal render_svg(); same contract as the BFD at :344.
+
+    CI runs the drift tests BEFORE gen.build regenerates anything, so a stale committed SVG
+    would otherwise pass every other guard here while showing the wrong picture.
+    """
+    from gen.pfd import UNITS, render_svg
+    stale = []
+    for unit in UNITS:
+        path = _pfd_path(unit)
+        if not os.path.exists(path):
+            stale.append(f"{unit}: docs/diagrams/pfd-{unit.lower()}.svg is missing")
+            continue
+        if open(path, encoding="utf-8").read() != render_svg(unit):
+            stale.append(unit)
+    assert not stale, (
+        "process flow diagram(s) stale or missing; run `python -m gen.build` and commit the "
+        "result: " + ", ".join(stale)
+    )
+
+
+def test_pfd_layout_is_deterministic():
+    """The generator must be a pure function of the data, drawings and host page alike."""
+    from gen.pfd import UNITS, render_page, render_svg
+    for unit in UNITS:
+        assert render_svg(unit) == render_svg(unit), f"{unit} render is not deterministic"
+    assert render_page() == render_page()
+
+
+def test_every_instrument_is_drawn_on_its_unit_pfd():
+    """Set equality per unit op, both directions - the lesson of the lost product arrow.
+
+    One direction catches an instrument silently dropped from a drawing. The other catches a
+    tag drawn on a unit that does not own it, which a "count the bubbles" check would miss.
+    Deliberately NOT an allow-list built from the tags already drawn.
+    """
+    from gen.pfd import UNITS, render_svg
+    registered = {}
+    for r in load_rows("instruments"):
+        registered.setdefault(r["unit_op"], set()).add(r["tag"])
+
+    offenders = []
+    for unit in UNITS:
+        svg = render_svg(unit)
+        # Tags render as two text elements, the letters and the four digits, so recombine.
+        drawn = set(re.findall(r'class="tag"[^>]*>([A-Z]{2,4})</text>\s*'
+                               r'<text class="tag"[^>]*>(\d{4})</text>', svg))
+        drawn = {f"{a}-{b}" for a, b in drawn}
+        want = registered.get(unit, set())
+        for tag in sorted(want - drawn):
+            offenders.append(f"{unit}: {tag} is registered but not drawn")
+        for tag in sorted(drawn - want):
+            offenders.append(f"{unit}: {tag} is drawn but not registered on this unit")
+    assert not offenders, "PFD/instrument-register mismatch: " + "; ".join(offenders)
+
+
+def test_a_tag_that_declares_control_is_a_loop_capable_measurement():
+    """A tag may not claim control while its reading comes off a withdrawn sample.
+
+    The contradiction this forbids is the Q-042 case wearing the opposite mask: a loop cannot
+    close on a sample somebody carried to a bench, so a `C` in the output position together
+    with an at-line or off-line mode is a data error, not a loop to draw. Stated over the mode
+    VOCABULARY rather than over the rows: `on_line` counts as loop-capable (a sample is
+    diverted automatically and may be returned), so an automated sampler closing a loop is
+    permitted and only a human-carried sample is refused. That is the premise, and it is the
+    one that would have to change for this guard to be wrong.
+    """
+    from gen.controls import LOOP_CAPABLE_MODES, tag_declares_control
+    offenders = [
+        f"{r['instrument_id']} {r['tag']} is {r['measurement_mode']}"
+        for r in load_rows("instruments")
+        if tag_declares_control(r["tag"]) and r["measurement_mode"] not in LOOP_CAPABLE_MODES
+    ]
+    assert not offenders, (
+        "instrument tag(s) declaring a control function on a reading no loop can close on - "
+        f"the loop-capable modes are {sorted(LOOP_CAPABLE_MODES)}. Either the tag should not "
+        "carry a control letter or the mode is wrong (Q-042, Q-056): " + "; ".join(offenders)
+    )
+
+
+def test_the_loop_rendering_follows_from_the_tag_and_the_mode():
+    """Which bubbles get an actuator arrow is COMPUTED, and this is the computation.
+
+    Written in the shape of test_the_at_line_decision_follows_from_the_arithmetic (:1025): the
+    invariant is derived from the registers through the generator's own public function, then
+    the drawing is checked against it. So if a tag gains a control letter, or a mode is
+    corrected, the drawing has to move with it or this fails.
+
+    C-013's instrument is asserted separately and deliberately. It is the row this repository
+    built the at_line_only control type for, and the one that must never acquire an actuator
+    arrow; it currently qualifies on two independent counts (at-line mode, no control letter),
+    and this pins BOTH rather than trusting either alone.
+    """
+    from gen.pfd import UNITS, loop_state, render_svg
+    instruments = load_rows("instruments")
+    by_unit = {}
+    for r in instruments:
+        by_unit.setdefault(r["unit_op"], []).append(r)
+
+    offenders = []
+    for unit in UNITS:
+        svg = render_svg(unit)
+        expected_closed = sorted(r["tag"] for r in by_unit.get(unit, [])
+                                 if loop_state(r) == "closed")
+        drawn_actuators = len(re.findall(r'class="act"', svg))
+        if drawn_actuators != len(expected_closed):
+            offenders.append(
+                f"{unit}: {drawn_actuators} actuator arrow(s) drawn but "
+                f"{len(expected_closed)} closed loop(s) computed {expected_closed}")
+        expected_dashed = sorted(r["tag"] for r in by_unit.get(unit, [])
+                                 if loop_state(r) == "withdrawn")
+        drawn_dashed = len(re.findall(r'class="bubw"', svg))
+        if drawn_dashed != len(expected_dashed):
+            offenders.append(
+                f"{unit}: {drawn_dashed} dashed ring(s) drawn but "
+                f"{len(expected_dashed)} withdrawn measurement(s) computed")
+    assert not offenders, (
+        "the PFD's loop rendering no longer follows from measurement_mode and the declared tag "
+        "letters - re-examine which is wrong rather than adjusting this test: "
+        + "; ".join(offenders)
+    )
+
+    c013 = [r for r in load_rows("controls") if r["control_id"] == "C-013"]
+    assert c013, "C-013 is not registered"
+    ref = c013[0]["instrument_ref"].strip()
+    row = [r for r in instruments if r["instrument_id"] == ref]
+    assert row, f"C-013 names instrument {ref!r}, which does not resolve"
+    assert loop_state(row[0]) == "withdrawn", (
+        f"C-013's instrument {ref} ({row[0]['tag']}) renders as "
+        f"{loop_state(row[0])!r}, so the open loop would be drawn as a control. It is "
+        f"at_line_only BECAUSE no loop can close on it (Q-042) - re-examine the row."
+    )
+    from gen.controls import tag_declares_control
+    assert not tag_declares_control(row[0]["tag"]), (
+        f"C-013's instrument tag {row[0]['tag']} now declares a control function, which "
+        f"contradicts control_type=at_line_only"
+    )
+
+
+def test_pfd_instrument_stream_refs_touch_their_unit():
+    """A stream_ref must name a stream the instrument's own unit actually touches.
+
+    This is what makes a per-unit drawing well defined: a bubble is placed on one of its unit's
+    own stream lanes, so a stream_ref pointing somewhere else has nowhere to go and would be
+    drawn against an unrelated line. DEXPI Process 1.0 section 2.8.2 puts a sensing point "on a
+    stream or a unit operation", and a blank stream_ref is therefore legal - it attaches to the
+    unit - but a WRONG one is not.
+    """
+    streams = {r["stream_id"]: r for r in load_rows("streams")}
+    offenders = []
+    for r in load_rows("instruments"):
+        ref = (r["stream_ref"] or "").strip()
+        if not ref:
+            continue
+        s = streams.get(ref)
+        if s is None:
+            offenders.append(f"{r['instrument_id']}: stream_ref {ref} does not resolve")
+        elif r["unit_op"] not in (s["from_unit"], s["to_unit"]):
+            offenders.append(
+                f"{r['instrument_id']} ({r['tag']}) is on {r['unit_op']} but {ref} runs "
+                f"{s['from_unit']}->{s['to_unit']}")
+    assert not offenders, (
+        "instrument(s) whose stream_ref names a stream their unit operation does not touch, so "
+        "the bubble cannot be placed: " + "; ".join(offenders)
+    )
+
+
+def test_svg_element_ids_are_globally_unique():
+    """Marker ids must not collide across the generated SVGs.
+
+    bfd.svg uses bare ids (`arrow`, `warr`, `uarr`). The PFD pages inline seven more SVGs on the
+    same site, and duplicate ids across inlined documents make `url(#arrow)` resolve to whichever
+    came first - arrowheads silently repainted in another diagram's colour. The PFDs therefore
+    namespace theirs per unit, and this keeps it that way.
+    """
+    seen = {}
+    offenders = []
+    for path in _generated_svgs():
+        rel = os.path.relpath(path, ROOT)
+        for ident in re.findall(r'\sid="([^"]+)"', open(path, encoding="utf-8").read()):
+            if ident in seen:
+                offenders.append(f"{ident!r} in both {seen[ident]} and {rel}")
+            else:
+                seen[ident] = rel
+    assert not offenders, (
+        "duplicate SVG element id(s) across generated diagrams; they collide when both are "
+        "inlined on one page: " + "; ".join(offenders)
+    )
+
+
+def test_every_generated_svg_is_well_formed_xml():
+    """Registered text reaches these drawings, and registered text contains ampersands.
+
+    equipment.csv holds "Buffer preparation & hold suite". Interpolated raw that is not
+    well-formed XML, and gen/flowsheet.py has no escaping helper at all - it escapes nothing and
+    survives only because UNIT_LABELS happens to override every unit it draws. So this is a live
+    defect the moment a generator puts a registered `name` on a drawing, not a hypothetical one.
+    """
+    import xml.etree.ElementTree as ET
+    offenders = []
+    for path in _generated_svgs():
+        try:
+            ET.fromstring(open(path, encoding="utf-8").read())
+        except ET.ParseError as exc:
+            offenders.append(f"{os.path.relpath(path, ROOT)}: {exc}")
+    assert not offenders, (
+        "generated SVG(s) that are not well-formed XML - check that every interpolated CSV "
+        "field goes through an escape helper: " + "; ".join(offenders)
+    )
+
+
+def test_the_pfd_legend_describes_the_actual_styles():
+    """Same guard as the BFD's at :364, for the same reason: a legend is a claim.
+
+    The BFD's legend was inherited from a hand-drawn file and two of its three claims were
+    false. These legends are generated from the start, so they get checked from the start.
+    """
+    from gen.pfd import UNITS, render_svg
+    offenders = []
+    for unit in UNITS:
+        svg = render_svg(unit)
+        if "dashed ring = withdrawn sample" not in svg:
+            offenders.append(f"{unit}: legend no longer explains the dashed ring")
+        bubw = re.search(r"\.bubw \{[^}]*\}", svg)
+        if not bubw or "stroke-dasharray" not in bubw.group(0):
+            offenders.append(f"{unit}: legend says DASHED ring, but .bubw is {bubw and bubw.group(0)}")
+        act = re.search(r"\.act \{[^}]*\}", svg)
+        if "Teal arrow to the unit box" in svg and (not act or "#00897b" not in act.group(0)):
+            offenders.append(f"{unit}: legend says teal actuator, but .act is {act and act.group(0)}")
+    assert not offenders, "PFD legend contradicts the emitted CSS: " + "; ".join(offenders)
+
+
+def test_the_pfd_does_not_claim_a_standard_symbol_set():
+    """The drawings must say whose symbols they are, because nobody's standard was read.
+
+    ISO 10628-1:2014 is the standard that specifies BFD and PFD content and it is NOT retrieved
+    (SRC-ISO-10628-1); DEXPI supplies the principle but its own section 6 says the presentation
+    layer needs further work; ISA-5.1-2024 is unread and un-reproducible (Q-053). So a drawing
+    that implied conformance would be asserting something nobody here has checked - the exact
+    defect that produced the tag scheme's "ISA-style" failure message.
+    """
+    from gen.pfd import UNITS, render_svg
+    src = open(os.path.join(ROOT, "gen", "pfd.py"), encoding="utf-8").read()
+    for unit in UNITS:
+        svg = render_svg(unit)
+        assert "this project" in svg and "own" in svg, (
+            f"{unit}: the drawing must state that the symbol set is this project's own")
+        assert "Q-054" in svg, f"{unit}: the drawing must cite the symbol-set question Q-054"
+        assert not re.search(r"\bISA[- ]?5\.1\b(?!.*not)", svg), (
+            f"{unit}: the drawing must not present its symbols as ISA-5.1")
+    assert "Q-055" in src and "Q-054" in src, (
+        "gen/pfd.py must record the symbol-set and final-control-element gaps")
+
+
+def test_csv_line_endings_match_the_declared_convention():
+    """Line endings are a convention here, and an editing tool will silently rewrite them.
+
+    Ten of the twelve CSVs are CRLF and two are LF. Nothing enforced it, so a generated or
+    rewritten file could flip wholesale and show as a diff on every line - which buries the one
+    row that actually changed, and is exactly how a real edit gets reviewed without being read.
+    The rule is per-file, taken from the file itself: every line ends the same way.
+    """
+    lf_only = {"streams.csv", "scenarios.csv"}
+    offenders = []
+    for path in sorted(glob.glob(os.path.join(ROOT, "data", "*.csv"))):
+        name = os.path.basename(path)
+        raw = open(path, "rb").read()
+        lines = raw.count(b"\n")
+        crs = raw.count(b"\r")
+        if name in lf_only:
+            if crs:
+                offenders.append(f"{name}: expected LF only, found {crs} CR byte(s)")
+        elif crs != lines:
+            offenders.append(f"{name}: {crs} CR byte(s) for {lines} line(s) - mixed endings")
+    assert not offenders, (
+        "CSV line-ending convention broken (10 files CRLF, streams.csv and scenarios.csv LF); "
+        "re-save preserving the file's own endings: " + "; ".join(offenders)
+    )
+
+
+def test_generator_symbols_named_in_the_registers_exist():
+    """A register that cites a code symbol must cite one that is really there.
+
+    Q-053 and two source rows pointed at `gen/controls.py TAG_LETTERS` for the whole slice-1
+    cycle. No such name exists - it is TAG_FIRST_LETTERS - so a reader following the citation
+    found nothing, and no guard noticed because nothing checked prose against code.
+    """
+    offenders = []
+    for csv_name in ("questions", "sources", "parameters", "risks", "controls", "instruments"):
+        for row in load_rows(csv_name):
+            blob = " ".join(v or "" for v in row.values())
+            for module, symbol in re.findall(r"gen/(\w+)\.py\s+([A-Z][A-Z0-9_]{3,})", blob):
+                path = os.path.join(ROOT, "gen", module + ".py")
+                if not os.path.exists(path):
+                    offenders.append(f"{csv_name}: gen/{module}.py does not exist")
+                elif not re.search(rf"^{symbol}\s*=", open(path, encoding="utf-8").read(), re.M):
+                    offenders.append(
+                        f"{csv_name}: cites gen/{module}.py {symbol}, which is not defined there")
+    assert not offenders, (
+        "register(s) citing a generator symbol that does not exist: " + "; ".join(sorted(set(offenders)))
+    )
+
+
+def test_the_unread_census_is_complete():
+    """The census claims to cover EVERY unread source, so it has to.
+
+    STRENGTHENS test_read_sources_are_not_in_the_unread_census (:696), which only ever checked
+    one direction - that a source listed in the census really is unread. Nothing checked the
+    direction the page's own prose promises: "it covers every source in the register whose
+    `access` is abstract only, record only or not retrieved". That claim was FALSE when this
+    guard was written. Three sources added in Tier-3 slice 1 - SRC-BHANGALE-2022 and the two
+    ISA documents - were unread and absent from the census, and the page asserted their
+    absence meant nothing was missing. A one-directional guard on a two-directional claim is
+    how that shipped, which is the general lesson worth keeping.
+    """
+    unread = {
+        r["source_key"] for r in load_rows("sources")
+        if (r.get("access") or "").strip() in ACCESS_UNREAD
+    }
+    text = open(
+        os.path.join(ROOT, "docs", "sources", "reading-list.md"), encoding="utf-8"
+    ).read()
+    m = re.search(r"##\s*What we have not actually read(.*?)(\n##\s|\Z)", text, re.S)
+    assert m, "census section not found in reading-list.md"
+    listed = set(re.findall(r"^\|\s*\[(SRC-[A-Z0-9-]+)\]", m.group(1), re.M))
+    missing = sorted(unread - listed)
+    assert not missing, (
+        "unread source(s) absent from the census in docs/sources/reading-list.md, which claims "
+        "to cover every one of them - add a row for each, or read it and correct its `access`: "
+        + ", ".join(missing)
+    )
+
+
+def test_no_published_page_claims_the_tag_scheme_is_isa():
+    """The ISA claim has to be refused on the SITE, not only inside gen/controls.py.
+
+    test_the_declared_tag_scheme_does_not_claim_to_be_isa (:1096) reads gen/controls.py and
+    nothing else, so it could not see that docs/techtransfer/index.md went on describing the
+    register as carrying "an ISA-style tag" for the whole of slice 1 - the exact phrase that
+    slice removed from the guard's own failure message, still published one directory away.
+    A guard scoped to the file where a claim was FIXED cannot find the copies that survived,
+    which is the general lesson: sweep for the marker everywhere it can publish.
+
+    Naming ISA is fine and necessary - Q-053 and the source rows must be able to say what the
+    scheme is NOT based on. What is refused is the claim of resemblance or conformance.
+    """
+    offenders = []
+    for path in _doc_files():
+        rel = os.path.relpath(path, ROOT)
+        for n, line in enumerate(open(path, encoding="utf-8"), start=1):
+            if re.search(r"ISA[- ]?(?:style|compliant|conformant|conforming)", line, re.I):
+                offenders.append(f"{rel}:{n}")
+            if re.search(r"(?:per|to|follows|following|according to)\s+ANSI/ISA-5\.1(?!\s*(?:is|edition))",
+                         line, re.I):
+                offenders.append(f"{rel}:{n}")
+    assert not offenders, (
+        "published page(s) presenting the instrument tag scheme as ISA's. It is this project's "
+        "own and conformance to the current edition is unverified (Q-053); ISA-5.1-2024 and "
+        "ISA-TR5.1.02-2024 are unread and may not be reproduced: " + ", ".join(offenders)
+    )
+
+
+# ---------------------------------------------------------------------------
+# Tier-3 slice 3: the ligation design envelope (gen/envelope.py), added 2026-09-25.
+#
+# Three claims this repository was making could not be checked while they were prose, and every
+# one of them had already failed silently:
+#
+#   * that a band's two endpoints were two INDEPENDENT citations. `parameters.csv` carries one
+#     `source_key` per row, so a range whose ends came from one document looked identical to one
+#     bracketed by two. `P-BLOCK-PUR` was that defect at its worst - both ends from one patent, one
+#     of them a 6.00 g bench datum sitting inside a band labelled 145-258 g, and its point value a
+#     YIELD misread as a purity.
+#   * that a set of bands describes a REGION. Two parameters can each sit inside their band while
+#     the corner they form together is unreachable.
+#   * that an information requirement was ANCHORED. Almost none is, for an enzymatic step: `enzym`
+#     and `biocatal` return zero hits across ICH Q11 and Q7.
+#
+# The acceptance panel then found the same class of defect in the slice that introduced the guards
+# against it - four checklist rows citing an ICH Q11 "s4.3" that does not exist, and two envelope
+# rows whose verdict claimed a measured endpoint their own notes denied. Both holes are now closed
+# by the guards below, which is why several of them check a row against ITS OWN data rather than
+# against a vocabulary.
+# ---------------------------------------------------------------------------
+
+def test_the_new_registers_pass_their_own_vocabularies():
+    """One call, because gen/envelope.py raises with every problem it found rather than the first.
+
+    Strict on vocabulary for the reason gen/controls.py gives: a typo must not fall through to a
+    confident statement about the process. What makes this more than a spell-check is the set of
+    cross-checks inside it - a verdict that contradicts its own endpoints, a point value with no
+    argument behind it, an anchor clause its own source row never records reading.
+    """
+    from gen.envelope import validate
+    validate()
+
+
+def test_a_refused_bracket_is_not_written_as_a_range():
+    """The user's standing rule, made mechanical.
+
+    A bracket that fails the two-independent-endpoints test does not get written as a range: the
+    parameter keeps a blank or a clearly-labelled single point, and the failure becomes a registered
+    question naming what second source would fix it. So a `not_a_range` verdict in envelopes.csv and
+    a numeric range in parameters.csv are a direct contradiction between two registers.
+
+    The live case is the ligation concentration, whose two ends are a demonstrated SUCCESS and a
+    reported FAILURE - different kinds of claim, so no width between them is a window of operation.
+    """
+    from gen.envelope import range_written_where_refused
+    offenders = range_written_where_refused()
+    assert not offenders, (
+        "parameter(s) carrying a range that envelopes.csv rules is not one; blank the range and "
+        "register the question instead: " + "; ".join(offenders)
+    )
+
+
+def test_every_band_has_an_endpoint_audit():
+    """A number a reader can use must say whether its two ends are two claims or one.
+
+    Added after the acceptance panel pointed out that `one_source_both_ends` was disclosed only in
+    envelopes.csv, so the disclosure never reached whoever read the band off the parameter register.
+    The fix is not a second column - carrying a relation on both sides lets the two disagree with
+    nothing to detect it, which is why instruments.csv has no `control_loop` column. It is to
+    require that the audit EXISTS and to render it beside the parameter at build time.
+
+    One-directional on purpose: three envelope rows legitimately have no parameter counterpart, and
+    two of them exist precisely to record spans that must NOT be written as ranges.
+    """
+    from gen.envelope import unaudited_bands
+    offenders = unaudited_bands()
+    assert not offenders, (
+        "band(s) in parameters.csv with no endpoint audit in envelopes.csv: " + "; ".join(offenders)
+    )
+
+
+def test_no_design_intent_band_spans_an_unreachable_corner():
+    """ICH Q8(R2) Appendix 2 sanctions an INSCRIBED box, never a circumscribed one.
+
+    Where one parameter's acceptable range depends on another's, an applicant may report the true
+    curved region or a smaller box - and every corner of that box has to be simultaneously
+    attainable. A box drawn round the region claims operation at corners nobody has reached.
+
+    No live row trips this, and that is expected rather than a weakness: the only `design_intent`
+    band in the register is the evaporator's, which no coupling touches. Its evidence is the
+    mutation case, the same standing as `not_measurable` in gen/controls.py - kept because the
+    distinction is real and the next such case needs it.
+    """
+    from gen.envelope import corner_rule_offenders
+    offenders = corner_rule_offenders()
+    assert not offenders, (
+        "design_intent band(s) spanning a corner a coupling declares unreachable: "
+        + "; ".join(offenders)
+    )
+
+
+def test_no_published_page_presents_the_panel_as_qualified_signoff():
+    """The panel is four reviews this project ran itself. It is not a sign-off, and no page may read
+    as though it were.
+
+    In the idiom of test_no_published_page_claims_the_tag_scheme_is_isa (:1893), and for the same
+    reason: a claim fixed in one file survives one directory away, so the sweep has to run over
+    everything that publishes. It matches claim SHAPES rather than vocabulary, and it carves out any
+    line carrying a negation - because saying what the panel is NOT has to stay sayable, and a guard
+    that refused the disclaimer would create pressure to delete it.
+
+    Four independent REJECTs on four different questions are a publishable result. A package that
+    reads as though it had been signed off is a misrepresentation, and a worse one than any single
+    wrong number, because it invites a reader to stop checking.
+    """
+    from gen.envelope import signoff_claim_offenders
+    offenders = signoff_claim_offenders(_doc_files())
+    assert not offenders, (
+        "published page(s) presenting the acceptance panel as qualified engineering sign-off. It is "
+        "this project's own role-based review, run by four reviewers who could not see each other, "
+        "and it approves nothing: " + "; ".join(os.path.relpath(o, ROOT) for o in offenders)
+    )
+
+
+def test_the_panel_publishes_disagreement_rather_than_a_consensus():
+    """Disagreement is published, not reconciled - so the page must show every verdict.
+
+    The failure mode is a summary that averages four reviews into a tone. Each reviewer's verdict,
+    their single binding blocker and what would change it must all reach the page, and each blocker
+    must resolve to a question this repository already tracks - otherwise the panel is generating
+    new work rather than judging the register it was given.
+    """
+    from gen.envelope import render
+    out = render()
+    rows = load_rows("verdicts")
+    assert rows, "the acceptance panel register is empty"
+    qids = {r["question_id"] for r in load_rows("questions")}
+    for r in rows:
+        assert r["blocker_ref"] in qids, (
+            f"{r['verdict_id']}: blocker {r['blocker_ref']} is not a registered question")
+        assert r["blocker_ref"] in out, f"{r['verdict_id']}'s blocker is not rendered"
+        assert r["verdict"] in out, f"{r['verdict_id']}'s verdict is not rendered"
+        assert r["reviewer_role"] in out, f"{r['verdict_id']}'s role is not rendered"
+    blockers = {r["blocker_ref"] for r in rows}
+    assert len(blockers) > 1 or len(rows) == 1, (
+        "every reviewer named the same blocker, which is a result worth stating explicitly rather "
+        "than one to assert by accident - check the panel really ran independently")

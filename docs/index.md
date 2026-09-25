@@ -45,10 +45,12 @@ solvents.** The boundary starts at received, purified, 5'-phosphorylated blocks;
 - **[Mass & energy balance](balance/index.md)** — executable, scenario-driven.
 - **[Open questions](registers/questions.md)** — Q-001 (annealing / product form) and Q-002 (real annual demand) drive everything.
 
-!!! note "Scope of this release (Tier 2)"
+!!! note "Scope of this release (Tier 3, in progress)"
     Tier 1 established the architecture, the data model and build, the two headline findings, the
     executable mass balance across illustrative throughput scenarios, and seeded registers. Tier 2
     added the full energy balance, species-resolved impurity fate, the contamination-control
     strategy with CIP/SIP, filterable registers, a generated flowsheet, and equipment sizing basis
-    and turndown. The facility capital concept, process flow diagrams with instrument tags, and the
-    control strategy are Tier 3 and are marked as stubs or registered gaps where not yet built.
+    and turndown. Tier 3 has since added the control strategy as data and a
+    [process flow diagram per unit operation](diagrams/pfd.md) generated from it. The facility
+    capital concept is still Tier 3, and is marked as a stub or a registered gap where not yet
+    built; so are equipment layout, stream conditions on the drawings, and any P&ID.

@@ -84,12 +84,15 @@ nav:
       - Spray drying: process/spray-drying.md
       - Microbial control: process/microbial.md
       - Control strategy: process/controls.md
+      - Ligation design envelope: process/ligation-envelope.md
   - Mass & energy balance:
       - Method: balance/index.md
       - Results: balance/results.md
       - Impurity fate: balance/impurities.md
   - Equations: equations/index.md
-  - Diagrams: diagrams/index.md
+  - Diagrams:
+      - Block flow diagram: diagrams/index.md
+      - Process flow diagrams: diagrams/pfd.md
   - Facility concept: facility/index.md
   - Process development: devel/index.md
   - Tech transfer: techtransfer/index.md
