@@ -17,6 +17,9 @@ docs/process/streams.md
 docs/process/controls.md
 docs/balance/results.md
 docs/balance/impurities.md
+# The PFD host page is generated; the per-unit SVGs it includes are COMMITTED,
+# like docs/diagrams/bfd.svg, so a byte-drift test can compare against them.
+docs/diagrams/pfd.md
 
 # Python
 __pycache__/

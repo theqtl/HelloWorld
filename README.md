@@ -68,8 +68,18 @@ blocks it. Most acceptance bases in it are assumption-flagged placeholders — t
 **checkable structure**, not a control strategy a contract manufacturer could execute. It also makes
 two things representable that prose could not: a measurement that exists but cannot close a loop on
 its own stream (`at_line_only`, Q-042), and an enzyme-clearance route carried as two branches with
-neither chosen (Q-050). The facility capital concept and process flow diagrams with instrument tags
-remain Tier 3, marked as stubs or registered gaps.
+neither chosen (Q-050). The facility capital concept remains Tier 3, marked as stubs or registered
+gaps.
+
+The second Tier-3 slice drew those instruments: a **process flow diagram per unit operation**,
+generated from the same registers, where whether a bubble is a closed control loop or a withdrawn
+sample is *computed* from the measurement mode and the declared tag letters rather than asserted.
+That is what keeps the `at_line_only` case honest — it cannot be drawn as a control. Drawing it also
+surfaced three gaps that prose had hidden: no standard this project has read specifies a PFD symbol
+set (Q-054), no register records which final control element a loop manipulates (Q-055), and seven
+instruments whose tags declare a control function appear in no control-register row (Q-056). None of
+the three was closed by inventing data. Equipment layout, stream conditions on the drawing, and any
+P&ID remain out of scope.
 
 The slice also got something wrong and is worth reading for that. Its first version held that
 variable-pathlength slope spectroscopy is inherently at-line, wrote that into a question, a control

@@ -14,6 +14,11 @@ from .balance import run_all
 from .flowsheet import render as render_flowsheet
 from .impurity import render as render_impurities
 from .controls import render as render_controls, tag_scheme_markdown
+from .pfd import (
+    UNITS as PFD_UNITS,
+    render_page as render_pfd_page,
+    render_svg as render_pfd_svg,
+)
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DOCS = os.path.join(ROOT, "docs")
@@ -213,6 +218,11 @@ def main():
     written.append(_write("balance/impurities.md", render_impurities()))
     written.append(_write("process/controls.md", render_controls()))
     written.append(_write("diagrams/bfd.svg", render_flowsheet()))
+    # One PFD per unit operation: 49 instruments on one sheet is unreadable, and every
+    # instrument row declares a unit_op while only 39 of 49 declare a stream_ref.
+    for unit in PFD_UNITS:
+        written.append(_write(f"diagrams/pfd-{unit.lower()}.svg", render_pfd_svg(unit)))
+    written.append(_write("diagrams/pfd.md", render_pfd_page()))
     print("Generated:")
     for w in written:
         print("  docs/" + w)
