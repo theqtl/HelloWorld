@@ -428,11 +428,21 @@ answer.
 | [SRC-DEXPI-2-0] | abstract only | Nothing. Registered as context: it unifies the P&ID and Process specifications and makes "DEXPI XML" the standard BFD/PFD serialization. Front matter and Chapter 1 read; the model reference was not | Context for the PFD generator only |
 | [SRC-DEXPI-PID-1-4] | abstract only | Nothing. Covers P&IDs, i.e. the plant model, not PFDs — so it is not what a process flow diagram anchors to. Overview page only | Context for the PFD generator only |
 | [SRC-ISO-10628-1] | not retrieved | Nothing, and that is the point: it is **the** standard specifying what a BFD and PFD must contain, so it is what would settle whether the generated diagrams conform. Buy it into document control | Process flow diagrams, Q-054 |
+| [SRC-ANCT4-2022] | abstract only | **Nothing, and the row exists to say so.** A substrate-inhibition rate law, a Ki and two thermal figures were reported from it by the slice-3 research; the body was never retrievable (reCAPTCHA; Europe PMC `fullTextXML` HTTP 500) and neither reading can be checked. The 45 °C endpoint of the inactivation bracket rested on it and was withdrawn | Ligation evidence page (as an unverifiable claim), Q-061 |
+| [SRC-ABBS-2014] | record only | Nothing. The direction only — that modification at the ligation junction costs rate. Its kinetic figures reached the register through a summariser rather than a retrieved document and are deliberately not carried | Ligation evidence page (as an unverified claim) |
+| [SRC-WAKAI-2013] | abstract only | An order-of-magnitude enthalpy analogue (−35 kJ/mol, pyrophosphate hydrolysis) used only to show the ligation reaction enthalpy is negligible against the sensible heating duty. The conclusion survives an order-of-magnitude error, which is what makes an abstract acceptable here | Ligation evidence page, heat-duty argument |
+| [SRC-WU-2009] | abstract only | The size-dependence half of a negative result: a 6050-bp plasmid fragments under sonication where a 21-nt siRNA does not, supporting shear lability as a long-chain phenomenon and therefore the ABSENCE of a designable shear limit for our product | Ligation evidence page, U01-LIG turndown rationale |
 
-**How to read this table.** Five of these eight are genuinely load-bearing and unread. Two are
-provenance-chain entries whose numbers reach us through an open source that *was* read in full, so
-nothing rests on the unread document. One, the microbiological control paper, no longer supports
-anything at all, because both numbers once attributed to it turned out to belong elsewhere.
+**How to read this table.** The rows fall into four kinds, and the distinction matters more than
+the count — which is why no count is written here: a number in this paragraph went stale the moment
+the table grew, and it had. Some rows are **genuinely load-bearing and unread**, and those are the
+ones worth a human with a browser. Some are **provenance-chain entries** whose numbers reach us
+through an open source that *was* read in full, so nothing rests on the unread document. Some
+**support nothing at all** — the microbiological control paper, because both numbers once attributed
+to it turned out to belong elsewhere; the two ISA documents, which are named only so the tag scheme
+can state what it is *not* based on. And some are here **because a claim was made from them and
+cannot be checked**: `SRC-ANCT4-2022` is the case to read, since a bracket endpoint rested on a
+figure whose document was never retrievable, and the bracket was withdrawn rather than kept.
 
 **Three of them are not paywalled.** The 2026 morphology paper is CC BY 4.0, the antisense
 ultrafiltration paper is bronze open access, and both Penn State membrane papers are deposited in an

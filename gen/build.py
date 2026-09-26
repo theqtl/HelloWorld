@@ -88,6 +88,46 @@ def gen_registers():
          "the latter); and `gap` means no control is defined yet. The last two render as "
          "registered gaps rather than as controls. A blank `acceptance_basis` is an unfilled gap "
          "carrying a live reference, never an invented limit.", None),
+        # The four slice-3 registers. Each existed as data before it existed as a page,
+        # which meant a reader could not browse the envelope at all - the values were in
+        # the repository and nowhere on the site. Every other CSV has a register page and
+        # these are no exception.
+        ("envelopes", "registers/envelopes.md", "Envelope register",
+         "One row per bracket, and the reason this register exists rather than two more columns "
+         "on `parameters`: a range has **two endpoints that are two different claims**, so each "
+         "carries its own `source_key` and its own `scale_system`. A band whose ends came from one "
+         "document is not thereby wrong - it may be the honest summary of what one study measured - "
+         "but it is a weaker object than a band spanning two independent studies, and "
+         "`one_source_both_ends` says which it is where the number is read. `low_drives` and "
+         "`high_drives` name the equipment item, utility or control whose sizing each end sets; "
+         "that is the whole point of bracketing a number rather than picking one.", None),
+        ("couplings", "registers/couplings.md", "Coupling register",
+         "A design space is a region, not a box, and the corners of a box are frequently "
+         "unreachable together. Each row ties two parameters, states the direction of the tension, "
+         "names the corner it forbids and whether that corner is reachable, and points at the item "
+         "the coupling bites. Reading `envelopes` without this register would licence operating at "
+         "a corner no row claims is attainable.", None),
+        ("infoneeds", "registers/infoneeds.md", "Information-requirement register",
+         "What a facility designer needs to know about this step, each row anchored to a clause "
+         "that can be quoted rather than to anyone's sense of completeness. `anchor_strength` is "
+         "load-bearing: **direct** means the clause speaks to the thing itself, **generic** means "
+         "the clause demands the category and the application to an enzymatic step is ours. That "
+         "distinction is not decoration - no regulatory document retrieved for this slice contains "
+         "a clause about enzymatic ligation of oligonucleotides, and the one modality-specific "
+         "guideline expressly declines the route as premature. `disposition` records the four-way "
+         "split: bracketed from evidence, bracketed by argument, a single point genuinely "
+         "justified, or not knowable from the public record.", None),
+        ("verdicts", "registers/verdicts.md", "Acceptance verdicts",
+         "Four reviewers asked one question - could a facility be designed for this step from this "
+         "output - answering independently, without seeing each other and without being asked to "
+         "agree. **All four returned REJECT, on four different blockers.** The disagreement is the "
+         "result and is published rather than reconciled; each verdict is recorded as returned, "
+         "not revised to match what was later fixed.\n\n"
+         "!!! warning \"This is this project's own internal review, by role\"\n"
+         "    It is **not** qualified engineering sign-off, not a design review by licensed "
+         "engineers, and carries no professional endorsement. The reviewers are roles this project "
+         "assigned to itself in order to attack its own output. Read the verdicts as findings "
+         "against the register, which is what they are.", None),
     ]
     for name, rel, title, intro, cols in specs:
         rows = load_rows(name)

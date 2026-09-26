@@ -107,6 +107,11 @@ nav:
       - Sources: registers/sources.md
       - Instruments: registers/instruments.md
       - Controls: registers/controls.md
+      - Envelopes: registers/envelopes.md
+      - Couplings: registers/couplings.md
+      - Information requirements: registers/infoneeds.md
+      - Acceptance verdicts: registers/verdicts.md
   - Reading list: sources/reading-list.md
+  - Ligation evidence: sources/ligation-evidence.md
   - Decisions:
       - ADR 0001 — Information architecture: adr/0001-information-architecture.md

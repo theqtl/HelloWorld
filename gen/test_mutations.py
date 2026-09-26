@@ -523,3 +523,50 @@ def test_mutation_the_purity_sensitivity_follows_the_registered_block_count(muta
         lo = float(a[key3].strip("* %"))
         hi = float(b[key2].strip("* %"))
         assert hi > lo, f"ceiling did not rise when the block count fell: {lo} -> {hi}"
+
+
+# ---------------------------------------------------------------------------
+# test_every_data_csv_is_published_somewhere
+#
+# This guard globs the REAL data/ directory rather than going through load_rows, so the
+# DATA_DIR redirection cannot reach it - the same limit the module docstring records for the
+# CRLF and field-count guards. What can be mutated is the guard's own declaration of which
+# CSVs are published elsewhere, and that is where its logic lives: the exemption must be
+# EARNED by a real publication, not granted by appearing in a list.
+# ---------------------------------------------------------------------------
+
+def test_mutation_an_undeclared_csv_with_no_register_page_is_caught(monkeypatch):
+    """Drop an exemption and the CSV becomes invisible data, which must fail.
+
+    Stands in for the real defect: four CSVs were committed, guarded and read by the
+    generator while no page showed them.
+    """
+    import gen.test_balance as tb
+    monkeypatch.setattr(tb, "_PUBLISHED_ELSEWHERE",
+                        {k: v for k, v in tb._PUBLISHED_ELSEWHERE.items() if k != "impurities"})
+    with pytest.raises(AssertionError, match="no register spec"):
+        tb.test_every_data_csv_is_published_somewhere()
+
+
+def test_mutation_an_unearned_exemption_is_caught(monkeypatch):
+    """Claiming publication on a page that does not carry the rows must fail.
+
+    This is the half that caught a real error while being written: the declaration first
+    named `impurity_id`, and the overlay renders impurities by NAME, so the exemption was
+    being asserted rather than demonstrated.
+    """
+    import gen.test_balance as tb
+    monkeypatch.setattr(tb, "_PUBLISHED_ELSEWHERE",
+                        dict(tb._PUBLISHED_ELSEWHERE, impurities=("balance/impurities.md",
+                                                                  "impurity_id")))
+    with pytest.raises(AssertionError, match="exemption is not earned"):
+        tb.test_every_data_csv_is_published_somewhere()
+
+
+def test_mutation_an_exemption_naming_a_missing_page_is_caught(monkeypatch):
+    import gen.test_balance as tb
+    monkeypatch.setattr(tb, "_PUBLISHED_ELSEWHERE",
+                        dict(tb._PUBLISHED_ELSEWHERE,
+                             impurities=("balance/nonexistent-page.md", "name")))
+    with pytest.raises(AssertionError, match="does not exist"):
+        tb.test_every_data_csv_is_published_somewhere()
