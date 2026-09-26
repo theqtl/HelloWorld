@@ -78,13 +78,14 @@ nav:
       - Overview: process/index.md
       - Stream table: process/streams.md
       - Enzymatic ligation: process/ligation.md
+      - Ligation design envelope: process/ligation-envelope.md
+      - Ligation evidence: sources/ligation-evidence.md
       - Block preparation (incoming): process/blocks.md
       - Filtration & UF/DF: process/filtration.md
       - Evaporation: process/evaporation.md
       - Spray drying: process/spray-drying.md
       - Microbial control: process/microbial.md
       - Control strategy: process/controls.md
-      - Ligation design envelope: process/ligation-envelope.md
   - Mass & energy balance:
       - Method: balance/index.md
       - Results: balance/results.md
@@ -107,11 +108,11 @@ nav:
       - Sources: registers/sources.md
       - Instruments: registers/instruments.md
       - Controls: registers/controls.md
-      - Envelopes: registers/envelopes.md
-      - Couplings: registers/couplings.md
-      - Information requirements: registers/infoneeds.md
-      - Acceptance verdicts: registers/verdicts.md
+      - Design envelope:
+          - Envelopes: registers/envelopes.md
+          - Couplings: registers/couplings.md
+          - Information requirements: registers/infoneeds.md
+          - Acceptance verdicts: registers/verdicts.md
   - Reading list: sources/reading-list.md
-  - Ligation evidence: sources/ligation-evidence.md
   - Decisions:
       - ADR 0001 — Information architecture: adr/0001-information-architecture.md

@@ -6,7 +6,9 @@ wrong number when you hear one, and know precisely which facts are established, 
 and which are still open.
 
 Full citations, reachability and the scale each source applies to are in the
-[source register](../registers/sources.md). This page is the order to read them in.
+[source register](../registers/sources.md). This page is the order to read them in. For the
+ligation step specifically, the [ligation evidence](ligation-evidence.md) page records which of
+these documents a claim was actually checked against, and which claims were withdrawn when it was.
 
 ## How to read the access labels
 
@@ -16,6 +18,7 @@ source register. The two things are different and the difference is the whole po
 | Label | Meaning |
 |---|---|
 | **full text read** | the complete article or document was read |
+| **partial text read** | retrieved and readable in full; the sections named in its register note were read, the rest was not. Cited only from the sections read |
 | **web page read** | a web page, blog, vendor note, standard or patent read in full |
 | **abstract only** | only the abstract, or an abstract-equivalent record summary, was seen |
 | **record only** | only bibliographic metadata was confirmed; no abstract was read |

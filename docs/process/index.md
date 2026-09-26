@@ -18,7 +18,13 @@ blocks to a dried DS powder.
 7. **[Control strategy](controls.md)** — the CPP → CQA matrix and the instruments behind it;
    also spans the whole train.
 
-See the [block flow diagram](../diagrams/index.md) and the [stream table](streams.md).
+Ligation is the step worked furthest: its [design envelope](ligation-envelope.md) brackets each
+variable with both endpoints separately sourced, and its
+[evidence trail](../sources/ligation-evidence.md) says how well each of those numbers is known.
+
+See the [block flow diagram](../diagrams/index.md) and the [stream table](streams.md). What each
+step can go wrong at is the [risk register](../registers/risks.md); what is done about it, row by
+row, is the [control register](../registers/controls.md).
 
 ## The architecture-critical unknown (Q-001)
 
