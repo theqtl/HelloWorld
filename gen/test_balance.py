@@ -2062,16 +2062,17 @@ def test_the_panel_publishes_disagreement_rather_than_a_consensus():
         "than one to assert by accident - check the panel really ran independently")
 
 
-#: CSVs that are deliberately NOT dumped as a register page, and the page that publishes
-#: them instead. This is a map rather than an allow-list on purpose: the guard below
-#: checks that the named page exists AND actually contains the rows, so an exemption has
-#: to be earned by a real publication rather than asserted by being listed here.
+# Not every CSV gets a register page: two are published as part of a wider page instead.
+# Each entry says WHERE (the relpath gen/build.py writes), WHICH generator produces it (an
+# attribute of gen.build), and WHICH column that generator actually prints. All three are
+# checked, so an exemption is earned by the generator's output rather than granted by being
+# listed here.
 _PUBLISHED_ELSEWHERE = {
     # The overlay renders each impurity by NAME, not by id - so the column checked here is
     # the one the page actually shows. Checking `impurity_id` looked right and was wrong,
     # which is the argument for proving an exemption instead of listing it.
-    "impurities": ("balance/impurities.md", "name"),
-    "scenarios": ("balance/results.md", "label"),
+    "impurities": ("balance/impurities.md", "render_impurities", "name"),
+    "scenarios": ("balance/results.md", "render_balance", "label"),
 }
 
 
@@ -2086,8 +2087,15 @@ def test_every_data_csv_is_published_somewhere():
 
     The rule is derived from the two sets rather than enumerated: every `data/*.csv` must
     either have a register spec in gen/build.py, or be named in _PUBLISHED_ELSEWHERE with a
-    page that exists and demonstrably carries its rows.
+    generator that is wired to a page and demonstrably prints its rows.
+
+    The evidence is the **generator's return value**, not a file on disk. The first version
+    of this guard checked that the page existed under `docs/`, which passed locally and
+    failed in CI: those pages are generated and gitignored, and CI runs pytest before
+    `python -m gen.build`. A test that asserts on a build artefact is testing the order of
+    the last two commands someone ran.
     """
+    import gen.build as build
     src = open(os.path.join(ROOT, "gen", "build.py"), encoding="utf-8").read()
     spec_named = set(re.findall(r'^\s*\("([a-z]+)",\s*"registers/', src, re.M))
     offenders = []
@@ -2100,18 +2108,26 @@ def test_every_data_csv_is_published_somewhere():
                 f"{name}.csv has no register spec in gen/build.py and is not declared in "
                 f"_PUBLISHED_ELSEWHERE - it is committed data that no page shows")
             continue
-        rel, id_col = _PUBLISHED_ELSEWHERE[name]
-        page = os.path.join(ROOT, "docs", rel)
-        if not os.path.exists(page):
-            offenders.append(f"{name}.csv claims to be published on {rel}, which does not exist")
+        rel, fn, id_col = _PUBLISHED_ELSEWHERE[name]
+        renderer = getattr(build, fn, None)
+        if renderer is None:
+            offenders.append(
+                f"{name}.csv names generator {fn}(), which gen/build.py does not define")
             continue
-        text = open(page, encoding="utf-8").read()
+        # The generator must be wired to the page the exemption claims, or it renders text
+        # that reaches no reader.
+        if f'_write("{rel}", {fn}())' not in src:
+            offenders.append(
+                f"{name}.csv claims to be published on {rel}, but gen/build.py does not "
+                f"write that page from {fn}()")
+            continue
+        text = renderer()
         ids = [(r.get(id_col) or "").strip() for r in load_rows(name)]
         ids = [i for i in ids if i]
         if ids and not any(i in text for i in ids):
             offenders.append(
-                f"{name}.csv claims to be published on {rel}, but none of its {id_col} values "
-                f"appear there - the exemption is not earned")
+                f"{name}.csv claims to be published on {rel}, but {fn}() prints none of its "
+                f"{id_col} values - the exemption is not earned")
     assert not offenders, (
         "committed data that no published page shows. Add a register spec in gen/build.py, or "
         "declare where it is published and make that true: " + "; ".join(offenders)

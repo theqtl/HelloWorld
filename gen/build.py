@@ -211,7 +211,7 @@ def _excipient_sensitivity():
     return scn["label"], rows
 
 
-def gen_balance():
+def render_balance():
     results = [asdict(r) for r in run_all()]
     body = BANNER + "# Mass & energy balance (results)\n\n"
     body += ("!!! warning \"Assumption-driven\"\n"
@@ -285,14 +285,14 @@ def gen_balance():
              "solution at the evaporator is an open process choice (`P-EXCIP-FRAC-PRE-EVAP`, "
              "Q-038) and it swings the evaporation duty severalfold — see the "
              "[method page](index.md).\n")
-    return _write("balance/results.md", body)
+    return body
 
 
 def main():
     written = []
     written += gen_registers()
     written.append(gen_streams_on_process())
-    written.append(gen_balance())
+    written.append(_write("balance/results.md", render_balance()))
     written.append(_write("balance/impurities.md", render_impurities()))
     written.append(_write("process/controls.md", render_controls()))
     written.append(_write("process/ligation-envelope.md", render_envelope()))

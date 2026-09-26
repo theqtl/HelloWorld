@@ -532,7 +532,10 @@ def test_mutation_the_purity_sensitivity_follows_the_registered_block_count(muta
 # DATA_DIR redirection cannot reach it - the same limit the module docstring records for the
 # CRLF and field-count guards. What can be mutated is the guard's own declaration of which
 # CSVs are published elsewhere, and that is where its logic lives: the exemption must be
-# EARNED by a real publication, not granted by appearing in a list.
+# EARNED by the generator's output, not granted by appearing in a list.
+#
+# All three fields of an entry are mutated, because all three can lie independently: the
+# page it claims, the generator it names, and the column it says that generator prints.
 # ---------------------------------------------------------------------------
 
 def test_mutation_an_undeclared_csv_with_no_register_page_is_caught(monkeypatch):
@@ -549,7 +552,7 @@ def test_mutation_an_undeclared_csv_with_no_register_page_is_caught(monkeypatch)
 
 
 def test_mutation_an_unearned_exemption_is_caught(monkeypatch):
-    """Claiming publication on a page that does not carry the rows must fail.
+    """Claiming publication of a column the generator does not print must fail.
 
     This is the half that caught a real error while being written: the declaration first
     named `impurity_id`, and the overlay renders impurities by NAME, so the exemption was
@@ -557,16 +560,50 @@ def test_mutation_an_unearned_exemption_is_caught(monkeypatch):
     """
     import gen.test_balance as tb
     monkeypatch.setattr(tb, "_PUBLISHED_ELSEWHERE",
-                        dict(tb._PUBLISHED_ELSEWHERE, impurities=("balance/impurities.md",
-                                                                  "impurity_id")))
+                        dict(tb._PUBLISHED_ELSEWHERE,
+                             impurities=("balance/impurities.md", "render_impurities",
+                                         "impurity_id")))
     with pytest.raises(AssertionError, match="exemption is not earned"):
         tb.test_every_data_csv_is_published_somewhere()
 
 
-def test_mutation_an_exemption_naming_a_missing_page_is_caught(monkeypatch):
+def test_mutation_a_generator_that_reaches_no_page_is_caught(monkeypatch):
+    """A generator that renders text gen/build.py never writes publishes nothing.
+
+    The page path is the half of the claim the generator itself cannot evidence: calling it
+    proves the rows are rendered, not that any reader sees them.
+    """
     import gen.test_balance as tb
     monkeypatch.setattr(tb, "_PUBLISHED_ELSEWHERE",
                         dict(tb._PUBLISHED_ELSEWHERE,
-                             impurities=("balance/nonexistent-page.md", "name")))
-    with pytest.raises(AssertionError, match="does not exist"):
+                             impurities=("balance/nonexistent-page.md", "render_impurities",
+                                         "name")))
+    with pytest.raises(AssertionError, match="does not write that page"):
         tb.test_every_data_csv_is_published_somewhere()
+
+
+def test_mutation_an_exemption_naming_a_missing_generator_is_caught(monkeypatch):
+    import gen.test_balance as tb
+    monkeypatch.setattr(tb, "_PUBLISHED_ELSEWHERE",
+                        dict(tb._PUBLISHED_ELSEWHERE,
+                             impurities=("balance/impurities.md", "render_nothing", "name")))
+    with pytest.raises(AssertionError, match="does not define"):
+        tb.test_every_data_csv_is_published_somewhere()
+
+
+def test_mutation_the_publication_guard_reads_the_generator_not_the_built_page(tmp_path,
+                                                                              monkeypatch):
+    """The guard must pass with no built pages on disk at all.
+
+    Its first version checked `os.path.exists(docs/<page>)`. Those pages are generated and
+    gitignored, so it passed on a machine that had just run the build and failed in CI, where
+    pytest runs first. Point DOCS at an empty directory: nothing is written there, and the
+    guard must still reach its verdict from the generators.
+    """
+    import gen.build as build
+    import gen.test_balance as tb
+    monkeypatch.setattr(build, "DOCS", str(tmp_path / "docs"))
+    assert not os.path.exists(os.path.join(str(tmp_path / "docs"), "balance", "results.md"))
+    tb.test_every_data_csv_is_published_somewhere()
+    assert not os.path.exists(str(tmp_path / "docs")), (
+        "the guard wrote a page - it must render in memory, not build into the docs tree")
