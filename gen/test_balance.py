@@ -2060,3 +2060,75 @@ def test_the_panel_publishes_disagreement_rather_than_a_consensus():
     assert len(blockers) > 1 or len(rows) == 1, (
         "every reviewer named the same blocker, which is a result worth stating explicitly rather "
         "than one to assert by accident - check the panel really ran independently")
+
+
+# Not every CSV gets a register page: two are published as part of a wider page instead.
+# Each entry says WHERE (the relpath gen/build.py writes), WHICH generator produces it (an
+# attribute of gen.build), and WHICH column that generator actually prints. All three are
+# checked, so an exemption is earned by the generator's output rather than granted by being
+# listed here.
+_PUBLISHED_ELSEWHERE = {
+    # The overlay renders each impurity by NAME, not by id - so the column checked here is
+    # the one the page actually shows. Checking `impurity_id` looked right and was wrong,
+    # which is the argument for proving an exemption instead of listing it.
+    "impurities": ("balance/impurities.md", "render_impurities", "name"),
+    "scenarios": ("balance/results.md", "render_balance", "label"),
+}
+
+
+def test_every_data_csv_is_published_somewhere():
+    """A register that exists as data and nowhere on the site is invisible, not private.
+
+    Written because four CSVs were in exactly that state: `envelopes`, `couplings`,
+    `infoneeds` and `verdicts` were committed, guarded and read by the generator, and a
+    reader could not browse any of them - the envelope was in the repository and nowhere on
+    the published site. Nothing caught it, because no test related the set of data files to
+    the set of pages.
+
+    The rule is derived from the two sets rather than enumerated: every `data/*.csv` must
+    either have a register spec in gen/build.py, or be named in _PUBLISHED_ELSEWHERE with a
+    generator that is wired to a page and demonstrably prints its rows.
+
+    The evidence is the **generator's return value**, not a file on disk. The first version
+    of this guard checked that the page existed under `docs/`, which passed locally and
+    failed in CI: those pages are generated and gitignored, and CI runs pytest before
+    `python -m gen.build`. A test that asserts on a build artefact is testing the order of
+    the last two commands someone ran.
+    """
+    import gen.build as build
+    src = open(os.path.join(ROOT, "gen", "build.py"), encoding="utf-8").read()
+    spec_named = set(re.findall(r'^\s*\("([a-z]+)",\s*"registers/', src, re.M))
+    offenders = []
+    for path in sorted(glob.glob(os.path.join(ROOT, "data", "*.csv"))):
+        name = os.path.basename(path)[:-4]
+        if name in spec_named:
+            continue
+        if name not in _PUBLISHED_ELSEWHERE:
+            offenders.append(
+                f"{name}.csv has no register spec in gen/build.py and is not declared in "
+                f"_PUBLISHED_ELSEWHERE - it is committed data that no page shows")
+            continue
+        rel, fn, id_col = _PUBLISHED_ELSEWHERE[name]
+        renderer = getattr(build, fn, None)
+        if renderer is None:
+            offenders.append(
+                f"{name}.csv names generator {fn}(), which gen/build.py does not define")
+            continue
+        # The generator must be wired to the page the exemption claims, or it renders text
+        # that reaches no reader.
+        if f'_write("{rel}", {fn}())' not in src:
+            offenders.append(
+                f"{name}.csv claims to be published on {rel}, but gen/build.py does not "
+                f"write that page from {fn}()")
+            continue
+        text = renderer()
+        ids = [(r.get(id_col) or "").strip() for r in load_rows(name)]
+        ids = [i for i in ids if i]
+        if ids and not any(i in text for i in ids):
+            offenders.append(
+                f"{name}.csv claims to be published on {rel}, but {fn}() prints none of its "
+                f"{id_col} values - the exemption is not earned")
+    assert not offenders, (
+        "committed data that no published page shows. Add a register spec in gen/build.py, or "
+        "declare where it is published and make that true: " + "; ".join(offenders)
+    )
