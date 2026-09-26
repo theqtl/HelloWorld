@@ -660,7 +660,11 @@ def render():
              "failed silently: that a band's two endpoints were two independent citations, that a set "
              "of bands describes a region, and that an information requirement was anchored in a "
              "clause. The narrative account of the step is the hand-written "
-             "[enzymatic ligation](ligation.md) page; this is the evidence behind it.\n\n")
+             "[enzymatic ligation](ligation.md) page. How well each number below is known - "
+             "verified against its document, merely reported, or derived here - and the claims "
+             "that were withdrawn after checking are on the "
+             "[ligation evidence](../sources/ligation-evidence.md) page, which is this page's "
+             "provenance.\n\n")
 
     # ---- 1. the checklist and the four-way split
     total, split = _split_table()

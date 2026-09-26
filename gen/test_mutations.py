@@ -607,3 +607,64 @@ def test_mutation_the_publication_guard_reads_the_generator_not_the_built_page(t
     tb.test_every_data_csv_is_published_somewhere()
     assert not os.path.exists(str(tmp_path / "docs")), (
         "the guard wrote a page - it must render in memory, not build into the docs tree")
+
+
+# ---------------------------------------------------------------------------
+# Reachability: the nav bijection, the orphan-page rule, the access legend
+#
+# These three guards read mkdocs.yml, gen/build.py and docs/ directly, so DATA_DIR
+# redirection cannot reach them. What is mutated instead is the derived set each one
+# compares - which is where the logic is - and the vocabulary constant the legend is
+# checked against.
+# ---------------------------------------------------------------------------
+
+def test_mutation_a_page_missing_from_the_nav_is_caught(monkeypatch):
+    """Drop a nav entry and its page becomes reachable only by search, which must fail."""
+    import gen.test_balance as tb
+    real = tb._nav_pages()
+    victim = "process/ligation-envelope.md"
+    assert victim in real, "the fixture page is no longer in the nav; pick another"
+    monkeypatch.setattr(tb, "_nav_pages", lambda: real - {victim})
+    with pytest.raises(AssertionError, match="no mkdocs.yml nav entry lists them"):
+        tb.test_every_page_is_in_the_nav_and_every_nav_entry_is_a_real_page()
+
+
+def test_mutation_a_nav_entry_with_no_page_behind_it_is_caught(monkeypatch):
+    """A sidebar row pointing at nothing must fail here, not at mkdocs build time."""
+    import gen.test_balance as tb
+    real = tb._nav_pages()
+    monkeypatch.setattr(tb, "_nav_pages", lambda: real | {"process/not-a-page.md"})
+    with pytest.raises(AssertionError, match="nothing writes and no file provides"):
+        tb.test_every_page_is_in_the_nav_and_every_nav_entry_is_a_real_page()
+
+
+def test_mutation_a_generated_page_nothing_links_to_is_caught(monkeypatch):
+    """The real defect, reproduced: a page correctly built and linked from nowhere.
+
+    Declaring a page generated is the faithful mutation, because the orphan that prompted this
+    guard was generated and unlinked. The ADR is the fixture: it is hand-written and, correctly,
+    no page links to it.
+    """
+    import gen.test_balance as tb
+    real = tb._generated_pages()
+    orphan = "adr/0001-information-architecture.md"
+    monkeypatch.setattr(tb, "_generated_pages", lambda: real | {orphan})
+    with pytest.raises(AssertionError, match="reachable only from the sidebar"):
+        tb.test_every_generated_page_is_linked_from_a_hand_written_page()
+
+
+def test_mutation_an_access_label_absent_from_the_legend_is_caught(monkeypatch):
+    """Exactly the defect found: a vocabulary value the legend does not explain."""
+    import gen.test_balance as tb
+    monkeypatch.setattr(tb, "ACCESS_VOCAB", set(tb.ACCESS_VOCAB) | {"skim-read"})
+    with pytest.raises(AssertionError, match="absent from the reading-list legend"):
+        tb.test_the_access_legend_covers_the_whole_vocabulary()
+
+
+def test_mutation_a_legend_label_outside_the_vocabulary_is_caught(monkeypatch):
+    """The other direction: a legend row left behind after a value was retired."""
+    import gen.test_balance as tb
+    monkeypatch.setattr(tb, "ACCESS_VOCAB",
+                        {v for v in tb.ACCESS_VOCAB if v != "partial-text-read"})
+    with pytest.raises(AssertionError, match="not in ACCESS_VOCAB"):
+        tb.test_the_access_legend_covers_the_whole_vocabulary()

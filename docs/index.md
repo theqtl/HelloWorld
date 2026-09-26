@@ -44,6 +44,10 @@ solvents.** The boundary starts at received, purified, 5'-phosphorylated blocks;
 - **[Does the duplex survive spray drying?](findings/spray-drying.md)** — the central drying finding.
 - **[Mass & energy balance](balance/index.md)** — executable, scenario-driven.
 - **[Open questions](registers/questions.md)** — Q-001 (annealing / product form) and Q-002 (real annual demand) drive everything.
+- **[Ligation design envelope](process/ligation-envelope.md)** — the ligation step bracketed rather
+  than point-valued, with each endpoint beside its own source; its
+  [evidence trail](sources/ligation-evidence.md) says how well each number is known and which
+  claims were withdrawn.
 
 !!! note "Scope of this release (Tier 3, in progress)"
     Tier 1 established the architecture, the data model and build, the two headline findings, the
@@ -51,6 +55,9 @@ solvents.** The boundary starts at received, purified, 5'-phosphorylated blocks;
     added the full energy balance, species-resolved impurity fate, the contamination-control
     strategy with CIP/SIP, filterable registers, a generated flowsheet, and equipment sizing basis
     and turndown. Tier 3 has since added the control strategy as data and a
-    [process flow diagram per unit operation](diagrams/pfd.md) generated from it. The facility
+    [process flow diagram per unit operation](diagrams/pfd.md) generated from it, and the ligation
+    step as a [design envelope](process/ligation-envelope.md) — ranges with both endpoints sourced
+    separately, the couplings that stop those ranges forming a box, an information-requirement
+    checklist anchored to citable clauses, and an acceptance panel. The facility
     capital concept is still Tier 3, and is marked as a stub or a registered gap where not yet
     built; so are equipment layout, stream conditions on the drawings, and any P&ID.

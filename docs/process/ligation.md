@@ -9,6 +9,11 @@ checklist and the acceptance panel — is generated from the registers on the
 [ligation design envelope](ligation-envelope.md) page. Where the two disagree, the envelope page
 is derived from `data/*.csv` and this one is hand-written, so the envelope wins.
 
+How well each of those numbers is actually known — which were re-checked against the document,
+which a research pass asserted and nothing verified, and the four claims that were **withdrawn**
+after checking — is the [ligation evidence](../sources/ligation-evidence.md) page. Read it before
+quoting any figure from either page: it is where the corrections live.
+
 ## Enzyme and chemistry
 
 - The viable class is **double-stranded RNA (nick-sealing) ligases** — T4 RNA ligase 2 family and

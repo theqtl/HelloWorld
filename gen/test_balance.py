@@ -2132,3 +2132,102 @@ def test_every_data_csv_is_published_somewhere():
         "committed data that no published page shows. Add a register spec in gen/build.py, or "
         "declare where it is published and make that true: " + "; ".join(offenders)
     )
+
+
+def _nav_pages():
+    """Every page path named in mkdocs.yml nav, relative to docs/."""
+    cfg = open(os.path.join(ROOT, "mkdocs.yml"), encoding="utf-8").read()
+    nav = cfg[cfg.index("\nnav:"):]
+    return set(re.findall(r":\s*([A-Za-z0-9_\-/]+\.md)\s*$", nav, re.M))
+
+
+def _generated_pages():
+    """Every Markdown page gen/build.py writes, read from its source rather than from disk.
+
+    Read from the source on purpose: these pages are gitignored, so globbing docs/ would make
+    the answer depend on whether anyone had run the build - the defect that broke CI once.
+    """
+    src = open(os.path.join(ROOT, "gen", "build.py"), encoding="utf-8").read()
+    written = set(re.findall(r'_write\(\s*f?"([^"{}]+\.md)"', src))
+    written |= set(re.findall(r'\(\s*"[a-z]+",\s*"(registers/[a-z]+\.md)"', src))
+    return written
+
+
+def test_every_page_is_in_the_nav_and_every_nav_entry_is_a_real_page():
+    """A page nothing links to and the sidebar does not list is not published, only present.
+
+    Written after the ligation work landed four registers and two pages that were all correctly
+    generated, correctly gitignored and correctly guarded - and one of which no page on the site
+    linked to at all. `test_every_data_csv_is_published_somewhere` proves *data reaches a page*.
+    Nothing proved *a page reaches a reader*, so the two properties drifted apart.
+
+    Both directions, because each fails differently: a generated page missing from the nav is
+    invisible, and a nav entry with no page behind it is a dead sidebar row that only shows up
+    once someone runs `mkdocs build --strict`.
+    """
+    nav = _nav_pages()
+    generated = _generated_pages()
+    handwritten = set()
+    for path in glob.glob(os.path.join(ROOT, "docs", "**", "*.md"), recursive=True):
+        rel = os.path.relpath(path, os.path.join(ROOT, "docs")).replace(os.sep, "/")
+        if rel not in generated:
+            handwritten.add(rel)
+    pages = generated | handwritten
+
+    missing = sorted(pages - nav)
+    dead = sorted(nav - pages)
+    assert not missing, (
+        "these pages exist but no mkdocs.yml nav entry lists them, so a reader can only reach "
+        "them by search or by a link from elsewhere: " + ", ".join(missing))
+    assert not dead, (
+        "these mkdocs.yml nav entries name a page that nothing writes and no file provides: "
+        + ", ".join(dead))
+
+
+def test_every_generated_page_is_linked_from_a_hand_written_page():
+    """The sidebar is not the only way in, and for a generated page it is the weakest one.
+
+    A generated page reached only by scrolling the sidebar is buried: nothing in the prose tells
+    a reader it exists or why they would want it. The narrow rule - *generated* pages need an
+    inbound link from a *hand-written* one - has no exemptions, which is why it is drawn there.
+    Hand-written section landing pages are excluded as link targets because they are reached as
+    sections, and `index.md` is the way in rather than a destination.
+    """
+    generated = _generated_pages()
+    inbound = {p: set() for p in generated}
+    for path in glob.glob(os.path.join(ROOT, "docs", "**", "*.md"), recursive=True):
+        rel = os.path.relpath(path, os.path.join(ROOT, "docs")).replace(os.sep, "/")
+        if rel in generated:
+            continue  # a generated page linking a generated page is code, not curation
+        text = open(path, encoding="utf-8").read()
+        here = os.path.dirname(rel)
+        for m in re.finditer(r"\]\(([^)#\s]+\.md)", text):
+            target = os.path.normpath(os.path.join(here, m.group(1))).replace(os.sep, "/")
+            if target in inbound:
+                inbound[target].add(rel)
+    orphans = sorted(p for p, srcs in inbound.items() if not srcs)
+    assert not orphans, (
+        "these generated pages are reachable only from the sidebar - no hand-written page links "
+        "to them, so nothing tells a reader they exist: " + ", ".join(orphans))
+
+
+def test_the_access_legend_covers_the_whole_vocabulary():
+    """A legend that omits a live label is worse than no legend: it reads as complete.
+
+    `partial-text-read` was added to ACCESS_VOCAB during the ligation slice and eleven sources
+    now carry it - every ICH document the information-requirement checklist is anchored to. The
+    reading list's "How to read the access labels" table was not updated, so a reader consulting
+    the legend to interpret the register found no entry for the label on eleven rows.
+
+    Checked both ways against the vocabulary constant, never against a re-typed list.
+    """
+    page = os.path.join(ROOT, "docs", "sources", "reading-list.md")
+    text = open(page, encoding="utf-8").read()
+    legend = set(re.findall(r"^\|\s*\*\*([a-z ]+)\*\*\s*\|", text, re.M))
+    expected = {v.replace("-", " ") for v in ACCESS_VOCAB}
+    assert not (expected - legend), (
+        "these access values are in ACCESS_VOCAB and absent from the reading-list legend: "
+        + ", ".join(sorted(expected - legend)))
+    assert not (legend - expected), (
+        "the reading-list legend explains labels that are not in ACCESS_VOCAB, so it describes a "
+        "vocabulary the register does not use: " + ", ".join(sorted(legend - expected)))
