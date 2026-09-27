@@ -33,7 +33,9 @@ Report at the end of each phase what you verified by execution versus what you t
 | 2 — the vocabulary, the fields, the visibility | **done** | `25c831b` |
 | 3 — the corrections the audits forced | **done** | `55c75d2` |
 | 4 — buffers | **done** | `83a7da0` |
-| 5 — sizing, and the citable cleaning criteria | **next** | — |
+| 5 — sizing, and the citable cleaning criteria | **done** | `c2cf6a5` |
+
+**All six phases are committed. What remains is review: the PR, and the end-of-slice report in its body.**
 
 **Baseline is now 215 tests, not 147.** Phase 0 took it to 155, phase 1 to 163, phase 2 to 202, phase 3 to 205,
 phase 4 to 215.
