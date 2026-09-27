@@ -51,7 +51,7 @@ membrane data):
 
 | Impurity class | Size difference vs product | Filtration verdict |
 |---|---|---|
-| **Block-internal n-1 / n+1** | ~1 nt in ~21 (~5%) | **Cannot be cleared** by size or charge. |
+| **Block-internal n-1 / n+1** | ~1 nt in ~21 (~5%, arithmetic ours: <span class="prov-inference">inference</span>) | **Cannot be cleared** by size or charge. |
 | **Unreacted blocks & partial ligation products** | a whole block (3–10 nt in 21) | **Clearable** by UF/DF (and NF for the very short ones). |
 | Adenylylated dead-end (AppN) | ~1 residue | Cannot be cleared; control at the reaction. |
 | ATP / AMP / PPi / monovalent salts | << 1 kDa | **Cleared** by diafiltration — the workhorse. |
@@ -150,11 +150,20 @@ DNase digestion, which adds a protein to clear. Registered as **R-006**.
 
 1. **What each mode clears, quantitatively** — see the matrix in §2 and the
    [process page](../process/filtration.md). Diafiltration clears small solutes to 99.9% at
-   7 diavolumes (σ≈1); UF/DF concentrates and clears whole-block species; depth/0.2 µm clears
+   7 diavolumes (σ≈1) — computed, not measured: `EQ-DIAF` at `P-DF-DIAVOL` = 7 leaves
+   \(e^{-7}\) ≈ 0.09%; UF/DF concentrates and clears whole-block species; depth/0.2 µm clears
    particulates and bioburden. None clears n-1.
 2. **Does block control + high conversion hold final purity without a polish?** It holds the
-   *internal-limited* purity at \(\prod f_i\) (~70–88% for 3 blocks at 89–96%). Whether that
+   *internal-limited* purity at \(\prod f_i\) — **~82–87% for 3 blocks**, from `P-BLOCK-PUR`'s
+   registered 93.6–95.6% (\(0.936^3\) to \(0.956^3\)). Whether that
    **meets spec** depends on how the spec is set (next point).
+   !!! warning "This figure was ~70–88% until 2026-09-27, and the old number is withdrawn"
+       The wider band cubed an **89–96%** block purity. `Q-011` retracted that band's low end:
+       89.1% was measured at **6.00 g**, a bench datum sitting inside a range advertised as
+       145–258 g. The chromatography-free hectogram measurements are 93.6, 94.8 and 95.6%.
+       89–96% survives only as the *first-principles* band (\(0.97^4\) to \(0.99^4\);
+       `SRC-US6087491`) and must not be quoted as a measurement. Six other prose sites still
+       carry the retracted band — see `Q-073`.
 3. **What would have to move for the filtration-only case to close?** The old framing — "does the
    floor beat the published number" — has no answer because **there is no such number and there is not
    meant to be one.** No published full-length percentage or single-impurity limit exists for any

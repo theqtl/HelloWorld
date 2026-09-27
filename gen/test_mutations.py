@@ -1243,15 +1243,15 @@ def test_mutation_an_estimated_quantity_with_no_parameter_named_is_caught(monkey
     Writes a page making exactly the claim the rule refuses - a quantity labelled as an educated
     estimate with nothing naming the row that carries its basis - and proves the guard sees it.
 
-    THE FIXTURE USES `mM` AND NOT A PERCENTAGE, and the reason is a defect in the guard this one
-    rides on rather than a stylistic choice. `_QUANTITY` ends its unit alternation with `\b`, and a
-    word boundary after `%` requires a WORD character next - so `0.5%`, `0.5 %.` and `0.5% of` all
-    fail to match, and `test_numeric_claims_in_prose_carry_a_citation` has never policed a
-    percentage at all. Measured, not reasoned: seven prose lines across four pages are quantities
-    under a corrected regex, carry no citation in their window, and pass today. That is a
-    pre-existing hole in a different guard and correcting it is not this phase's work, so it is
-    REGISTERED here rather than fixed silently - and this case is written so that it does not
-    depend on the bug either way.
+    THE FIXTURE USES `mM` AND NOT A PERCENTAGE. That began as a way around a defect in the guard
+    this one rides on: `_QUANTITY` ended its unit alternation with `\b`, a word boundary after `%`
+    requires a WORD character next, and so `0.5%`, `0.5 %.` and `0.5% of` all failed to match.
+    PHASE 3 CORRECTED THAT - `%` now sits on its own branch with no boundary assertion, and
+    `test_mutation_a_bare_percentage_with_no_citation_is_caught` holds the correction in place. The
+    count registered here was seven prose lines across THREE pages, not four; all seven were judged
+    individually and one of them was carrying a block-purity band `Q-011` had already retracted.
+    The fixture stays on `mM` anyway, because this case is about the estimate chip and not about
+    which units `_QUANTITY` recognises, and it should not fail for an unrelated reason.
     """
     import gen.test_balance as tb
     page = tmp_path / "estimated.md"
@@ -1291,3 +1291,73 @@ def test_mutation_a_generated_page_left_out_of_gitignore_is_caught(monkeypatch):
     monkeypatch.setattr(tb, "_generated_pages", lambda: real | {"registers/not-ignored.md"})
     with pytest.raises(AssertionError, match="not listed in .gitignore"):
         tb.test_every_generated_page_is_gitignored()
+
+
+def test_mutation_a_bare_percentage_with_no_citation_is_caught(monkeypatch, tmp_path):
+    """The hole phase 2 measured and phase 3 closed, held shut by a failing case.
+
+    `_QUANTITY` used to read `(?:%|percent|...)\\b` - ONE word boundary after the whole
+    alternation. `%` is not a word character, so `\\b` demanded a word character after it and every
+    percentage that ended a clause slipped through. For the guard's whole life it had never policed
+    a percentage, which is the single most common way a number is written in this repo's prose.
+
+    THE THREE SHAPES BELOW ARE THE THREE THAT FAILED, and they are checked as a group because
+    fixing one spelling and not another is exactly how the bug survived: a percentage at end of
+    line, one followed by sentence punctuation, and one followed by a word. If a future edit
+    reinstates the trailing boundary, every one of them stops matching and this case goes green -
+    so the assertion is that the guard RAISES on all three at once.
+    """
+    import gen.test_balance as tb
+    page = tmp_path / "uncited.md"
+    page.write_text(
+        "# A page\n\n"
+        "Conversion reached 0.5%\n"
+        "\n\n\n\n"
+        "Recovery was 29 %.\n"
+        "\n\n\n\n"
+        "It clears 99.9% of the salt.\n",
+        encoding="utf-8")
+    monkeypatch.setattr(tb, "_doc_files", lambda: [str(page)])
+    with pytest.raises(AssertionError, match="numeric claim") as exc:
+        tb.test_numeric_claims_in_prose_carry_a_citation()
+    message = str(exc.value)
+    for shape in ("0.5%", "29 %.", "99.9%"):
+        assert shape in message, (
+            f"the corrected _QUANTITY missed {shape!r}; a percentage in this shape is unpoliced again")
+
+
+def test_mutation_a_cited_percentage_passes(monkeypatch, tmp_path):
+    """And the limit, or the fix would just be a ban on percentages.
+
+    Same three shapes, each with a real token in its window. Without this the guard could be
+    satisfied by never writing a percentage in prose, which is not the property wanted.
+    """
+    import gen.test_balance as tb
+    page = tmp_path / "cited.md"
+    page.write_text(
+        "# A page\n\n"
+        "Conversion reached 0.5% (SRC-ALMAC-2023).\n"
+        "\n\n\n\n"
+        "Recovery was 29 %. See `Q-011`.\n"
+        "\n\n\n\n"
+        "`EQ-DIAF` gives 99.9% of the salt cleared.\n",
+        encoding="utf-8")
+    monkeypatch.setattr(tb, "_doc_files", lambda: [str(page)])
+    tb.test_numeric_claims_in_prose_carry_a_citation()
+
+
+def test_mutation_the_corrected_quantity_pattern_still_refuses_a_longer_unit(monkeypatch, tmp_path):
+    """The trailing `\\b` was there for a reason, and moving it must not drop that reason.
+
+    The word-spelled units keep their boundary so `10 mMol` does not match `mM` and report a
+    millimolar claim that was never made. Only the `%` branch lost the assertion, because `%` needs
+    none. This case fails if a future simplification hoists the boundary out of the group.
+    """
+    import gen.test_balance as tb
+    assert not tb._QUANTITY.search("10 mMol"), (
+        "_QUANTITY matched '10 mMol' as a millimolar quantity; the word-spelled units have lost "
+        "their trailing word boundary")
+    page = tmp_path / "longer-unit.md"
+    page.write_text("# A page\n\nThe buffer was 10 mMol overall.\n", encoding="utf-8")
+    monkeypatch.setattr(tb, "_doc_files", lambda: [str(page)])
+    tb.test_numeric_claims_in_prose_carry_a_citation()

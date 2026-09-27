@@ -36,7 +36,28 @@ register quote is **truncated one sentence early**: *"diluted 400-fold in **10 m
 with **methanol** — a sentence the register already cites, **for its percent sign**, to support a claim
 that the text contains exactly one `%`. It had the quench in hand and read it for punctuation. So
 `Q-059`'s *"the only retrieved quench is thermal"* is false of the documents (true only of the CSVs),
-and a quench row is **supportable**. Caveats that must travel: every chemical stop is at an
+and a quench row is **supportable**.
+
+> **CORRECTED 2026-09-27 by phase 3, which re-retrieved all four documents. It is THREE sources, not
+> four, and `Q-059` never contained the sentence quoted above.**
+>
+> - **`SRC-WO2025262452` does NOT name a chemical stop, and the register's existing reading of it was
+>   right.** The full passage: *"The reactions were quenched by heating to 95 °C for 20 min to
+>   inactivate the enzyme. The inactivated reactions were subsequently diluted 400-fold in 10 mM EDTA
+>   pH 7.0 and analyzed via HPLC as described below."* The document calls the **heat kill** the quench
+>   and applies the EDTA to the **already-inactivated** reaction as HPLC sample prep. Not a truncation
+>   defect; a correct quote.
+> - **The other three hold, verbatim, and only `SRC-PBCV1-2014` is on a ligation** — six timepoints
+>   *"halted … by addition of 25 µl stop solution"*, no thermal step, at 2.5 nM on unmodified DNA.
+>   Every quench in `SRC-NEB-WO2023173098` is on a **capping or poly(A) tailing** reaction, never a
+>   ligation — a scope caveat this section omits.
+> - **`Q-059` said something different and weaker.** Its actual words were a CSV census: *"quench,
+>   inactivat, EDTA, chelat and proteinase return zero hits in every non-sources CSV."* Re-measured,
+>   that census is **false now** — EDTA alone appears in five registers — having been falsified by the
+>   rows `Q-059` itself spawned. That is the claim phase 3 corrected, not the paraphrase above.
+> - **The two methanol quenches are one recipe in two units on two different screens** (`100% v/v` in
+>   the PNK screen, `1 volume` in the RNAL screen), which is close to this section's reading but not
+>   "one operation described twice". Caveats that must travel: every chemical stop is at an
 **analytical sampling point**, not a process unit operation; and the paper's two methanol quenches are
 almost certainly **one operation described twice** (1 volume ≈ 100% v/v), not two data points.
 
@@ -183,13 +204,40 @@ question is **`open`**. Visibility: a `_with_provenance_markers(rows)` transform
 enumerations at `gen/build.py:43-45` and `:219`, `gen/impurity.py:85`, `gen/__init__.py:2`,
 `docs/balance/index.md:10`, `docs/techtransfer/index.md:24`, `README.md:43-44` and `:67`.
 
-### Phase 3 — the corrections, owed regardless
+### Phase 3 — the corrections, owed regardless — **DONE 2026-09-27**
 Register the **2 mM vs 5 mM published contradiction** as a question; neither number is settled. Qualify
 `P-LIG-SEG-CONC` and `Q-064`: the *"6.7× void"* is basis-dependent — the 1.5 mM low end is per-segment
 across three segments plus **0.55 mM of tri-template hub** the register never mentions, ≈5.05 mM total,
 making the void ~2.0× on a total basis. Correct `Q-059`. Register the **75 °C hold plus centrifugal
 solids rejection**. Record in `docs/sources/ligation-evidence.md` that the register read Almac's
 methanol-quench sentence for its percent sign.
+
+**As built, with three corrections to this paragraph.** All five items landed; `Q-071` (the
+contradiction), `Q-072` (the solids rejection) and `Q-073` (see below) were raised, `Q-059`, `Q-064`,
+`Q-016`, `P-LIG-SEG-CONC`, `ENV-006`, `IN-005` and six source rows edited, and the evidence page grew
+six sections. 205 tests, up from 202. Every quote was re-retrieved first; the arithmetic
+(`3 × 1.5 + 0.55 = 5.05`) is confirmed against the patent's own line-by-line charge listing.
+
+1. **"~2.0× on a total basis" is one of four readings, not the answer.** Almac's *"as high as 10 mM"*
+   never states whether 10 mM is per blockmer or the sum, and the same paper says each ligation step
+   starts with **three** blockmers. Against 5.05 mM total the void is ≈2.0× (10 mM a total), ≈4.0×
+   (per blockmer over two) or ≈5.9× (over three); 6.7× is the width in the fourth reading only, where
+   the high end is per blockmer and the hub is excluded. Registered as **≈2× to ≈6×, basis unknown** —
+   which adds an unknown rather than narrowing the gap, so the refusal to write a range is *better*
+   founded than when it rested on a number.
+2. **The 75 °C + centrifugation sentence is at 96-well-plate scale, which this plan does not say.** It
+   sits inside the *PNK Screening Reaction* methods paragraph, format 96 well plates at 0.5 mM. That is
+   why `Q-072` is a question and no unit operation was added: a plate spin is not evidence for a disc
+   stack. Also, *"10 min (initial reactions) or 30 min (crude reactions)"* is **two conditions keyed to
+   feed type, not a 10–30 min range** — which is how the evidence page had it, and is now corrected
+   there too.
+3. **One item was inherited from phase 2 and one was found by the guard it fixed.** Phase 2 deferred the
+   `_QUANTITY` percentage hole here; it is fixed, with three mutation cases, one proved to fail against
+   the old regex. Correcting it caught `docs/findings/filtration.md` cubing an **89–96%** block purity
+   that `Q-011` had already retracted, publishing a ~70–88% purity floor where `P-BLOCK-PUR` supports
+   ~82–87%. That line is fixed; the other nine sites still carrying the retracted band are registered
+   as **`Q-073`** and deliberately not swept, because 89–96% is also a still-valid *first-principles*
+   band (`ENV-002`) and each site has to be read to decide which it meant.
 
 ### Phase 4 — buffers, with the audited split
 `BUF-MEMBRANE-CLEAN` as a **convention-level `one_source_both_ends`** row, access downgraded, **pH

@@ -36,11 +36,18 @@ more informative than the claim.
 ### The enzyme inactivation band was withdrawn entirely
 
 A bracket of 45–75 °C was proposed for inactivating the ligase. The upper end is sound and verified:
-`SRC-ALMAC-2023` applies a heat treatment at 75 °C for 10–30 min between the kinase and ligation
-steps, and it is *preparative* — the treated supernatant is carried forward. The lower end came from
+`SRC-ALMAC-2023` applies a heat treatment at 75 °C between the kinase and ligation steps, and it is
+*preparative* — the treated supernatant is carried forward. The lower end came from
 `SRC-ANCT4-2022`, whose **body was never retrievable**. Worse, one pass described that figure as a
 melting temperature and another as an activity midpoint after a 60-minute hold, with no document
 available to settle which. Four independent documents meanwhile chose 85–95 °C for the same duty.
+
+A smaller correction to this page's own wording, made 2026-09-27: the hold was described here as
+**"75 °C for 10–30 min"**, and it is not a range. The paper gives two discrete conditions keyed to
+which feed is running — verbatim, *"75 °C for 10 min (initial reactions) or 30 min (crude
+reactions)"* (`SRC-ALMAC-2023`). A hold time that depends on the feed is not an interval you may
+operate anywhere inside, and writing it as one is the same error this page exists to catch,
+committed by the page itself.
 
 **The bracket is not in the register.** The claim that "neither 85 nor 95 °C is needed" is not
 supported, and `SRC-ANCT4-2022` is registered `abstract-only` with an instruction to attribute
@@ -58,11 +65,19 @@ quantified form was not written into a row.
 
 ### A yield-cost claim that inverted its source
 
-A clearance route was described as costing 71% of the yield. The source says the opposite: its
-overall recovery was 29 ± 7% **for the whole process**, and the step in question *improved* yield by
-about 3%, with most of the loss occurring in a separate ultrafiltration. Reported figures that
-reverse the polarity of their source are the hardest class to catch, because they are arithmetically
-consistent with themselves.
+A clearance route was described as costing 71% of the yield. `SRC-DEVRIES-2018` says the opposite.
+Verbatim: *"The shown purification process had a recovery yield of 29 (±7)%"* — the **whole**
+downstream train, not the clearance step — and *"recovery yield was improved by 3%"* against the
+earlier protein-only process (`SRC-DEVRIES-2018`). Most of the loss is elsewhere again: *"During
+concentration with ultrafiltration nearly 50% of the produced polySia got lost"* — so the step read
+as a 71% cost belongs to a train that **gained** 3 points (`SRC-DEVRIES-2018`), and the 71% was an
+overall recovery mistaken for a step loss.
+
+Reported figures that reverse the polarity of their source are the hardest class to catch, because
+they are arithmetically consistent with themselves. What the correction itself rests on, stated so
+it can be checked: that +3% belongs to the **redesigned process as a whole**, a weaker attribution
+than "the step in question improved yield" — `SRC-DEVRIES-2018` credits the caustic treatment and
+the membrane adsorbers together and never apportions the gain between them.
 
 ### A block-count "sign error" that was not one
 
@@ -112,6 +127,179 @@ head-to-head thermal data for an immobilised ligase.
 
 ---
 
+## What re-retrieving two documents turned up
+
+The five sections below all came from one pass on 2026-09-27 that did nothing but fetch
+`SRC-ALMAC-2023`, its supporting information and `SRC-USPTO-10640812` again and read them against what
+the registers already said about them. Every document here had been read before — two of them are
+graded `full-text-read` and quoted verbatim in the source register.
+
+It produced a corrected void width, a contradiction inside a peer-reviewed paper, an unregistered
+process step, a proposed correction that turned out to be wrong, and a note on a sentence this repo
+had already quoted for the wrong reason. **None of it needed a source nobody had found.** That is the
+argument for re-reading: the marginal cost of a second pass over a document you already have is close
+to zero, and the failure mode it catches — a claim that hardened before anyone checked the sentence
+next to it — is invisible to every test in the suite.
+
+---
+
+## A void whose width nobody had checked
+
+`P-LIG-SEG-CONC` refuses to carry a range, and the reason has always been that its two ends are
+different *kinds* of claim — a success at 1.5 mM and a failure at 10 mM. That refusal is sound and
+stands. What was wrong is the number this repo put on the gap: **6.7×**, published flatly in four
+registers and this page, as though the width were known.
+
+The low end is **per segment**, and the mix carries a fourth oligonucleotide the register had never
+mentioned. `SRC-USPTO-10640812` Example 13 lists its 5 mL charge line by line: 1.5 mM of the centre
+segment, 1.5 mM of the 3′ segment, 1.5 mM of the 5′ segment — and *"750 μl 0.00387M Hub (Template)
+(0.55 mM final)"*. Three segments at 1.5 mM is 4.5 mM; with the hub the total oligonucleotide loading
+is **5.05 mM**.
+
+That hub has no counterpart here, and not as a matter of judgement. It is, verbatim, *"A tri-template
+hub (approximately 24 kDa) comprising a support material referred to as the hub and three template
+sequences"*, each template *"covalently attached, at its own individual attachment point"*
+(`SRC-USPTO-10640812`). `SRC-ALMAC-2023` needs no template species at all: the word "template"
+appears **exactly once** in its entire main text, and it is the product's own overhang —
+*"The overhang serves as a template for the next annealing step in the alternate strand."*
+
+The high end states no basis whatsoever. *"Starting blockmer concentrations as high as 10 mM"*
+(`SRC-ALMAC-2023`) does not say whether that is each blockmer or the sum, and the same paper says each
+ligation step starts with three blockmers. So:
+
+| If Almac's 10 mM is… | Comparable low figure | Void (`P-LIG-SEG-CONC`, arithmetic ours) |
+|---|---|---|
+| a total | 5.05 mM total | **≈2.0×** (`Q-064`) |
+| per blockmer, two blockmers | 5.05 mM total | ≈4.0× (`Q-064`) |
+| per blockmer, three blockmers | 5.05 mM total | ≈5.9× (`Q-064`) |
+| per blockmer, hub excluded | 1.5 mM per segment | 6.7× (`Q-064`) |
+
+**6.7× is the width in exactly one of four readings**, and it was published as if it were the only
+one. The honest statement is that the void is somewhere between about 2× and about 6× wide and the
+documents do not say which (`Q-064`).
+
+Note which direction this cuts. It does **not** narrow the gap or make the endpoints comparable — it
+adds a second unknown on top of the first. The interval's two ends were already different kinds of
+claim; now its width is unknown too. The refusal to write a range is better founded than when it
+rested on a number.
+
+## A document that contradicts itself, and what that does to a register
+
+Everything above is a claim of ours that failed. This one is different: the **published record is
+internally inconsistent**, and no amount of care on our side resolves it.
+
+`SRC-ALMAC-2023`'s main text says the telescoped phosphorylation ran at **5 mM**. Its own supporting
+information says **2 mM**. Verbatim, the paper:
+
+> Reaction parameter investigation allowed for final phosphorylation at 5 mM blockmer concentration,
+> with a one-pot phosphorylation of 1.2 and 1.3 (5′OH) with PNK-101.
+
+Verbatim, the SI of the same paper (`SRC-ALMAC-2023`):
+
+> Phosphorylation of the 5’-OH blockmers at 2 mM concentration was telescoped into the ligation
+> reaction at 1 mM concentration by sequential ligation of 1.4 to form the antisense strand and
+> following ligation of 1.1 to yield the full-length duplex as shown in Figure S5.
+
+It is the **same experiment** by every identifier either document offers: the same one-pot
+phosphorylation of 1.2 and 1.3, the same sequential ligation of 1.4 then 1.1, the same Figure S5.
+Both were retrieved and extracted twice with independent tools; the two figures never co-occur, and
+there is no erratum, footnote or "corrected to" anywhere in either document (`SRC-ALMAC-2023`).
+
+**Neither number is carried, and the contradiction is registered instead** — `Q-071`. That is the
+only honest move available. Preferring the SI on the usual grounds that it is the more detailed
+record runs into the fact that the main text's sentence is the more *specific* of the two, reading as
+the outcome of an optimisation; preferring the main text discards the document written to record
+exactly this kind of condition. A reader who picks one is guessing, and a register that picks one
+hides the guess.
+
+It is not a bookkeeping detail. Both documents agree the ligation itself runs at 1 mM
+(`SRC-ALMAC-2023`, `P-CONC-LIG`), so the
+charge concentration **is** the dilution the handoff imposes: 2 mM means one volume becomes two in a
+single vessel, 5 mM means one becomes five. Those size `U01-LIG` differently by a factor of 2.5, and
+the larger one arrives at the top fill where the 65 °C anneal already has a jacket-area problem
+(`Q-065`).
+
+!!! warning "Do not confuse this with the contradiction in `Q-059`"
+    That one is inside `SRC-CN119265174` and is about **enzyme inactivation** — 80 °C/5 min in one
+    example, 85 °C/15 min in another, and centrifugal removal with no thermal step at all in four
+    more. This one is inside `SRC-ALMAC-2023` and is about the **phosphorylation charge**. Two
+    documents, two unrelated defects. Reported together they would read as one paper with both.
+
+## A process step that was read for its punctuation
+
+The worst near-miss in this slice was not a wrong number. It was a sentence this register had already
+quoted, for the wrong reason.
+
+`P-CONC-LIG` and `Q-016` both rest on a count: the whole main text of `SRC-ALMAC-2023` contains
+**exactly one** percent sign, in *"100% v/v methanol"*, which is how we know the paper reports no
+conversion, yield or purity anywhere. That count is correct and was re-verified. But the sentence it
+was counted in reads, verbatim (`SRC-ALMAC-2023`):
+
+> Reactions were incubated at 25 °C at 400 rpm with samples taken at various time points and quenched
+> by addition of 100% v/v methanol (MeOH), shaken and centrifuged to pellet any precipitation, and
+> supernatants were analyzed by UPLC
+
+The register read that sentence for its punctuation while `Q-059` was recording that nothing
+retrieved stopped a reaction chemically. **The quench was in hand and was counted rather than read.**
+
+Two lessons, and the second is the transferable one. First, a source read for one property should be
+read for its content at the same time; the marginal cost was zero. Second, and more uncomfortable:
+the count was *right*. A verification pass that confirms the claim it set out to check can still walk
+past the answer to a different open question, and nothing in a green test suite will say so.
+
+## A correction that did not survive re-retrieval
+
+The three findings above all came from re-reading a document the register had already read. A fourth
+came from the same pass and **failed**, which is worth as much page space as the ones that held.
+
+It was put that `SRC-WO2025262452`'s quote in the source register stops one sentence early, and that
+the next sentence shows the reaction being stopped chemically rather than thermally — which would
+have made the register's *"Termination is a heat kill"* wrong. Retrieved and read, the full passage
+is (`SRC-WO2025262452`):
+
+> The reactions were quenched by heating to 95 °C for 20 min to inactivate the enzyme. The inactivated
+> reactions were subsequently diluted 400-fold in 10 mM EDTA pH 7.0 and analyzed via HPLC as described
+> below.
+
+The document calls the **heat kill** the quench, and applies the EDTA to the *already-inactivated*
+reaction as HPLC sample preparation (`SRC-WO2025262452`). The register's reading was right; the
+proposed correction was wrong. What the sentence does add is real but smaller — an EDTA dilution used
+to hold a finished reaction stable for analysis — and it is now carried as that.
+
+The reason this is on the page rather than quietly dropped: the correction was plausible, specific,
+and cited a real sentence. Three of four proposed corrections in this pass survived re-retrieval and
+one did not, and a register that only records the survivors will overstate how reliable a
+well-argued correction is.
+
+## A solids rejection nobody had registered
+
+The same paragraph carries a step the flowsheet does not have. Verbatim (`SRC-ALMAC-2023`):
+
+> Prior to reactions being used for ligations, the samples were heat treated at 75 °C for 10 min
+> (initial reactions) or 30 min (crude reactions), then centrifuged to pellet any precipitated
+> material and supernatant used for ligations.
+
+The thermal half was already registered as the kinase kill. The **centrifugation** was not, anywhere:
+before this was written, this page contained zero mentions of centrifugation, and every
+`centrifug*` in `data/` referred to `SRC-CN119265174` removing an *immobilised enzyme* — a different
+duty on a different material at a different point in the route.
+
+What makes it a finding rather than a detail is which centrifugation it is. The paper has three. Two
+follow a methanol quench and feed UPLC vials, which is sample preparation. This one's **supernatant
+is what goes into the ligation** — a phase separation on the product path, between phosphorylation
+and ligation, where no unit operation in the equipment register removes solids.
+
+**No unit operation was added, deliberately.** Two reasons, and the scale one is the real one. The
+sentence sits inside the *PNK Screening Reaction* methods paragraph, whose stated format is 96-well
+plates — a plate spin is not evidence for a disc stack. And `pfd.UNITS` is derived from
+`equipment.csv`, so a new unit cannot be kept off the drawing: it would force a flowsheet width fix
+and an SVG re-baseline on the strength of a plate observation. Registered as `Q-072`, which also
+records what is genuinely unknown: the paper says only *"any precipitated material"*, and whether
+that is denatured cell-free-extract protein (an enzyme-removal duty, bearing on `Q-050` and `Q-032`)
+or precipitated oligonucleotide (an unquantified yield loss) decides which equipment it needs.
+
+---
+
 ## Every bracket, with a verdict
 
 A range is only a range if its two ends are independent claims. Where they are not, the parameter
@@ -120,7 +308,7 @@ worked case.
 
 | Bracket | Verdict |
 |---|---|
-| Concentration, 1.5–10 mM | Two independent documents, **but a success point and a failure point, not a range**. The low end also crosses cofactor and buffer |
+| Concentration, 1.5–10 mM | Two independent documents, **but a success point and a failure point, not a range** — and the two ends are quoted on **different bases**, so the interval's own width is unknown (≈2× to ≈6×, not the 6.7× once published). The low end also crosses cofactor and buffer |
 | `P-LIG-TIME` | Two documents; one measurement plus one unverifiable |
 | Inactivation temperature | **Withdrawn** — one verified endpoint for the wrong enzyme and step, one unverifiable |
 | Turndown | **One source both ends**, same example, and one end calculated where the other is measured |
@@ -159,7 +347,17 @@ error messages.
   from the text layer, so its conversion and endotoxin figures are prose assertions rather than
   retrievable tables. The register says so.
 
+- **Characters that are not the character you typed:** the same paper writes the 5′ position with a
+  **prime (U+2032)** in its main text and a **right single quotation mark (U+2019)** in its SI, and
+  one source prints `Tris–HCl` with an **en dash**. A quote transcribed with the wrong codepoint
+  matches nothing, and the failure looks exactly like the claim being absent from the document.
+- **A host that was reachable last time:** PubMed Central served a reCAPTCHA challenge page to every
+  route tried this session, for a source this register records as reachable. The paper was retrieved
+  through the Europe PMC REST service instead. A `reachability` grade is a fact about a date.
+
 The practical consequence is that **a negative result from a single tool is not a negative result**.
+Two independent extractors on the same PDF, and a second host for the same document, are the cheapest
+insurance available; every quote added on 2026-09-27 was taken that way.
 
 ---
 
@@ -172,7 +370,13 @@ These are not oversights and should not be filled to make the page look finished
   absent from every source read.
 - **`P-ENZ-CLEARANCE-LRV`** — no achieved clearance figure exists for either enzyme branch. The
   clearance *duty* is a different quantity and is kept out of this field. See `Q-032`.
-- **The quench agent and its charge** — `Q-060`.
+- **The quench agent and its charge** — `Q-060`. Still blank, but the reason narrowed on 2026-09-27:
+  a chemical stop **is** in the retrieved record after all, and `Q-059` now carries three verified
+  instances. Every one of them is at an **analytical sampling point** — a stop solution halting a
+  bench ligation time course (`SRC-PBCV1-2014`), an EDTA/SDS quench on capping reactions rather than
+  ligations (`SRC-NEB-WO2023173098`), methanol into UPLC vials (`SRC-ALMAC-2023`). None is a
+  process-scale termination of a modified-siRNA ligation, so the field stays empty and the question
+  stays open on a narrower gap than before.
 - **A duplex melting temperature for our own sequence** — `Q-030`.
 - **The enzyme form itself** — `Q-050`, which is why no denature unit appears in the equipment
   register.

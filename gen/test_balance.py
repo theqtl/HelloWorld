@@ -555,8 +555,20 @@ def test_every_csv_row_has_the_right_number_of_fields():
 # caught nearly every citation defect found in the 2026-09-17 audit: an unsourced RNA recovery
 # figure, a vendor titre that existed nowhere, a concentration ceiling belonging to another
 # paper, a film thickness absent from both cited pages.
+# `%` SITS OUTSIDE THE TRAILING `\b`, AND THAT IS THE WHOLE POINT OF THE SHAPE.
+# For most of this guard's life the alternation read `(?:%|percent|g/L|...)\b`, with one word
+# boundary after the whole group. `%` is not a word character, so `\b` after it demanded a WORD
+# character next - and `0.5%`, `0.5 %.` and `0.5% of` therefore all failed to match. The guard
+# had never policed a percentage in prose at all, for every percentage that ends a clause.
+# Measured when it was corrected: SEVEN lines across three pages were quantities under the
+# corrected pattern, carried no citation in their window, and passed. One of them
+# (findings/filtration.md, the internal-limited purity) was carrying a block-purity band that
+# `Q-011` had already retracted, so the hole was hiding a live contradiction and not just a
+# formatting miss. Keep `%` on its own branch with no boundary assertion; the word-spelled units
+# keep theirs, because `10 mMol` must not match `mM`.
 _QUANTITY = re.compile(
-    r"(?<![\w.-])\d+(?:\.\d+)?\s?(?:%|percent|g/L|mg/mL|kDa|Da|kJ/kg|EU/mL|CFU|LMH|mM|°C|kWh|MJ)\b"
+    r"(?<![\w.-])\d+(?:\.\d+)?\s?"
+    r"(?:%|(?:percent|g/L|mg/mL|kDa|Da|kJ/kg|EU/mL|CFU|LMH|mM|°C|kWh|MJ)\b)"
 )
 _CITATION = re.compile(
     r"SRC-[A-Z0-9-]+|\bP-[A-Z0-9-]{3,}|\bEQ-[A-Z]+|\bQ-\d{3}|\bR-\d{3}"

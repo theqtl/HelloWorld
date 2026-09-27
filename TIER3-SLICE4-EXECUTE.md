@@ -31,11 +31,11 @@ Report at the end of each phase what you verified by execution versus what you t
 | 0 — separate the two axes | **done** | `bd9b91e` |
 | 1 — refuse a fabricated value; resolve buffer references | **done** | `35ec908` |
 | 2 — the vocabulary, the fields, the visibility | **done** | `25c831b` |
-| 3 — the corrections the audits forced | **next** | — |
-| 4 — buffers | open | — |
+| 3 — the corrections the audits forced | **done** | _this commit_ |
+| 4 — buffers | **next** | — |
 | 5 — sizing, and the citable cleaning criteria | open | — |
 
-**Baseline is now 202 tests, not 147.** Phase 0 took it to 155, phase 1 to 163, phase 2 to 202.
+**Baseline is now 205 tests, not 147.** Phase 0 took it to 155, phase 1 to 163, phase 2 to 202, phase 3 to 205.
 
 **What phase 0 delivered**, so phase 2 does not redo it: `envelopes.provenance` renamed to
 `endpoint_sourcing` with its own `ENDPOINT_SOURCING` constant kept deliberately separate from
@@ -163,6 +163,80 @@ state whether it is per blockmer or total, so the void's width is basis-dependen
 **A retrieval trap for any re-verification:** the Almac SI uses **U+2019**, not a prime (U+2032), so
 a quote written with a prime will not string-match.
 
+### Phase 3 — what landed, and the verified state phase 4 inherits
+
+**205 tests** (phase 2 left it at 202). **Next free question id is Q-074**; there are **55 question
+rows**, ids running Q-001..Q-073 with eighteen never issued. `gen/dataio.py`'s `QUESTION_STATUS`
+comment carries that arithmetic and was updated with it — keep them in step.
+
+**Three questions raised, and none of them is ground phase 4 should re-raise.** `Q-071` the 2 mM vs
+5 mM published contradiction; `Q-072` the phosphorylation-to-ligation solids rejection; `Q-073` the
+retracted 89–96% block-purity band still live in nine sites. **`Q-059`, `Q-064`, `Q-016`,
+`P-LIG-SEG-CONC`, `ENV-006` and `IN-005` were EDITED**, plus six source rows
+(`SRC-ALMAC-2023`, `SRC-USPTO-10640812`, `SRC-PBCV1-2014`, `SRC-NEB-WO2023173098`,
+`SRC-WO2025262452`, `SRC-DEVRIES-2018`), each carrying the verbatim quote behind its correction.
+
+**The quench picture phase 4 must build its row on, because it is not what the plan says.** The plan
+claims four registered sources name a chemical stop. **It is three, and only ONE is on a ligation:**
+
+- **`SRC-PBCV1-2014`** — the only ligation. *"reactions halted at 15, 30, 60, 120, 240 and 480 min by
+  addition of 25 µl stop solution"*, the solution being *"50 mM EDTA and 10 mM Tris–HCl at pH 7.5"*,
+  1:1 by volume so 25 mM EDTA final, **no thermal step**. But 2.5 nM unmodified DNA probes on an mRNA
+  splint — an analytical time course.
+- **`SRC-NEB-WO2023173098`** — *"2x Quench Solution (20 mM EDTA, 2% SDS)"* is exact, and there is a
+  second recipe, *"quenched by adding 2 µl of 30 mM EDTA and heating at 75 °C for 5 min"* — EDTA **and**
+  heat, the only retrieved instance of the shape `Q-059` argues for. **Every quench in that patent is on
+  a capping or poly(A) tailing reaction, never a ligation.**
+- **`SRC-ALMAC-2023`** — methanol, `100% v/v` in the PNK screen and `1 volume` in the RNAL screen: **one
+  recipe in two units on two different screens**, not two data points on quench strength. Both feed UPLC.
+- **`SRC-WO2025262452` is NOT a fourth.** Re-retrieved: *"The reactions were quenched by heating to
+  95 °C for 20 min to inactivate the enzyme. The inactivated reactions were subsequently diluted
+  400-fold in 10 mM EDTA pH 7.0 and analyzed via HPLC."* The document calls the **heat kill** the
+  quench; the EDTA is HPLC sample prep on an already-dead reaction. The register was right and the
+  proposed correction was wrong.
+
+So a quench row is supportable **only with the analytical-scale caveat the plan already demands**, and
+nothing retrieved terminates a modified-siRNA ligation at process scale. `Q-060` stays blank.
+
+**The Almac numbers, re-verified character by character with two independent PDF extractors** (SI
+integrity checked against the md5 figshare publishes):
+
+- `5 mM` appears **once** in the main text and **never** in the SI; `2 mM` **three times** in the SI and
+  never in the main text, and all three SI hits are the ATP row of Tables S1/S2, not the telescoping
+  sentence. The two figures never co-occur and no erratum reconciles them.
+- **Exactly ONE `%` in the whole main text**, in `100% v/v methanol` — the `P-CONC-LIG` / `Q-016` count
+  re-confirmed. (The SI has three, all in the Table S3 gradient.)
+- **Tables S1 and S2 are identical on every buffer component including pH** — 1 mM DTT, 2 mM ATP,
+  100 mM KCl, 10 mM MgCl2, 50 mM Tris-HCl pH 7.5 — and differ only in enzyme identity and blockmer
+  concentration (0.1 vs 0.5 mM). Phase 4's "do not add a PNK composition row" still holds, now verified
+  rather than reported.
+- **TWO retrieval hazards, not one.** The main text writes `5′OH` with a **prime (U+2032)** and no
+  hyphen; the SI writes `5’-OH` with a **right single quotation mark (U+2019)** and a hyphen. The plan
+  warns about the SI only. Also `SRC-PBCV1-2014` prints `Tris–HCl` with an **en dash**, and **PubMed
+  Central served a reCAPTCHA page to every route tried** — that paper came through the Europe PMC REST
+  service instead.
+
+**The 6.7× void is now ≈2× to ≈6×, basis unknown — do not re-simplify it.** `SRC-USPTO-10640812`
+Example 13 charges 1.5 mM of **each of three** segments **plus** *"750 μl 0.00387M Hub (Template)
+(0.55 mM final)"*, so 5.05 mM total oligonucleotide. The hub is *"approximately 24 kDa"*, covalently
+attached, and has **no counterpart in our route** — proved rather than assumed: the word "template"
+occurs **exactly once** in Almac's whole main text and it is the product's own overhang. Almac's high
+end states no basis at all. The plan's "~2.0× on a total basis" is one of four readings.
+
+**The `_QUANTITY` percentage hole phase 2 deferred here is FIXED**, with `%` moved onto its own branch
+outside the trailing `\b`. Three mutation cases guard it, and one was **proved to fail against the old
+regex** before being kept. The seven lines it newly caught were across **three** pages, not four as
+phase 2 recorded. One of them was a real defect: `docs/findings/filtration.md` cubed an 89–96% block
+purity that `Q-011` retracted on 2026-09-25, publishing a ~70–88% internal-limited purity floor where
+`P-BLOCK-PUR` supports **~82–87%**. Fixed there; the other nine sites are `Q-073` and are **deliberately
+not swept**, because 89–96% is also a still-valid first-principles band (`ENV-002`) and each site has to
+be read to decide which of the two it meant.
+
+**Deliberately NOT done in phase 3**, so phase 4 does not assume otherwise: no unit operation for the
+solids rejection (`pfd.UNITS` derives from `equipment.csv`, so it would force an SVG re-baseline on a
+96-well-plate observation); no quench row (phase 4 owns it); no value written for `P-LIG-SEG-CONC`; no
+sweep of `Q-073`'s nine sites.
+
 ## Working order
 
 Each phase leaves all three gates green and is independently landable. Phases 0–2 are the machinery;
@@ -231,7 +305,8 @@ Practical consequences when you work:
 - **Gates, judged by exit code, never piped through `tail`**, with generated pages deleted first
   because CI runs pytest **before** the build:
   `git clean -fXd docs ; python -m pytest gen -q ; python -m gen.build ; mkdocs build --strict`
-- Baseline **147 tests**. Every new guard mutation-tested against a failing case in
+- Baseline **147 tests** as the slice opened; **205** after phase 3. Every new guard mutation-tested
+  against a failing case in
   `gen/test_mutations.py` — tmp-copy `data/`, monkeypatch `gen.dataio.DATA_DIR`, anchor on a **row id**
   never a field value, assert the guard **raises**. Start with the red team's reproduction, which must
   now fail.

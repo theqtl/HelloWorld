@@ -254,7 +254,9 @@ QUESTION_STATUS = {
     "partially_resolved",  # part of it is settled and the rest is not. Five rows today.
     "resolved",            # EMPTY today, and informative rather than an oversight: this
                            # register has never closed a question. The eighteen ids missing
-                           # from the Q-001..Q-070 sequence were never issued, not retired.
+                           # from the Q-001..Q-073 sequence were never issued, not retired.
+                           # (Still eighteen after slice 4 phase 3 added Q-071 to Q-073:
+                           # 73 ids over 55 rows. Next free id is Q-074.)
 }
 
 #: Access grades meaning NOBODY HERE HAS READ THE DOCUMENT. An estimate's basis may not
