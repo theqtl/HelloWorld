@@ -3,7 +3,7 @@ import os
 from gen.dataio import (
     load_rows, load_params, param_value,
     PROVENANCE_VOCAB, PROVENANCE_REGISTERS, ENDPOINT_SOURCING, provenance_offenders,
-    RISK_UNIT_OPS, RISK_CATEGORIES,
+    risk_unit_ops, RISK_UNIT_OPS_UNSCOPED, RISK_CATEGORIES,
     ESTIMATE_PROVENANCE, ESTIMATE_COLUMNS, ESTIMATE_REGISTERS,
     QUESTION_STATUS, ACCESS_GRADES_UNREAD, question_status_offenders,
 )
@@ -1140,7 +1140,7 @@ def test_impurity_gaps_carry_a_registered_reference():
 # (a value tuned until a test passed).
 # ---------------------------------------------------------------------------
 
-# RISK_UNIT_OPS and RISK_CATEGORIES now live in gen/dataio.py and are imported at the top of
+# RISK_CATEGORIES lives in gen/dataio.py beside risk_unit_ops() and both are imported at the top of
 # this module. They were defined HERE, which made a test file the owner of a data vocabulary:
 # nothing raised at build time, and the only enforcement was a guard checking the register
 # against a list that lived beside it. Importing is the point - a guard that re-lists its own
@@ -1149,16 +1149,25 @@ def test_impurity_gaps_carry_a_registered_reference():
 
 def test_risk_unit_op_and_category_are_a_controlled_vocabulary():
     """A risk filed under a misspelt unit operation or category is invisible to anyone
-    filtering the register, and nothing detected that before this guard."""
+    filtering the register, and nothing detected that before this guard.
+
+    The unit-operation half is now checked against a vocabulary DERIVED from equipment.csv
+    rather than typed out: `risk_unit_ops()` is every `equip_id` plus `All`. That is what
+    phase 4 changed, and it closes a hole a hardcoded set could not - `Utilities` was simply
+    absent from the old literal, so a risk against the buffer-prep and CIP utilities had
+    nowhere legal to go, and two of the values it did list (`Ligation`, `UF/DF`) were spellings
+    that resolved to no register anywhere.
+    """
+    vocab = risk_unit_ops()
     offenders = []
     for r in load_rows("risks"):
-        if r["unit_op"] not in RISK_UNIT_OPS:
+        if r["unit_op"] not in vocab:
             offenders.append(f"{r['risk_id']}: unit_op {r['unit_op']!r}")
         if r["category"] not in RISK_CATEGORIES:
             offenders.append(f"{r['risk_id']}: category {r['category']!r}")
     assert not offenders, (
         f"risks.csv value(s) outside the vocabulary "
-        f"(unit_op {sorted(RISK_UNIT_OPS)}, category {sorted(RISK_CATEGORIES)}): "
+        f"(unit_op {sorted(vocab)}, category {sorted(RISK_CATEGORIES)}): "
         + "; ".join(offenders)
     )
 
@@ -2614,3 +2623,59 @@ def test_every_buffer_reference_resolves_and_every_buffer_is_referenced():
     assert not orphans, (
         "buffer(s) no other register names, so nothing in the process uses them: "
         + ", ".join(orphans))
+
+
+def test_every_solution_names_the_unit_operation_that_consumes_it():
+    """The unit-operation join, and the vocabulary fix it needed first.
+
+    The prerequisite is the point. Three registers carried a unit-operation reference in three
+    different spellings and `risks.unit_op` matched none of the others on two of its values, so
+    this guard could not have been written before the key was reconciled onto `equip_id` - a
+    solution naming `UF/DF` would have pointed at a string no register defines. See the note
+    above `risk_unit_ops()` in gen/dataio.py for what was measured before choosing which register
+    to change.
+
+    Reported through `solution_offenders()` rather than inline, so `python -m gen.build` raises on
+    a dangling unit operation too: a guard only pytest can reach does not stop a page publishing.
+    """
+    from gen.envelope import solution_offenders
+    offenders = solution_offenders()
+    assert not offenders, (
+        "solution(s) and unit operation(s) that do not resolve to each other:\n  "
+        + "\n  ".join(offenders))
+
+
+def test_the_unit_operation_vocabularies_resolve_to_one_key():
+    """Four registers, one key - asserted against the registers rather than against a list.
+
+    `instruments.unit_op` and `streams.from_unit`/`to_unit` already held `equip_id` before slice
+    4; `risks.unit_op` held a third spelling and `equipment.unit_op` is a display label. This
+    checks the three that are KEYS all resolve to `equip_id`, and it is deliberately silent about
+    `equipment.unit_op`, which stays a label on purpose.
+
+    The stream register's three boundary pseudo-nodes are exempt by name and not by pattern:
+    SUPPLY, WASTE and DS-STORE are where the process ENDS, so they are the one legitimate
+    non-equipment value, and listing them means a fourth one cannot appear silently.
+    """
+    from gen.dataio import equip_ids
+    ids = equip_ids()
+    boundary = {"SUPPLY", "WASTE", "DS-STORE"}
+    offenders = []
+    for r in load_rows("risks"):
+        op = r["unit_op"]
+        if op not in ids and op not in RISK_UNIT_OPS_UNSCOPED:
+            offenders.append(f"risks.csv {r['risk_id']}: unit_op {op!r} is not an equip_id")
+    for r in load_rows("instruments"):
+        if r["unit_op"] not in ids:
+            offenders.append(
+                f"instruments.csv {r['instrument_id']}: unit_op {r['unit_op']!r} is not an "
+                f"equip_id")
+    for r in load_rows("streams"):
+        for col in ("from_unit", "to_unit"):
+            if r[col] not in ids and r[col] not in boundary:
+                offenders.append(
+                    f"streams.csv {r['stream_id']}: {col} {r[col]!r} is neither an equip_id nor "
+                    f"one of the boundary nodes {sorted(boundary)}")
+    assert not offenders, (
+        "unit-operation reference(s) that do not resolve to equipment.csv:\n  "
+        + "\n  ".join(offenders))

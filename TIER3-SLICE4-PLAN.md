@@ -115,6 +115,40 @@ access grade must be **downgraded off `full-text-read`** (the only reachable cop
 reseller mirror, frozen 2016, Merck's own hosts 403, currency unverifiable), the pH figure must be
 dropped, and the 100-hour budget carried.
 
+> **CORRECTED 2026-09-27 by phase 4, which retrieved all four documents.** The conclusion holds —
+> `one_source_both_ends` at convention level — and four of the five bullets above do not survive
+> unaltered.
+>
+> - **The one-bracket-for-two-membranes bullet points at the wrong table.** Millipore's *cleaning*
+>   chart gives Ultracel `NaOH` and Biomax `NaOH/NaOCL` — two different agents, so it does **not**
+>   show one bracket covering both. The non-differentiation is real and sits in the **sanitization,
+>   depyrogenation and storage** tables, each of which covers "Ultracel / Biomax" with a single
+>   `NaOH 0.1 N` row while every acid and solvent agent in the same document differs between the
+>   two. That is better evidence, and it needs no polymer names — **the guide names no polymer for
+>   either membrane**, so "regenerated cellulose" and "polyethersulfone" come from outside it.
+>   Cytiva's HF handbook does name its own, verbatim: *"these membranes are polysulfone"*.
+> - **"Recurs across two vendors" is false of one of the three documents.** Millipore's cleaning
+>   chart and Cytiva's CFF handbook print the same four numbers (N vs M, cleaning vs
+>   sanitization/depyrogenation, pH 10–11 vs pH 13). **`SRC-CYTIVA-HF` reproduces neither end** —
+>   every cleaning table in it circulates a `0.5N NaOH` point at 50 °C for 1 hour. The convention
+>   reading is *better* argued from the numbers migrating between unit operations than from a
+>   vendor count.
+> - **"Frozen 2016" is wrong and the currency problem is worse.** The copy is **Rev C, 01/2009**,
+>   on a mirror uploaded 2015/03, and Merck's own host publishes a **newer Rev 7, 04/2021** that
+>   could not be transferred (three attempts; the second mirror 403s). A 12-year-old revision with
+>   a current one known to exist.
+> - **The access downgrade is right, the stated reason is not.** `partial-text-read` is honest on
+>   EXTENT — the cleaning, sanitization, depyrogenation and storage sections read in full, the
+>   installation chapters skimmed. Downgrading a *complete* read in order to signal a currency
+>   doubt would put two questions in one column, which is the polysemy phase 0 exists to have
+>   removed; the mirror and the revision belong in `reachability`, and that is where they are.
+> - The remaining bullets — the temperature conflict, the pH typo, the discouraged top end, the
+>   100-hour cap, and Cytiva's transferability disclaimer — are **verified verbatim** and carried.
+>   Cytiva's disclaimer is narrower than "disclaims transferability" and is quoted as it reads:
+>   *"Optimization of the procedures in terms of chemical concentration, recirculation time,
+>   temperature and pH will typically be performed on a case-by-case basis."* Cytiva's HF handbook
+>   also refuses an upper end the plan does not mention: *">60 °C) is not recommended"*.
+
 **PARTLY WRONG — the alkaline-resistance claim.** The mechanism half is supported and now better
 evidenced: the product has **zero 2′-OH** (both strands tokenised from the SI — 21 and 23 residues, all
 2′-OMe or 2′-F), and Egli & Manoharan (*NAR* 2023, open access) state *"Modification also affords
@@ -136,6 +170,15 @@ decision** — see phase 5.
 **CONFIRMED, and weaker than I framed it — the ISPE 1%.** The word *"Assume"* is there, and the figure
 sits inside a list headed *"Assumptions"*, used only to convert 720,000 L of water into 7,200 L of
 chemical in a waste-arithmetic example. It is a **bookkeeping placeholder, not a process parameter.**
+
+> **CONFIRMED VERBATIM 2026-09-27 by phase 4, with one refinement.** The figure is not a numbered
+> item in the *"Assumptions"* list — that list is items 1–5 — it follows the arithmetic as an inline
+> sixth assumption: *"100 CIP circuits × 2 cycles/month × 12months × (400L-250L) × 2 washes/cycle =
+> 720,000 L/year of water savings. Assume a nominal chemical concentration of 1% by volume for
+> caustic and acid washes. 720, 000L × 1% = 7,200L of chemical additives not used."* Bookkeeping
+> placeholder, confirmed. Two things in the same article ARE citable and were not noticed here: the
+> TFF sentence that licenses phase 4's two-row split, and *"It is not uncommon for a caustic/acid
+> CIP cycle to take on the order of two to four hours when optimized."*
 
 ## Audit round 3 — in-repo claims, verified by my own execution
 
@@ -252,6 +295,37 @@ Two CIP rows minimum — TFF chemistry differs from every other unit operation.
 The **unit-operation → solution guard** needs a prerequisite: three unit-op vocabularies resolve to
 each other nowhere — `equip_id`, free-text `equipment.unit_op`, and hardcoded `RISK_UNIT_OPS` where
 `Ligation` ≠ `Enzymatic ligation` and `Utilities` is absent. Fix the key, then guard on `equip_id`.
+
+> **AS BUILT 2026-09-27, with three corrections to this section.**
+>
+> 1. **"Three vocabularies" is four registers, and two of them already used the key.**
+>    `instruments.unit_op` is `U00-BUF`…`U06-CIP` and so are `streams.from_unit`/`to_unit` (plus the
+>    boundary nodes `SUPPLY`, `WASTE`, `DS-STORE`). So `equip_id` was already the key for half the
+>    data layer and `risks.unit_op` was the outlier — which **inverts** the obvious fix: relabelling
+>    `risks` to the equipment LABEL would have made three spellings into two and left the key
+>    unreachable. `risks.unit_op` now holds `equip_id`, `risk_unit_ops()` is derived from
+>    `equipment.csv`, and `equipment.unit_op` stays a display label on purpose. Registered and not
+>    fixed: `gen/pfd.py`'s `render_svg(unit_op)` takes an `equip_id` under a parameter name that says
+>    otherwise, which is much of why three vocabularies looked like one.
+> 2. **The brewery study did not measure hot caustic.** `SRC-ATWELL-2017` ran all 90 runs at ambient
+>    and measured a CONCENTRATION threshold — NaOH *"needs to be at least 1% w/v"*, above which
+>    *"there is no additional cleaning benefit"*. The lower-temperature claim is **Goode et al
+>    (2010)**, reported second-hand and **not retrieved**, so nothing rests on it. The paper is a
+>    better counterweight than described: 1% w/v is 0.25 M, inside the vendors' bracket and on its
+>    low side, and it independently **measured** pH ≈ 13 for caustic solutions.
+> 3. **"Two CIP rows minimum" is now a quotation, not an assertion** — `SRC-ISPE-WIENCEK-2006`:
+>    *"TFF membranes usually require cleaning chemistries and temperatures that are different than
+>    all other unit operations."*
+>
+> Also as built: the **quench** row is `fact` and scoped to analytical sampling in its own `use`
+> field, carrying the one ligation stop in the register (`SRC-PBCV1-2014`, 25 µl reaction, 2.5 nM
+> probes, into qPCR); re-retrieval found a **third** NEB quench recipe, still not on a ligation.
+> `BUF-DF` and `BUF-FINAL` are **`judgement`**, because the only honest way to write those
+> compositions is as defended estimates — and `BUF-FINAL`'s old cell named *"trehalose/sucrose?"*,
+> an invented identity wearing a hedge, which is now left in `Q-021` where it belongs. `pH` is
+> carried on `BUF-MEMBRANE-CLEAN` as **13**, cited to Cytiva and to Atwell's measurement rather
+> than dropped altogether: dropping the figure loses the correction, so the typo is named and the
+> right value is sourced.
 
 ### Phase 5 — the sizing work, and the HBEL reversal
 **The carryover criteria are citable** — register 10 ppm, 0.1% of therapeutic dose, no visible residue,

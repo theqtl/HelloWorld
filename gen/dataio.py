@@ -363,12 +363,64 @@ DISPOSITIONS = {
     "not_knowable",         # cannot be answered from the public record at all
 }
 
-#: Controlled vocabulary for risks.csv. Neither column was enforced before slice 3's guard, so a
-#: new risk row could ship an invalid unit_op or category silently and simply never be found by
-#: anyone filtering the register. Moved out of the test file in slice 4 so the vocabulary is owned
-#: by the data layer. NOTE the limit this does not fix: `unit_op` here is free text that resolves
-#: to no `equip_id`, so `Ligation` and the equipment register's `Enzymatic ligation` are different
-#: strings for one unit operation and `Utilities` is absent from this set entirely.
-RISK_UNIT_OPS = {"All", "Cleaning", "Evaporation", "Filtration", "Ligation",
-                 "Spray drying", "UF/DF"}
+# ---------------------------------------------------------------------------
+# THE UNIT-OPERATION KEY, WHICH WAS THREE STRINGS FOR ONE THING.
+#
+# Slice 4 phase 0 moved RISK_UNIT_OPS here and recorded what it could not fix:
+# `risks.unit_op` was free text resolving to no `equip_id`, so `Ligation` and the
+# equipment register's `Enzymatic ligation` were different strings for one unit
+# operation and `Utilities` was absent from the risk vocabulary entirely. Phase 4
+# needs the key, because a solution has to name the unit operation that consumes
+# it and "the CIP wash cleans Ligation" resolves to nothing.
+#
+# MEASURED BEFORE CHOOSING A DIRECTION, and the measurement changed the answer.
+# FOUR registers carry a unit-operation reference, not three:
+#
+#   * `instruments.unit_op`  -> already `equip_id` (U00-BUF .. U06-CIP)
+#   * `streams.from_unit` / `to_unit` -> already `equip_id`, plus the boundary
+#                              pseudo-nodes SUPPLY, WASTE and DS-STORE
+#   * `equipment.unit_op`    -> a free-text DISPLAY LABEL ("Enzymatic ligation"),
+#                              rendered by gen/controls.py and never used as a key
+#   * `risks.unit_op`        -> a third spelling, matching the label on four values
+#                              ("Cleaning", "Evaporation", "Filtration", "Spray
+#                              drying") and diverging on two ("Ligation", "UF/DF")
+#
+# So `equip_id` was ALREADY the key for two of the four registers and `risks` was
+# the outlier - which inverts the obvious fix. Relabelling `risks.unit_op` to the
+# equipment LABEL would have made three spellings into two and left the key
+# unreachable; pointing it at `equip_id` makes four registers share one. The risk
+# rows were rewritten accordingly and this vocabulary is now DERIVED from
+# equipment.csv, so a unit operation added there cannot be missing from it - the
+# defect that hid `Utilities`.
+#
+# Left alone deliberately, and recorded so it is not mistaken for consistency:
+# `equipment.unit_op` stays a display label, and gen/pfd.py's `render_svg(unit_op)`
+# takes an `equip_id` under a parameter name that says otherwise (`equip = {r["equip_id"]:
+# r for r in load_rows("equipment")}` two lines in). That misnomer is a large part of
+# why three vocabularies could look like one; renaming it moves no data and is not
+# this phase's business.
+# ---------------------------------------------------------------------------
+
+#: The one `risks.unit_op` value that names no equipment row: a risk filed against the whole
+#: train rather than against a unit. Every other value must be an `equip_id`, which is what
+#: makes a risk resolvable to the thing it is about.
+RISK_UNIT_OPS_UNSCOPED = frozenset({"All"})
+
+
+def equip_ids():
+    """Every `equip_id` in equipment.csv. The unit-operation key, computed from its owner."""
+    return frozenset((r.get("equip_id") or "").strip() for r in load_rows("equipment"))
+
+
+def risk_unit_ops():
+    """The controlled vocabulary for `risks.unit_op`: every `equip_id`, plus `All`.
+
+    A FUNCTION and not a frozenset built at import time, for a reason the mutation harness
+    makes concrete: it monkeypatches `gen.dataio.DATA_DIR`, so a vocabulary frozen when the
+    module loaded would describe the real data directory while the guard under test read a
+    temporary copy. A derived vocabulary has to be derived when it is asked for.
+    """
+    return equip_ids() | RISK_UNIT_OPS_UNSCOPED
+
+
 RISK_CATEGORIES = {"formulation", "microbial", "process", "product", "purity", "quality"}

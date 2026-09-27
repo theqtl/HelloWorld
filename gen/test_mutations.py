@@ -733,10 +733,14 @@ def test_mutation_re_adding_provenance_to_envelopes_is_caught(monkeypatch, tmp_p
 
 
 def test_mutation_a_bad_risk_unit_op_is_caught_against_the_imported_vocabulary(mutate):
-    """RISK_UNIT_OPS moved out of the test file; the guard must still see a bad value.
+    """The risk vocabulary moved out of the test file; the guard must still see a bad value.
 
-    The move is the point: the guard now imports the vocabulary from `gen/dataio.py` rather than
-    declaring it three lines above itself.
+    The move was the point in phase 0: the guard imports the vocabulary from `gen/dataio.py` rather
+    than declaring it three lines above itself. Phase 4 went further and made it `risk_unit_ops()`,
+    derived from equipment.csv - see
+    test_mutation_the_risk_vocabulary_follows_equipment_rather_than_a_frozen_list, which is the case
+    that proves the derivation. This one still covers the plain typo, which is the failure a
+    derived vocabulary does nothing about.
     """
     mutate("risks", "risk_id", "R-001", unit_op="Ligaton")
     import gen.test_balance as tb
@@ -1361,3 +1365,118 @@ def test_mutation_the_corrected_quantity_pattern_still_refuses_a_longer_unit(mon
     page.write_text("# A page\n\nThe buffer was 10 mMol overall.\n", encoding="utf-8")
     monkeypatch.setattr(tb, "_doc_files", lambda: [str(page)])
     tb.test_numeric_claims_in_prose_carry_a_citation()
+
+
+# ---------------------------------------------------------------------------
+# Slice 4 phase 4: the unit-operation key, and the solution join it made possible.
+#
+# The key came first for a reason these cases make concrete. `risks.unit_op` used to hold a
+# third spelling of the unit operation - `Ligation` where equipment says `Enzymatic ligation`
+# and `UF/DF` where it says `Ultrafiltration/Diafiltration`, with `Utilities` missing from the
+# vocabulary altogether - while `instruments.unit_op` and `streams.from_unit`/`to_unit` already
+# held `equip_id`. Two of these cases prove the old spellings are now refused; two prove the
+# vocabulary is DERIVED from equipment.csv rather than frozen into a literal, which is the
+# property that stopped `Utilities` being missing in the first place.
+# ---------------------------------------------------------------------------
+
+def test_mutation_a_solution_naming_no_unit_operation_is_caught(mutate):
+    """A composition with nowhere to go. Blank was the state of every buffer row before phase 4."""
+    mutate("buffers", "buffer_id", "BUF-LIG", equip_ref="")
+    with pytest.raises(ValueError, match="blank equip_ref"):
+        _validate()()
+
+
+def test_mutation_a_solution_naming_a_unit_operation_that_does_not_exist_is_caught(mutate):
+    """The dangling direction, mutated to the OLD spelling on purpose.
+
+    `Ligation` is what risks.csv said for the whole of Tier 3 until phase 4, so this is the
+    mistake a reader of the old register would actually make - and it must now fail rather than
+    render as a cross-reference.
+    """
+    mutate("buffers", "buffer_id", "BUF-LIG", equip_ref="Ligation")
+    with pytest.raises(ValueError, match="is not an equip_id"):
+        _validate()()
+
+
+def test_mutation_a_unit_operation_no_solution_names_is_caught(mutate):
+    """The reverse direction, which is the one that found five gaps.
+
+    `U00-BUF` is reached by exactly one buffer - `BUF-CIP`, which cleans it - so dropping it from
+    that row's `equip_ref` is the only way to build this case without also creating a dangling
+    token, the same constraint `test_mutation_a_buffer_nothing_references_is_caught` works under.
+    A unit operation with no solution is a piece of plant nobody has said how to clean.
+    """
+    mutate("buffers", "buffer_id", "BUF-CIP",
+           equip_ref="U06-CIP;U01-LIG;U02-CF;U04-EVAP;U05-SD")
+    with pytest.raises(ValueError, match=r"U00-BUF: no row of buffers\.csv names it"):
+        _validate()()
+
+
+def test_mutation_the_superseded_risk_unit_op_spelling_is_refused(mutate):
+    """`UF/DF` was legal in risks.csv until phase 4 and resolved to nothing. Both guards see it."""
+    mutate("risks", "risk_id", "R-005", unit_op="UF/DF")
+    import gen.test_balance as tb
+    with pytest.raises(AssertionError, match="outside the vocabulary"):
+        tb.test_risk_unit_op_and_category_are_a_controlled_vocabulary()
+    with pytest.raises(AssertionError, match="is not an equip_id"):
+        tb.test_the_unit_operation_vocabularies_resolve_to_one_key()
+
+
+def test_mutation_the_risk_vocabulary_follows_equipment_rather_than_a_frozen_list(mutate):
+    """The derivation itself, which a passing suite cannot demonstrate.
+
+    Rename a unit operation's `equip_id` in equipment.csv and every risk filed against it must
+    immediately fall outside the vocabulary. Under the old hardcoded literal this mutation would
+    have changed nothing at all - which is exactly how `Utilities` came to be absent from a
+    vocabulary that was supposed to describe the plant.
+    """
+    mutate("equipment", "equip_id", "U01-LIG", equip_id="U01-LIGASE")
+    import gen.test_balance as tb
+    with pytest.raises(AssertionError, match=r"unit_op 'U01-LIG'"):
+        tb.test_risk_unit_op_and_category_are_a_controlled_vocabulary()
+
+
+def test_mutation_a_new_unit_operation_with_no_solution_fails_the_join(mutate):
+    """The forward-looking half: the eighth unit operation cannot be added without a solution.
+
+    Mutating an existing `equip_id` is the available way to simulate an ADDED row - the harness
+    edits rows rather than appending them - and it has the same effect on the join, because the
+    new id is one no buffer names.
+    """
+    mutate("equipment", "equip_id", "U04-EVAP", equip_id="U07-NEW")
+    with pytest.raises(ValueError, match=r"U07-NEW: no row of buffers\.csv names it"):
+        _validate()()
+
+
+# ---------------------------------------------------------------------------
+# Slice 4 phase 4: the same estimate obligations, now against ROWS THAT REALLY CARRY THEM.
+#
+# The nine phase-2 cases above all supply the estimate themselves, because no row carried
+# `judgement` when they were written. Three do now - BUF-CIP, BUF-DF and BUF-FINAL - and a
+# guard proved only against a synthetic row is a guard proved against a row whose shape the
+# test author chose. These two mutate the live ones.
+# ---------------------------------------------------------------------------
+
+def test_mutation_the_first_real_estimate_may_not_write_its_composition(mutate):
+    """BUF-CIP is the first row in this repository to carry the fourth provenance.
+
+    Its number lives in `est_value` and `components` stays blank, which is what makes the recipe
+    unconsumable. Writing the recipe into `components` is the exact promotion the provenance
+    exists to prevent, and it must fail on the real row and not only on a supplied one.
+    """
+    mutate("buffers", "buffer_id", "BUF-CIP", components="NaOH 1% w/v (0.25 M) at 50 C, 30 min")
+    with pytest.raises(ValueError, match="an estimate wrote components="):
+        _validate()()
+
+
+def test_mutation_closing_the_question_under_a_live_estimate_is_caught(mutate):
+    """Mutate the QUESTION, not the estimate - the direction nothing else covers.
+
+    `BUF-CIP` leaves Q-074 open, and Q-074 is a real row somebody could mark resolved without
+    ever opening buffers.csv. The contradiction is then silent unless the guard reads across:
+    either the estimate closed the question, in which case it is not an estimate, or the question
+    register is wrong.
+    """
+    mutate("questions", "question_id", "Q-074", status="resolved")
+    with pytest.raises(ValueError, match=r"basis names Q-074, whose status is 'resolved'"):
+        _validate()()

@@ -32,10 +32,11 @@ Report at the end of each phase what you verified by execution versus what you t
 | 1 — refuse a fabricated value; resolve buffer references | **done** | `35ec908` |
 | 2 — the vocabulary, the fields, the visibility | **done** | `25c831b` |
 | 3 — the corrections the audits forced | **done** | `55c75d2` |
-| 4 — buffers | **next** | — |
-| 5 — sizing, and the citable cleaning criteria | open | — |
+| 4 — buffers | **done** | (this commit) |
+| 5 — sizing, and the citable cleaning criteria | **next** | — |
 
-**Baseline is now 205 tests, not 147.** Phase 0 took it to 155, phase 1 to 163, phase 2 to 202, phase 3 to 205.
+**Baseline is now 215 tests, not 147.** Phase 0 took it to 155, phase 1 to 163, phase 2 to 202, phase 3 to 205,
+phase 4 to 215.
 
 **What phase 0 delivered**, so phase 2 does not redo it: `envelopes.provenance` renamed to
 `endpoint_sourcing` with its own `ENDPOINT_SOURCING` constant kept deliberately separate from
@@ -395,3 +396,104 @@ mutation-proved; no `data/*.csv` line-ending flip; eight SVGs byte-unchanged.
 Then a report stating what was verified **by execution** versus reasoned about, and for every value
 carried under the new provenance: its basis, its falsifier, the question it did **not** close, and why
 a range was or was not given.
+
+### Phase 4 — what landed, and the verified state phase 5 inherits
+
+**215 tests** (phase 3 left it at 205). **Next free question id is Q-076** (Q-074 and Q-075 raised);
+**next free envelope id is ENV-019** — ENV-017 already existed, so the row phase 4 added is
+**ENV-018**, and the "next free ids by `max`, not assumption" rule caught the collision on the first
+append. Eight SVGs byte-unchanged; no line-ending flip; `risks.csv` changed in exactly one column
+across nineteen rows and nothing else.
+
+**Three rows now carry `judgement` — the machinery is exercised.** `BUF-CIP` (the caustic recipe),
+`BUF-DF` and `BUF-FINAL` (the two compositions that were `assumption` + "TBD"). `estimate_offenders()`
+ran against real rows for the first time, and two of the nine phase-2 mutation cases now have live
+counterparts: `test_mutation_the_first_real_estimate_may_not_write_its_composition` and
+`test_mutation_closing_the_question_under_a_live_estimate_is_caught`, the second of which mutates the
+QUESTION rather than the estimate — the cross-register direction nothing covered.
+
+**Six sources registered, all read, all re-retrieved for this phase:** `SRC-MILLIPORE-PELLICON3`,
+`SRC-CYTIVA-HF`, `SRC-CYTIVA-CFF`, `SRC-ISPE-WIENCEK-2006`, `SRC-ATWELL-2017`, `SRC-EGLI-2023`.
+**Alfa Laval and the PIC/S and WHO cleaning documents were deliberately NOT registered:** the first
+is not needed by any phase-4 row, and the other two are phase 5's content (the carryover criteria).
+
+**The unit-operation prerequisite: the plan's premise was wrong and the fix inverted.** The plan says
+three vocabularies resolve to each other nowhere. Measured, **four** registers carry a unit-operation
+reference, and two of them **already held `equip_id`**: `instruments.unit_op` is `U00-BUF`…`U06-CIP`,
+and so are `streams.from_unit`/`to_unit` (plus the boundary nodes `SUPPLY`, `WASTE`, `DS-STORE`). So
+`equip_id` was already the key for half the data layer and `risks.unit_op` was the outlier — which
+means relabelling `risks` to the equipment LABEL, the obvious reading of "fix the key", would have
+turned three spellings into two and left the key unreachable. `risks.unit_op` now holds `equip_id`;
+`risk_unit_ops()` is **derived** from `equipment.csv` (so `Utilities` cannot go missing again) and is
+a function, not an import-time frozenset, because the mutation harness monkeypatches `DATA_DIR`.
+`equipment.unit_op` stays a display label on purpose. **Registered, not fixed:** `gen/pfd.py`'s
+`render_svg(unit_op)` takes an `equip_id` under a parameter name that says otherwise — a large part of
+why three vocabularies looked like one.
+
+**`solution_offenders()` is the unit-op → solution guard**, in `gen/envelope.py`, called from
+`validate()` so the build raises too. Forward: every `buffers.equip_ref` resolves to an `equip_id`,
+and a blank one fails. Reverse, and this is the direction that found something: **five of the seven
+unit operations had no registered solution at all** before this phase, which the two CIP rows close.
+Four mutation cases, including one that renames an `equip_id` to prove the vocabulary follows
+`equipment.csv` rather than a literal.
+
+**What phase 4 refuted in its own plan** — all six corrections are written into the source rows
+themselves, with the verbatim quote behind each, so they cannot be lost:
+
+1. **The membrane non-differentiation is in the wrong table in the plan.** Millipore's *cleaning*
+   chart gives Biomax a NaOH/**NaOCl** blend, not NaOH alone — so it does NOT show one bracket for
+   both membranes. The one-row non-differentiation is in the **sanitization, depyrogenation and
+   storage** tables, each of which covers "Ultracel / Biomax" with a single `NaOH 0.1 N` row while
+   every acid and solvent agent in the same document differs between them. That is *stronger*
+   evidence, and it needs no polymer names — which matters, because **the guide names no polymer for
+   either membrane**, so "regenerated cellulose" and "polyethersulfone" are attributions from
+   somewhere else. Cytiva's hollow-fibre handbook does name its own: polysulfone.
+2. **The brewery study did not measure hot caustic.** `SRC-ATWELL-2017` ran every one of its 90 runs
+   "under ambient temperature conditions consistent with industrial operation" and measured a
+   concentration threshold: NaOH must be "at least 1% w/v" and above that "there is no additional
+   cleaning benefit". The lower-temperature claim belongs to **Goode et al (2010)**, which Atwell
+   only reports and which was **not retrieved** — so no temperature conclusion may rest on it. The
+   paper is a better counterweight than the plan described, not a worse one, and it adds a third
+   independent, *measured* pH ≈ 13 for caustic solutions.
+3. **The bracket does not recur across "two vendors" without exception.** Millipore's cleaning chart
+   and Cytiva's CFF handbook print the same four numbers (N versus M, cleaning versus
+   sanitization/depyrogenation, pH 10–11 versus pH 13). `SRC-CYTIVA-HF` — third document, third
+   polymer — reproduces **neither end**, circulating a 0.5 N point at 50 °C for an hour. The
+   convention reading survives and is *better* argued from the migration between unit operations
+   than from a vendor count.
+4. **The Millipore copy is not "frozen 2016".** It is **Rev C, 01/2009**, on a reseller mirror
+   uploaded 2015/03, and Merck's own host publishes a **newer Rev 7, 04/2021** that could not be
+   transferred (three attempts, empty reply; the manuals.plus mirror 403s). So the currency problem
+   is sharper than the plan states: a 12-year-old revision, with a current one known to exist.
+5. **The access grade was downgraded, for the honest reason.** `partial-text-read`, because the
+   cleaning, sanitization, depyrogenation and storage sections were read in full while the
+   installation chapters were skimmed — and the mirror-and-currency problem is recorded in
+   `reachability`, where it belongs. Grading a full read as partial to *signal* a currency doubt
+   would put two questions in one column, which is the polysemy phase 0 exists to have removed.
+6. **The ISPE 1% is not a numbered item in the Assumptions list.** The list is items 1–5; the
+   sentence "Assume a nominal chemical concentration of 1% by volume for caustic and acid washes"
+   follows the arithmetic as an inline sixth assumption. Its only job is to turn 720,000 L of water
+   into 7,200 L of chemical.
+
+**And one thing the plan asserted that is now quoted.** "Two CIP rows minimum — TFF chemistry differs
+from every other unit operation" is `SRC-ISPE-WIENCEK-2006`, verbatim: *"TFF membranes usually require
+cleaning chemistries and temperatures that are different than all other unit operations. Establishing
+specifications for each unit operation may minimize the need to test multiple CIP chemistries at the
+production scale."*
+
+**The quench row, and what it does not claim.** `BUF-QUENCH` is `fact`, carrying the **one** chemical
+stop on a **ligation** anywhere in the register — `SRC-PBCV1-2014`'s 50 mM EDTA / 10 mM Tris–HCl
+pH 7.5 stop solution, re-retrieved via Europe PMC and confirmed 1:1 into a **25 µl** reaction at
+**2.5 nM** probes, feeding qPCR. Its `use` says in terms that it is analytical sampling and not a
+unit operation. Re-retrieving `SRC-NEB-WO2023173098` found a **third** quench recipe phase 3 did not
+record ("10 µL 50 mM EDTA with 0.7 % Tween-20"), and it is on a poly(A) tailing reaction like the
+other two — so the count is three recipes in that patent, none on a ligation. `Q-060` stays blank and
+`Q-059` was edited to say that the analytical quench being registered is not an answer to it.
+
+**Carried forward to phase 5, and still not done.** The plan's "Also register, do not fix here" items
+are **not registered yet**: `gen/flowsheet.py` `VIEW_W = 1160` with 30 px of slack and no test
+catching a clipped box, and the retro-fit audit of the 35 `assumption` rows. The line-ending guard's
+docstring is also still wrong, and the real figures are now **measured**: **14 CRLF and 2 LF across
+16 files**, not "ten of the twelve" — left alone because the plan says register rather than fix, and
+recorded here with the numbers so the fix does not need re-measuring. Also still not done: the
+structured `buffer_ref` column phase 1 deferred as a rendering feature.

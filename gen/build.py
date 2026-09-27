@@ -315,6 +315,21 @@ def render_estimates():
             "rather than a rule invented alongside it.\n\n")
         body += "_No rows._\n"
         return body
+    # The complement of the note above, and computed for the same reason: the page must not be
+    # able to say how many estimates exist, or which questions they leave open, from a number
+    # somebody typed. Phase 4 is where this branch first ran at all.
+    registers = sorted({r["Register"] for r in rows})
+    leaves = sorted({q for r in rows for q in r["Leaves open"].split(", ") if q})
+    body += (
+        f"!!! note \"{len(rows)} estimate{'s' if len(rows) != 1 else ''} on this page, and "
+        f"{len(leaves)} question{'s' if len(leaves) != 1 else ''} still open behind "
+        f"{'them' if len(rows) != 1 else 'it'}\"\n"
+        f"    The rows live in {', '.join('`' + n + '`' for n in registers)}. Every one names the "
+        f"question its basis does **not** answer - {', '.join(leaves)} - and none of those "
+        f"questions is closed by the estimate standing on it: that is what the `Leaves open` "
+        f"column is for, and a `resolved` question cited there fails the build. Read an estimate "
+        f"as this project's defended position, not as a measurement, and read the falsifier as "
+        f"the experiment that would settle it.\n\n")
     body += md_table(rows)
     return body
 

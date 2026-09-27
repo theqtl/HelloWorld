@@ -36,6 +36,7 @@ from .dataio import (
     BRACKET_VERDICTS, BRACKET_VERDICTS_RANGEABLE, DISPOSITIONS,
     ENDPOINT_SOURCING, provenance_offenders, question_status_offenders,
     ESTIMATE_PROVENANCE, ESTIMATE_COLUMNS, ESTIMATE_REGISTERS, ACCESS_GRADES_UNREAD,
+    equip_ids,
 )
 from .tables import md_table
 
@@ -156,6 +157,62 @@ def equation_ids():
     root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     text = open(os.path.join(root, "docs", "equations", "index.md"), encoding="utf-8").read()
     return set(re.findall(r"^##\s*(EQ-[A-Z]+)", text, re.M))
+
+
+def solution_offenders():
+    """Solutions and unit operations that do not resolve to each other, keyed on `equip_id`.
+
+    A composition is only half of a solution. The other half is WHERE IT GOES, and until phase 4
+    nothing in the data layer joined the two: `buffers.csv` described four solutions and named no
+    unit operation, while the three unit-operation vocabularies did not resolve to each other at
+    all - so "the caustic wash cleans Ligation" would have pointed at a string that exists in no
+    register. The key is fixed first (see the note above `risk_unit_ops` in gen/dataio.py) and the
+    join is then arithmetic rather than prose.
+
+    Both directions, because each is a different defect.
+
+      * A `buffers.equip_ref` naming no `equip_id` is a recipe for a vessel that does not exist,
+        and a blank one is a solution nobody has said what to do with.
+      * A unit operation NO solution names is the one that matters, and it is why the reverse
+        direction is worth the trouble: every unit operation in this train is wetted, so every
+        one of them has to be cleaned, and an equipment row that no buffer reaches is a piece of
+        plant with no stated cleaning chemistry. Before phase 4 that was five of the seven -
+        which is exactly the gap the two CIP rows close, and the guard is what stops the eighth
+        unit operation being added without one.
+
+    Deliberately NOT a check that the SOLUTION's own unit operation is the only one it may serve:
+    `BUF-CIP` legitimately names six, and `BUF-MEMBRANE-CLEAN` names both the cassettes it cleans
+    and the skid that delivers it.
+    """
+    problems = []
+    ids = equip_ids()
+    rows = load_rows("buffers")
+    if rows and "equip_ref" not in rows[0]:
+        return ["buffers.csv has no equip_ref column, so no solution states the unit operation "
+                "that consumes it; the unit-operation join cannot be checked at all"]
+    named = set()
+    for r in rows:
+        bid = r.get("buffer_id")
+        refs = _refs(r.get("equip_ref"))
+        if not refs:
+            problems.append(
+                f"buffers.csv {bid}: blank equip_ref. A solution with no unit operation is a "
+                f"recipe nobody has said what to do with - name the equip_id(s) that consume it")
+        for ref in refs:
+            if ref not in ids:
+                problems.append(
+                    f"buffers.csv {bid}: equip_ref {ref} is not an equip_id. The three "
+                    f"unit-operation vocabularies were reconciled onto equip_id in slice 4 phase "
+                    f"4; a label like 'Ligation' or 'UF/DF' resolves to nothing")
+            else:
+                named.add(ref)
+    for eid in sorted(ids - named):
+        problems.append(
+            f"equipment.csv {eid}: no row of buffers.csv names it in equip_ref, so this unit "
+            f"operation has no stated cleaning or process solution. Every unit operation here is "
+            f"wetted and therefore cleaned; register the solution or say in buffers.csv which one "
+            f"serves it")
+    return problems
 
 
 def estimate_offenders():
@@ -508,6 +565,11 @@ def validate():
     # eye, so an unchecked one publishes as a defended number with nothing behind it.
     problems += question_status_offenders()
     problems += estimate_offenders()
+
+    # The unit-operation join. Runs at build time with the others because a solution pointing at
+    # a unit operation that does not exist renders as a confident cross-reference to nothing -
+    # the same failure mode as the buffer ids that nine registers named and nothing resolved.
+    problems += solution_offenders()
 
     if problems:
         raise ValueError("envelope register problem(s): " + "; ".join(problems))
