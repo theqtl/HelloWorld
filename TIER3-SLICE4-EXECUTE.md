@@ -31,7 +31,7 @@ Report at the end of each phase what you verified by execution versus what you t
 | 0 — separate the two axes | **done** | `bd9b91e` |
 | 1 — refuse a fabricated value; resolve buffer references | **done** | `35ec908` |
 | 2 — the vocabulary, the fields, the visibility | **done** | `25c831b` |
-| 3 — the corrections the audits forced | **done** | _this commit_ |
+| 3 — the corrections the audits forced | **done** | `55c75d2` |
 | 4 — buffers | **next** | — |
 | 5 — sizing, and the citable cleaning criteria | open | — |
 
@@ -236,6 +236,63 @@ be read to decide which of the two it meant.
 solids rejection (`pfd.UNITS` derives from `equipment.csv`, so it would force an SVG re-baseline on a
 96-well-plate observation); no quench row (phase 4 owns it); no value written for `P-LIG-SEG-CONC`; no
 sweep of `Q-073`'s nine sites.
+
+### Phase 4 — verified state, 2026-09-27
+
+**Baseline 205 tests.** Phase 4 is the FIRST phase that writes an actual estimate: `judgement` is in
+the vocabulary and **zero rows anywhere use it**. Phases 0–3 built the machinery, the guards and the
+corrections; nothing has exercised them yet.
+
+**Recommendation before starting: open a PR for phases 0–3 first.** Eight commits and well over a
+thousand lines sit unreviewed on the branch, and phases 0–3 are exactly the reviewable unit the plan
+designed — the machinery plus the corrections, with **no estimate resting on any of it**. Phase 4 is
+the first phase whose content is a judgement call rather than a mechanical invariant, so if review
+changes the machinery, phase 4's data would have to be rewritten. Land 0–3, then start 4 on a clean
+base.
+
+**The guards phase 4 must satisfy** (`estimate_offenders()` in `gen/envelope.py:161`, guarded by
+`test_an_educated_estimate_carries_its_obligations` at `test_balance.py:2382`):
+
+1. The number goes in **`est_value`** and the row's own quantity columns stay **blank**. For
+   `buffers` those columns are **`components` and `ph`** — `ESTIMATE_REGISTERS` is
+   `{"parameters": ("value",), "buffers": ("components", "ph"), "scenarios": (...)}`. So an
+   estimated CIP recipe does **not** go in `components`. The converse is guarded too: `est_value`
+   on a non-estimate row fails.
+2. **`basis` must resolve every `SRC-`/`P-`/`EQ-`/`Q-` token**, no cited source may be graded
+   `abstract-only`, `record-only` or `not-retrieved`, and **at least one `Q-` token is required** —
+   a row naming no open question is claiming to have settled something.
+3. **The cited question must be `open`.** A `partially_resolved` or `resolved` one is a contradiction.
+4. `judgement` is **refused outside `ESTIMATE_REGISTERS`**.
+
+Four more guards exist and must stay green: `test_no_numeric_reader_consumes_an_estimate`,
+`test_an_estimate_is_marked_in_the_cell_where_the_number_is_read`,
+`test_the_marker_transform_is_wired_into_every_estimate_register`,
+`test_every_estimate_reaches_the_census`, and
+`test_an_estimated_quantity_in_prose_names_the_parameter_it_estimates`.
+
+**Phase 4 starts with source registration, not with buffer rows.** Of 106 source rows, the only
+cleaning-adjacent one is `SRC-MILLIPORE-TFF`, and it is registered for **TFF yield loss**, not
+cleaning. Nothing is registered for Cytiva (two handbooks, exact doc codes `CY28744-18Jul22-HB` and
+`CY14739-24Feb21-HB`), the Millipore *Pellicon 3 IUG* (`AN1065EN00 Rev C, 01/2009`, reachable only
+via a third-party mirror so its access grade must be **downgraded off `full-text-read`**),
+Wiencek/ISPE 2006, PIC/S PI 006-3 (**docview 3447**, not 3436), WHO TRS 1019 Annex 3, Alfa Laval, or
+the brewery CIP paper. Since `basis` must resolve its `SRC-` tokens and they must be READ grades,
+**no estimate can be written until its sources exist**.
+
+**The plan's phase-4 content, with the audit corrections already applied** — do not re-derive these:
+`BUF-MEMBRANE-CLEAN` is `one_source_both_ends` at convention level, **not** two independent
+endpoints; drop its **pH 10–11** figure as a typo beside 0.1–0.5 N NaOH (which is pH 13); carry the
+**100-hour cumulative exposure budget** and Millipore's own *"better membrane life has been observed
+at lower concentrations"*. `BUF-CIP` is the genuine `judgement` case. A **quench** row is now
+supportable from four documents, with the caveat that every chemical stop is at an **analytical
+sampling point**, not process scale. **Do not** add a PNK composition row (it would duplicate
+`BUF-LIG`) or IMAC buffers (conditional on `Q-050`). Two CIP rows minimum — TFF chemistry differs
+from every other unit operation.
+
+**The unit-op → solution guard has a prerequisite.** Three vocabularies resolve to each other
+nowhere: `equip_id`, free-text `equipment.unit_op`, and `RISK_UNIT_OPS` where `Ligation` ≠
+`Enzymatic ligation` and `Utilities` is absent entirely. Phase 0 relocated that constant but did not
+reconcile it. Fix the key first, then guard on `equip_id`.
 
 ## Working order
 
