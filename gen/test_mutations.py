@@ -668,3 +668,77 @@ def test_mutation_a_legend_label_outside_the_vocabulary_is_caught(monkeypatch):
                         {v for v in tb.ACCESS_VOCAB if v != "partial-text-read"})
     with pytest.raises(AssertionError, match="not in ACCESS_VOCAB"):
         tb.test_the_access_legend_covers_the_whole_vocabulary()
+
+
+# ---------------------------------------------------------------------------
+# Slice 4 phase 0: the two provenance axes, and the vocabularies that moved.
+# ---------------------------------------------------------------------------
+
+def test_mutation_a_bad_provenance_in_buffers_is_caught(mutate):
+    """`buffers.csv` was one of eight registers whose `provenance` nothing checked.
+
+    It is the register slice 4's estimates land in, so it is the one worth proving first. Before
+    this guard a misspelling here validated, and the row rendered as a confident statement about
+    how well a buffer composition is known.
+    """
+    mutate("buffers", "buffer_id", "BUF-DF", provenance="assumtpion")
+    with pytest.raises(ValueError, match="buffers.csv BUF-DF: provenance"):
+        _validate()()
+
+
+def test_mutation_a_bad_provenance_in_equipment_is_caught(mutate):
+    """A second unchecked register, to prove the guard is not buffers-specific."""
+    mutate("equipment", "equip_id", "U01-LIG", provenance="guess")
+    with pytest.raises(ValueError, match="equipment.csv U01-LIG: provenance"):
+        _validate()()
+
+
+def test_mutation_a_bad_endpoint_sourcing_is_caught(mutate):
+    """The renamed column is enforced under its new name."""
+    mutate("envelopes", "envelope_id", "ENV-011", endpoint_sourcing="facts")
+    with pytest.raises(ValueError, match="ENV-011: endpoint_sourcing"):
+        _validate()()
+
+
+def test_mutation_a_blank_endpoint_sourcing_is_caught(mutate):
+    """Blank is not a legal value on either axis.
+
+    Worth its own case because the rename went through a state where the column did not exist
+    and every row read blank - so "the guard fires on a typo" and "the guard fires when the
+    column is gone" are different claims and only one of them was proved by the case above.
+    """
+    mutate("envelopes", "envelope_id", "ENV-011", endpoint_sourcing="")
+    with pytest.raises(ValueError, match="ENV-011: endpoint_sourcing ''"):
+        _validate()()
+
+
+def test_mutation_re_adding_provenance_to_envelopes_is_caught(monkeypatch, tmp_path):
+    """The rename made permanent: a `provenance` column back on `envelopes.csv` must fail.
+
+    Anchored on the HEADER rather than on a row id, because that is what the defect is - so this
+    case writes a header instead of using the `mutate` fixture, which rewrites one row.
+    """
+    import shutil
+    copy = tmp_path / "data"
+    shutil.copytree(REAL_DATA_DIR, copy)
+    path = copy / "envelopes.csv"
+    raw = open(path, "rb").read()
+    head, sep, rest = raw.partition(b"\r\n")
+    assert b"endpoint_sourcing" in head
+    open(path, "wb").write(head.replace(b"endpoint_sourcing", b"provenance") + sep + rest)
+    monkeypatch.setattr("gen.dataio.DATA_DIR", str(copy))
+    import gen.test_balance as tb
+    with pytest.raises(AssertionError, match="carries a `provenance` column again"):
+        tb.test_the_two_provenance_axes_are_separate_columns()
+
+
+def test_mutation_a_bad_risk_unit_op_is_caught_against_the_imported_vocabulary(mutate):
+    """RISK_UNIT_OPS moved out of the test file; the guard must still see a bad value.
+
+    The move is the point: the guard now imports the vocabulary from `gen/dataio.py` rather than
+    declaring it three lines above itself.
+    """
+    mutate("risks", "risk_id", "R-001", unit_op="Ligaton")
+    import gen.test_balance as tb
+    with pytest.raises(AssertionError, match="outside the vocabulary"):
+        tb.test_risk_unit_op_and_category_are_a_controlled_vocabulary()

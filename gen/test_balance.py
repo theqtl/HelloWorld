@@ -1,6 +1,10 @@
 """Integrity + balance tests. Run: python -m pytest gen/ -q"""
 import os
-from gen.dataio import load_rows, load_params, param_value
+from gen.dataio import (
+    load_rows, load_params, param_value,
+    PROVENANCE_VOCAB, PROVENANCE_REGISTERS, ENDPOINT_SOURCING, provenance_offenders,
+    RISK_UNIT_OPS, RISK_CATEGORIES,
+)
 from gen.balance import run_all, purity_floor
 
 
@@ -32,10 +36,69 @@ def test_assumption_params_reference_a_question():
 
 
 def test_no_value_without_provenance():
+    """A written value must declare how it was arrived at.
+
+    The vocabulary is IMPORTED, not re-listed. This guard used to spell out
+    `("fact", "inference", "assumption")` inline, which meant adding a fourth provenance
+    required finding and editing every copy of the list - and a copy that was missed would
+    not fail, it would refuse a legitimate value.
+
+    Note what this guard does NOT do, because it was read as doing it: it polices the
+    VOCABULARY of a row that has a value. It says nothing about whether the row should have
+    a value at all. `value_written_where_refused` is the guard for that.
+    """
     for r in load_rows("parameters"):
         if (r.get("value") or "").strip():
-            assert r["provenance"] in ("fact", "inference", "assumption"), \
+            assert r["provenance"] in PROVENANCE_VOCAB, \
                 f"{r['param_id']} has a value but bad provenance {r['provenance']!r}"
+
+
+def test_provenance_is_a_controlled_vocabulary_in_every_register():
+    """`provenance` is enforced on all eleven registers that carry it, and
+    `endpoint_sourcing` on the twelfth.
+
+    Before slice 4 it was enforced on three - `parameters` (and there only when the row had a
+    non-blank `value`), `controls` and `instruments`. `buffers`, `couplings`, `equipment`,
+    `impurities`, `infoneeds`, `scenarios`, `utilities` and `verdicts` were unchecked, so a
+    misspelling in any of them rendered as a confident statement about how well a number is
+    known. That mattered most for `buffers`, which is where slice 4's own estimates land.
+    """
+    offenders = provenance_offenders()
+    assert not offenders, "provenance vocabulary violation(s):\n  " + "\n  ".join(offenders)
+
+
+def test_the_two_provenance_axes_are_separate_columns():
+    """`envelopes` must not carry `provenance`, and must carry `endpoint_sourcing`.
+
+    The two columns were both called `provenance` and answered different questions: whether the
+    ENDPOINTS are published figures, versus what kind of act produced the number THIS PROJECT
+    carries. Eleven of seventeen envelope rows consequently read as flat contradictions of
+    `parameters.csv` - every one of them in the same direction, and not one of them a data error.
+    `P-BLOCK-PUR` is the case that shows why reconciling the data would have been wrong: ENV-001's
+    endpoints really are published measurements and the value the parameter carries really is an
+    assumption.
+
+    This guard is the rename made permanent. Re-adding a `provenance` column to `envelopes.csv`
+    would recreate the polysemy silently, because both spellings would validate.
+    """
+    header = load_rows("envelopes")[0].keys()
+    assert "provenance" not in header, (
+        "envelopes.csv carries a `provenance` column again. That column is `endpoint_sourcing`: "
+        "it says what standing the two ENDPOINTS have as retrieved claims, which is not the "
+        "question `parameters.provenance` answers"
+    )
+    assert "endpoint_sourcing" in header, "envelopes.csv is missing endpoint_sourcing"
+    assert not (PROVENANCE_REGISTERS and
+                any(name == "envelopes" for name, _ in PROVENANCE_REGISTERS)), (
+        "envelopes must not be in PROVENANCE_REGISTERS - it carries the other axis"
+    )
+    # The two vocabularies share tokens today. They are separate constants so that a value
+    # added to one axis does not become legal on the other, which is the whole point of the
+    # rename; if they were the same object, phase 2's fourth provenance would silently become
+    # a legal endpoint verdict.
+    assert PROVENANCE_VOCAB is not ENDPOINT_SOURCING, (
+        "the two axes must be two constants, or widening one widens the other"
+    )
 
 
 def test_questions_referenced_exist():
@@ -1060,12 +1123,11 @@ def test_impurity_gaps_carry_a_registered_reference():
 # (a value tuned until a test passed).
 # ---------------------------------------------------------------------------
 
-#: Controlled vocabulary for risks.csv. Neither column was enforced before, so a new
-#: risk row could ship an invalid unit_op or category silently and simply never be
-#: found by anyone filtering the register.
-RISK_UNIT_OPS = {"All", "Cleaning", "Evaporation", "Filtration", "Ligation",
-                 "Spray drying", "UF/DF"}
-RISK_CATEGORIES = {"formulation", "microbial", "process", "product", "purity", "quality"}
+# RISK_UNIT_OPS and RISK_CATEGORIES now live in gen/dataio.py and are imported at the top of
+# this module. They were defined HERE, which made a test file the owner of a data vocabulary:
+# nothing raised at build time, and the only enforcement was a guard checking the register
+# against a list that lived beside it. Importing is the point - a guard that re-lists its own
+# expectation proves only that someone typed the same thing twice.
 
 
 def test_risk_unit_op_and_category_are_a_controlled_vocabulary():
@@ -1245,9 +1307,6 @@ def test_the_declared_tag_scheme_does_not_claim_to_be_isa():
 
 
 # --- B/E. The control matrix, and referential integrity across both new files ---
-
-PROVENANCE_VOCAB = {"fact", "inference", "assumption"}
-
 
 def _refs(value):
     """A reference cell holds one id, or several separated by ';'.

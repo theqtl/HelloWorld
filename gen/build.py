@@ -100,7 +100,15 @@ def gen_registers():
          "but it is a weaker object than a band spanning two independent studies, and "
          "`one_source_both_ends` says which it is where the number is read. `low_drives` and "
          "`high_drives` name the equipment item, utility or control whose sizing each end sets; "
-         "that is the whole point of bracketing a number rather than picking one.", None),
+         "that is the whole point of bracketing a number rather than picking one.\n\n"
+         "**`endpoint_sourcing` is not `parameters.provenance`, and until slice 4 both columns "
+         "were called `provenance`.** This one says what standing the two *endpoints* have as "
+         "retrieved claims - a statement about the literature. That one says what kind of act "
+         "produced the number *this project carries* - a statement about this project. Eleven of "
+         "these rows read as flat contradictions of the parameter register while the columns "
+         "shared a name, and not one of them was a data error: `ENV-001`'s endpoints really are "
+         "published measurements, and the value `P-BLOCK-PUR` carries really is an assumption. "
+         "The columns were separated rather than reconciled.", None),
         ("couplings", "registers/couplings.md", "Coupling register",
          "A design space is a region, not a box, and the corners of a box are frequently "
          "unreachable together. Each row ties two parameters, states the direction of the tension, "
