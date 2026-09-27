@@ -424,3 +424,33 @@ def risk_unit_ops():
 
 
 RISK_CATEGORIES = {"formulation", "microbial", "process", "product", "purity", "quality"}
+
+
+# ---------------------------------------------------------------------------
+# THE CLEANING SOLUTIONS, NAMED, BECAUSE A DERIVED QUANTITY NOW DEPENDS ON THEM.
+#
+# gen/balance.py computes the campaign cleaning-water demand as
+# `len(equip_ids()) * washes * volume_per_wash` - the circuit count DERIVED from
+# the equipment register rather than written down. That is only honest if every
+# unit operation really does have a registered cleaning chemistry, so
+# `cip_coverage_offenders()` proves it, and this constant says which rows count
+# as cleaning duty.
+#
+# WHY A NAMED CONSTANT RATHER THAN A SEARCH OF `buffers.use`. Sniffing prose for
+# "clean" would make the balance's circuit count depend on wording, and the same
+# class of guard already burned this repository once: the first version of the
+# information-need clause check searched `notes` and blessed the very clause it
+# was written to refuse, because the sentence DENYING the clause contained it.
+# A delimited list is the only version of this that a rewording cannot break.
+#
+# `solution_offenders()` is the neighbouring guard and asks a WIDER question -
+# every unit operation must be named by SOME solution, process or cleaning. This
+# one is narrower and is the premise the balance needs: named by a CLEANING
+# solution specifically. BUF-LIG reaches U01-LIG, so the wider guard passes on a
+# unit operation that nothing cleans.
+# ---------------------------------------------------------------------------
+
+#: The `buffer_id`s whose duty is cleaning rather than processing. Two, and the split
+#: between them is SRC-ISPE-WIENCEK-2006's own instruction that TFF membranes need a
+#: different chemistry from every other unit operation - not a preference of ours.
+CIP_SOLUTIONS = ("BUF-CIP", "BUF-MEMBRANE-CLEAN")

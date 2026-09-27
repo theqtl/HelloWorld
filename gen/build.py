@@ -375,6 +375,52 @@ def _excipient_sensitivity():
     return scn["label"], rows
 
 
+def _range_to_steel():
+    """The two registered bands that decide plant size, resolved into vessel and utility litres.
+
+    THE TABLE THE PLAN ASKED TO BE PUBLISHED FROM THE MODEL SO IT CANNOT DRIFT - the same reason
+    `_excipient_sensitivity` exists, and the same deep-copy idiom: the parameter dict is copied per
+    case, nothing is written to `data/`, and the figures are whatever gen/balance.py computes today.
+
+    Two bands, chosen because they are the ones that move steel rather than duty:
+
+      * `P-CONC-LIG` - ligation concentration. Its low end is not a bigger tank, it is a DIFFERENT
+        PLANT: the Mid scenario needs a single vessel of tens of thousands of litres, which is not
+        something you buy. So this band decides whether the concept exists at the middle demand, not
+        how big one item is.
+      * `P-DF-DIAVOL` - diafiltration diavolumes. It moves buffer and clean water and leaves the
+        retentate alone, which is itself informative: the retentate is back-calculated from demand
+        through the downstream yields, so upstream losses cannot change it.
+
+    Both are `assumption` placeholders (Q-017, Q-020), so the SPREAD is the finding and no column
+    here is a design basis.
+    """
+    from .balance import run_scenario
+    params = load_params()
+    scns = load_rows("scenarios")
+    rows = []
+    for pid, label, cases, fields in (
+        ("P-CONC-LIG", "Ligation concentration (g/L)", ("5", "15", "20"),
+         (("ligation_volume_L", "Ligation batch volume (L)"),)),
+        ("P-DF-DIAVOL", "Diafiltration diavolumes", ("4", "7", "20"),
+         (("df_buffer_volume_L", "Diafiltration buffer (L)"),
+          ("wfi_approx_L", "Clean water demand (L)"))),
+    ):
+        registered = (params[pid].get("value") or "").strip()
+        for case in cases:
+            p = {k: dict(v) for k, v in params.items()}
+            p[pid]["value"] = case
+            res = [run_scenario(s, p) for s in scns]
+            for field, fl in fields:
+                row = {"Band": label,
+                       "Value": case + (" (registered)" if case == registered else ""),
+                       "Drives": fl}
+                for s, r in zip(scns, res):
+                    row[s["label"]] = _fmt(getattr(r, field))
+                rows.append(row)
+    return rows
+
+
 def render_balance():
     results = [asdict(r) for r in run_all()]
     body = BANNER + "# Mass & energy balance (results)\n\n"
@@ -406,6 +452,9 @@ def render_balance():
         ("dryer_feed_mass_kg", "Spray-dryer feed (kg)"),
         ("dryer_water_evaporated_kg", "Dryer water evaporated (kg)"),
         ("drying_gas_kg", "Drying gas required, derived (kg)"),
+        ("ufdf_holdup_volume_L", "UF/DF hold-up volume implied by the loss fraction (L)"),
+        ("cip_circuits", "CIP circuits, derived from the equipment register"),
+        ("cip_water_approx_L", "Cleaning water, caustic wash only (L)"),
         ("wfi_approx_L", "Clean water demand approx (L)"),
         ("aqueous_waste_approx_L", "Aqueous waste approx (L)"),
         ("evap_duty_MJ", "Evaporation duty, latent minimum (MJ)"),
@@ -416,6 +465,7 @@ def render_balance():
         ("dryer_feed_sensible_MJ", "Dryer feed sensible heat (MJ)"),
         ("dryer_process_duty_MJ", "Dryer process duty, what drying requires (MJ)"),
         ("dryer_heater_duty_MJ", "Dryer heater duty, inlet gas from ambient (MJ)"),
+        ("anneal_topfill_duty_MJ", "Ligation anneal jacket duty at top fill (MJ)"),
     ]
     header = ["Quantity"] + [r["label"] for r in results]
     lines = ["| " + " | ".join(header) + " |",
@@ -436,6 +486,53 @@ def render_balance():
              "is **derived** from the process duty rather than assumed, so no gas:water ratio is "
              "carried. Operating temperatures are assumptions (Q-045, Q-046); MVR recovers most of "
              "the evaporator's latent load as recompressed vapour.\n\n")
+
+    body += ("\n## From a registered band to steel\n\n"
+             "Two of the bands in the parameter register decide plant SIZE rather than duty. "
+             "Holding everything else at its placeholder and moving one at a time, computed here "
+             "rather than quoted:\n\n")
+    body += md_table(_range_to_steel())
+    body += ("\nThe finding is not the width, it is what the bottom of the concentration envelope "
+             "asks for: at 5 g/L the Mid scenario needs a single ligation vessel of over thirty "
+             "thousand litres, which is not a vessel anyone buys — so `P-CONC-LIG` (Q-017) decides "
+             "whether this plant can be built at that demand, not merely how large one item is. "
+             "Diavolumes behave differently and the difference is worth reading: `P-DF-DIAVOL` "
+             "(Q-020) triples the diafiltration buffer and leaves the **UF retentate volume "
+             "unchanged**, because the retentate is back-calculated from DS demand through the "
+             "downstream yields — so a loss upstream of it cannot move it. Both rows are "
+             "`assumption` placeholders, so the spread is the result and no column is a basis.\n\n"
+             "## Cleaning, which used to be zero litres\n\n"
+             "The clean-water figure above now contains cleaning. Until this slice it was "
+             "`diafiltration buffer + ligation volume` and nothing else, so `U06-CIP` sat in the "
+             "equipment register contributing to no number at all. The circuit count is **derived** "
+             "from the equipment register rather than written down — every unit operation is wetted "
+             "and therefore cleaned, which `cip_coverage_offenders()` proves — so adding a unit "
+             "operation raises the cleaning demand without anyone remembering to.\n\n"
+             "**It is a floor, not an estimate, for three stated reasons** (all Q-076). "
+             "`P-CIP-WASH-VOL` carries 400 L per circuit per wash from a facility whose circuits "
+             "average 200 L of hold-up, while the ligation vessel here is thousands of litres. Only "
+             "the caustic wash is counted, because caustic is the only chemistry registered "
+             "(`BUF-CIP`, `BUF-MEMBRANE-CLEAN`) while the source facility runs caustic *and* acid. "
+             "And **no rinse is counted at all**, although PIC/S §7.9.1 requires the caustic itself "
+             "be removed to a defined limit and WHO permits a carryover limit expressed *in rinse "
+             "water as ppm* — which makes the rinse both mandatory and the medium the limit is "
+             "measured in (`P-CARRYOVER-PPM`, SRC-PICS-PI006-3, SRC-WHO-TRS1019-A3).\n\n"
+             "**There is no CIP steam duty here, and that is the fourth provenance working.** The "
+             "only wash temperature in the register is `BUF-CIP`\u2019s *ambient to 50 °C*, which is "
+             "an **educated estimate** and therefore lives in `est_value`; every read in "
+             "`gen/balance.py` goes through `param_value`, which reads `value`. So the estimate is "
+             "*physically unable* to reach a duty, and the honest outcome is a missing number with a "
+             "named reason (Q-074) rather than a duty resting on a judgement. Registering an "
+             "`assumption` placeholder for the same temperature would give one figure two homes. "
+             "The anneal jacket duty above is the steam load that *could* be computed, because "
+             "every input to it is a registered value.\n\n"
+             "**The hold-up row is the loss fraction made visible.** `P-UFDF-HOLDUP-LOSS` is a "
+             "single fraction, and the same 0.10 stands for 23 L of unrecoverable hardware volume at "
+             "the low scenario and four times that at the high one. Its own source measured 30–40% "
+             "at 20–80 mL, so the fraction is scale-dependent and carrying one value across the "
+             "scenarios is a modelling choice (Q-036). No membrane area is published from it: that "
+             "would need a specific hold-up in L/m², and no such figure is registered anywhere "
+             "here.\n\n")
 
     label, sens = _excipient_sensitivity()
     body += ("## Where evaporation earns its place\n\n"

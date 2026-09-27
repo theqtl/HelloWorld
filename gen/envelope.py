@@ -36,7 +36,7 @@ from .dataio import (
     BRACKET_VERDICTS, BRACKET_VERDICTS_RANGEABLE, DISPOSITIONS,
     ENDPOINT_SOURCING, provenance_offenders, question_status_offenders,
     ESTIMATE_PROVENANCE, ESTIMATE_COLUMNS, ESTIMATE_REGISTERS, ACCESS_GRADES_UNREAD,
-    equip_ids,
+    equip_ids, CIP_SOLUTIONS,
 )
 from .tables import md_table
 
@@ -212,6 +212,102 @@ def solution_offenders():
             f"operation has no stated cleaning or process solution. Every unit operation here is "
             f"wetted and therefore cleaned; register the solution or say in buffers.csv which one "
             f"serves it")
+    return problems
+
+
+def cip_coverage_offenders():
+    """Unit operations with no registered CLEANING solution, and cleaning rows that do not exist.
+
+    This is the premise gen/balance.py's cleaning-water demand rests on. That figure is
+    `len(equip_ids()) * washes * volume_per_wash` - the circuit count DERIVED from the equipment
+    register rather than typed in, so that adding a unit operation raises the cleaning demand
+    without anyone remembering to. Deriving it is only honest if every unit operation really is
+    cleaned by something registered, and until this function existed nothing said so.
+
+    NOT A DUPLICATE OF `solution_offenders()`, and the difference is the whole reason for it. That
+    guard asks whether every unit operation is named by SOME solution - process or cleaning - and
+    `BUF-LIG` names `U01-LIG`, so it passes happily on a vessel that nothing cleans. This one asks
+    the narrower question the derived quantity needs: is every unit operation named by a solution
+    whose duty IS cleaning. The two directions again:
+
+      * a unit operation no cleaning solution reaches is a wetted surface with no chemistry, and
+        it is also a circuit the balance is charging water for - so the figure would be counting
+        cleaning that no recipe describes;
+      * a `CIP_SOLUTIONS` id that is not in `buffers.csv` means the constant has drifted from the
+        register, which would silently shrink what "cleaned" means rather than fail.
+    """
+    problems = []
+    rows = {r.get("buffer_id"): r for r in load_rows("buffers")}
+    ids = equip_ids()
+    cleaned = set()
+    for bid in CIP_SOLUTIONS:
+        r = rows.get(bid)
+        if r is None:
+            problems.append(
+                f"dataio.CIP_SOLUTIONS names {bid}, which is not a buffer_id in buffers.csv. The "
+                f"balance derives its circuit count on the premise that these rows describe the "
+                f"cleaning of every unit operation; a name that resolves to nothing quietly "
+                f"narrows that premise instead of breaking it")
+            continue
+        cleaned |= {x for x in _refs(r.get("equip_ref")) if x in ids}
+    for eid in sorted(ids - cleaned):
+        problems.append(
+            f"equipment.csv {eid}: no CLEANING solution names it in equip_ref (checked against "
+            f"{list(CIP_SOLUTIONS)}). Every unit operation here is wetted, and gen/balance.py "
+            f"charges cleaning water for each one, so a unit operation with a process solution but "
+            f"no cleaning chemistry is being billed for a wash that no recipe describes")
+    return problems
+
+
+#: {parameter: (the source keys that really print it, the key that is the WRONG document)}.
+#: Two rows today, both carrying a cleaning carryover criterion. This is not a general
+#: mechanism and is not meant to become one - it is a named trap, recorded because the
+#: confusion is between two documents that every other guard here treats as equally good.
+CRITERION_SOURCES = {
+    "P-CARRYOVER-PPM": (("SRC-PICS-PI006-3", "SRC-WHO-TRS1019-A3"), "SRC-WHO-TRS1044"),
+    "P-CARRYOVER-DOSE-FRAC": (("SRC-PICS-PI006-3", "SRC-WHO-TRS1019-A3"), "SRC-WHO-TRS1044"),
+}
+
+
+def criterion_source_offenders():
+    """A cleaning criterion citing the WRONG WHO document, which no other guard can see.
+
+    THE TRAP, and it is worth stating why it needs a guard of its own rather than a careful
+    reader. `SRC-WHO-TRS1044` is WHO TRS 1044 Annex 4 - the TECHNOLOGY TRANSFER guideline - and it
+    is the right citation for the PDE-then-MACO derivation METHOD, which is why the
+    contamination-control page already cites it. The carryover criteria are printed in a DIFFERENT
+    document, TRS 1019 Annex 3 Appendix 3. Swap them and every existing check passes: the key
+    resolves, the access grade is a read grade, the provenance is `fact` with a source, the prose
+    reference is registered. Two WHO documents, both read in full, and nothing in this repository
+    could tell them apart.
+
+    Runs from `validate()` so the BUILD refuses it, for the reason phase 0 gave about
+    vocabularies: a rule only a test knows cannot stop `python -m gen.build` from publishing the
+    wrong citation.
+
+    Both directions, as everywhere else here: the row must cite a document that really prints the
+    criterion, and must not cite the one that does not.
+    """
+    problems = []
+    params = load_params()
+    for pid, (right, wrong) in CRITERION_SOURCES.items():
+        row = params.get(pid)
+        if row is None:
+            problems.append(
+                f"CRITERION_SOURCES names {pid}, which is not in parameters.csv - the trap guard "
+                f"has drifted from the register it guards")
+            continue
+        blob = " ".join((row.get(c) or "") for c in ("source_key", "notes", "scale_system"))
+        if wrong in blob:
+            problems.append(
+                f"{pid} names {wrong}. That is the technology-transfer guideline, which states the "
+                f"PDE-then-MACO METHOD and prints no carryover criterion; the criteria are in "
+                f"{' / '.join(right)}. Both documents are WHO and both are read in full, which is "
+                f"why this needs a guard and not a reader")
+        if not any(k in blob for k in right):
+            problems.append(
+                f"{pid} names none of {list(right)}, so nothing it cites actually prints the "
+                f"criterion it carries")
     return problems
 
 
@@ -570,6 +666,17 @@ def validate():
     # a unit operation that does not exist renders as a confident cross-reference to nothing -
     # the same failure mode as the buffer ids that nine registers named and nothing resolved.
     problems += solution_offenders()
+
+    # And the narrower cleaning-coverage question, which is the premise the balance's
+    # derived circuit count rests on. At build time with the rest, because a cleaning
+    # demand computed from an unproven premise publishes as a utility size.
+    problems += cip_coverage_offenders()
+
+    # And the named citation trap: a cleaning criterion attributed to WHO's
+    # technology-transfer guideline instead of its validation one. At build time
+    # because both documents resolve and both were read, so nothing else here can see
+    # the difference.
+    problems += criterion_source_offenders()
 
     if problems:
         raise ValueError("envelope register problem(s): " + "; ".join(problems))

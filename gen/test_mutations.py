@@ -1480,3 +1480,163 @@ def test_mutation_closing_the_question_under_a_live_estimate_is_caught(mutate):
     mutate("questions", "question_id", "Q-074", status="resolved")
     with pytest.raises(ValueError, match=r"basis names Q-074, whose status is 'resolved'"):
         _validate()()
+
+
+# ---------------------------------------------------------------------------
+# Slice 4 phase 5. The guards added with the sizing work and the carryover criteria,
+# each proved against the defect it claims to catch.
+# ---------------------------------------------------------------------------
+
+def test_mutation_a_unit_operation_losing_its_cleaning_chemistry_is_caught(mutate):
+    """The premise the balance's DERIVED circuit count rests on, attacked at its weakest point.
+
+    `solution_offenders` would NOT catch this: drop the evaporator from the caustic wash's
+    `equip_ref` and `U04-EVAP` is still named by nothing else... except that is exactly the case the
+    wider guard also happens to see. So the mutation is chosen to separate the two guards - the
+    evaporator is dropped from `BUF-CIP` while `BUF-MEMBRANE-CLEAN` keeps every unit it had, and the
+    narrow guard must name `U04-EVAP` specifically as lacking a CLEANING chemistry rather than any
+    solution at all.
+    """
+    from gen.envelope import cip_coverage_offenders
+    mutate("buffers", "buffer_id", "BUF-CIP",
+           equip_ref="U06-CIP;U00-BUF;U01-LIG;U02-CF;U05-SD")
+    offenders = cip_coverage_offenders()
+    assert any("U04-EVAP" in o for o in offenders), (
+        "dropping the evaporator from the only caustic recipe that reaches it must be caught: the "
+        "balance is still charging cleaning water for it. Got: " + "; ".join(offenders))
+
+
+def test_mutation_the_cleaning_solution_constant_drifting_from_the_register_is_caught(mutate):
+    """`CIP_SOLUTIONS` names rows; if a row is renamed the constant must break, not narrow.
+
+    This is the failure mode a prose search would have had: silently matching fewer rows and
+    shrinking what "cleaned" means without anything going red. Renaming the buffer id makes the
+    constant point at nothing, and the guard has to say so rather than conclude that nothing is
+    cleaned by caustic.
+    """
+    from gen.envelope import cip_coverage_offenders
+    mutate("buffers", "buffer_id", "BUF-CIP", buffer_id="BUF-CAUSTIC")
+    offenders = cip_coverage_offenders()
+    assert any("CIP_SOLUTIONS" in o and "BUF-CIP" in o for o in offenders), (
+        "a renamed cleaning row must break the constant explicitly. Got: " + "; ".join(offenders))
+
+
+def test_mutation_blanking_a_cip_input_refuses_rather_than_cleaning_for_free(mutate):
+    """Cleaning demand must not be able to return to zero by a blank.
+
+    The whole point of the phase-5 term is that `U06-CIP` costs something. A blank wash volume is
+    the shortest route back to zero litres, and `_require` has to refuse it - the same rule that
+    already protects every thermal constant.
+    """
+    from gen.balance import run_all
+    mutate("parameters", "param_id", "P-CIP-WASH-VOL", value="")
+    with pytest.raises(ValueError, match="P-CIP-WASH-VOL"):
+        run_all()
+
+
+def test_mutation_a_loss_fraction_that_consumes_the_step_is_caught(mutate):
+    """The composed-yield bound, proved through the DATA layer as well as in process.
+
+    `test_a_loss_fraction_that_consumes_the_step_raises_instead_of_publishing` proves it against an
+    in-memory parameter copy; this proves the same defect arriving the way it really would, as an
+    edited CSV. Before the bound existed this mutation produced a MINUS 30,483 L ligation volume and
+    a negative clean-water demand, and the build published them.
+    """
+    from gen.balance import run_all
+    mutate("parameters", "param_id", "P-UFDF-HOLDUP-LOSS", value="1.2")
+    with pytest.raises(ValueError, match="outside .0, 1."):
+        run_all()
+
+
+def test_mutation_a_value_written_into_the_refused_fill_ratio_is_caught(mutate):
+    """The phase-1 refusal, exercised by the row phase 5 added.
+
+    `P-LIG-FILL-RATIO` is blank because 2 and 5 are two readings of one number rather than two ends
+    of a window. Picking one of them and writing it in is the tempting defect - it looks like
+    progress - and it is the same shape as the `P-LIG-SEG-CONC` hole the red team walked through.
+    """
+    from gen.envelope import value_written_where_refused
+    mutate("parameters", "param_id", "P-LIG-FILL-RATIO", value="5")
+    offenders = value_written_where_refused()
+    assert any("P-LIG-FILL-RATIO" in o for o in offenders), (
+        "writing one side of a published contradiction into the value column must be refused. "
+        "Got: " + "; ".join(offenders))
+
+
+def test_mutation_citing_the_transfer_guideline_for_the_criteria_is_caught(mutate):
+    """THE TRAP, proved. Both keys resolve, both are WHO, both were read in full.
+
+    `SRC-WHO-TRS1044` is the technology-transfer guideline and `SRC-WHO-TRS1019-A3` is the validation
+    one. Swap them on a carryover criterion and every pre-existing guard in this repository stays
+    green - the source resolves, the access grade is a read grade, the provenance is `fact` with a
+    source. Nothing but a guard that knows the two documents apart can see it.
+    """
+    from gen.dataio import load_params, load_rows
+    mutate("parameters", "param_id", "P-CARRYOVER-PPM", source_key="SRC-WHO-TRS1044")
+    params = load_params()
+    row = params["P-CARRYOVER-PPM"]
+    sources = {r["source_key"]: r for r in load_rows("sources")}
+    # Everything the existing guards check still passes, which is the point:
+    assert row["provenance"] == "fact"
+    assert row["source_key"] in sources
+    assert sources[row["source_key"]]["access"] == "full-text-read"
+    # And the phase-5 guard is the only thing that sees it - at build time, not just here.
+    from gen.envelope import criterion_source_offenders, validate
+    offenders = criterion_source_offenders()
+    assert any("P-CARRYOVER-PPM" in o and "SRC-WHO-TRS1044" in o for o in offenders), (
+        "the wrong WHO document must be named explicitly. Got: " + "; ".join(offenders))
+    with pytest.raises(ValueError, match="technology-transfer"):
+        validate()
+
+
+def test_mutation_a_criterion_citing_nothing_that_prints_it_is_caught(mutate):
+    """The other direction of the same guard: a criterion whose citation prints no criterion.
+
+    Dropping the source entirely and leaving the notes behind is the subtler version - the row still
+    READS as sourced, because its notes quote the clause. `test_fact_params_have_sources` catches a
+    blank `source_key` on a `fact` row, so this mutation also clears the notes to get past it and
+    land on the guard that actually checks WHICH document.
+    """
+    from gen.envelope import criterion_source_offenders
+    mutate("parameters", "param_id", "P-CARRYOVER-DOSE-FRAC",
+           source_key="SRC-ICH-Q7", notes="Q-047", scale_system="")
+    offenders = criterion_source_offenders()
+    assert any("P-CARRYOVER-DOSE-FRAC" in o and "prints the" in o for o in offenders), (
+        "a criterion citing a document that does not print it must be caught. Got: "
+        + "; ".join(offenders))
+
+
+def test_mutation_a_range_across_two_carryover_criteria_is_caught(mutate):
+    """10 ppm and 0.1% of dose are ALTERNATIVES under a most-stringent rule, not a band.
+
+    Banding two criteria with different denominators is the `not_a_range` defect in its purest form,
+    and it would render as a window of acceptable carryover that no document permits. The band guard
+    demands an endpoint audit for any range in `parameters.csv`, so this mutation has to be caught
+    even before anyone asks what the two ends mean.
+    """
+    from gen.envelope import unaudited_bands
+    mutate("parameters", "param_id", "P-CARRYOVER-PPM",
+           range_low="0.1", range_high="10", range_kind="evidence")
+    offenders = unaudited_bands()
+    assert any("P-CARRYOVER-PPM" in o for o in offenders), (
+        "a range invented across two different criteria must be caught as an unaudited band. "
+        "Got: " + "; ".join(offenders))
+
+
+def test_the_percent_per_million_branch_was_proved_against_the_old_regex():
+    """`ppm` added to the prose-citation quantity pattern, with the old pattern shown to miss it.
+
+    Phase 3 fixed the same class for `%` and recorded the method: prove the new branch catches
+    something the old one did not, or the addition is decoration. This phase publishes the first ppm
+    criterion in the register (`P-CARRYOVER-PPM`), so an uncited ppm claim in prose became a real
+    hazard rather than a hypothetical one. Measured when it was added: ZERO existing prose lines are
+    newly caught, so the guard closes a class rather than creating work.
+    """
+    import re as _re
+    from gen.test_balance import _QUANTITY
+    old = _re.compile(
+        r"(?<![\w.-])\d+(?:\.\d+)?\s?"
+        r"(?:%|(?:percent|g/L|mg/mL|kDa|Da|kJ/kg|EU/mL|CFU|LMH|mM|°C|kWh|MJ)\b)")
+    for sample in ("no more than 10 ppm of any product", "a limit of 0.5 ppm in rinse water"):
+        assert not old.search(sample), f"the old pattern already matched {sample!r}"
+        assert _QUANTITY.search(sample), f"the new pattern must match {sample!r}"
