@@ -26,9 +26,20 @@ Every numeric value carries a provenance flag, and nothing is invented:
 - <span class="prov-fact">fact</span> — from a cited source (see the [source](registers/sources.md) and its scale/system).
 - <span class="prov-inference">inference</span> — our reasoning or arithmetic, labelled as such.
 - <span class="prov-assumption">assumption</span> — an illustrative placeholder, registered as an [open question](registers/questions.md).
+- <span class="prov-judgement">judgement</span> — an **educated estimate**: a number defended on stated grounds that no document states. Every one of them is on the [estimate census](registers/estimates.md), with its basis and the observation that would show it wrong.
 
 A value we could not source is left **blank** and recorded as a gap, never filled with a
 plausible-looking number.
+
+**Why there are four flags and not three.** `assumption` was covering two unlike things: an
+illustrative placeholder the balance needs in order to run at all, and a bracket somebody built
+from published figures and can defend. Both read as "we made this up", which under-claimed the
+second; calling the second `inference` would have over-claimed, because an inference is derived
+from things that are cited and an estimate is not. The split has a cost that is deliberately paid
+in the data model rather than in prose: **an estimate may not occupy a value column.** Its number
+sits in `est_value`, which the balance does not read, so no estimate can reach a computed figure
+and none can close the question its basis names — a property of the columns, not a rule anyone has
+to remember.
 
 ## Fixed design decisions
 

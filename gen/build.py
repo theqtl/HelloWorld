@@ -6,9 +6,13 @@ docs/process/, and the balance results under docs/balance/. These files are
 generated: edit data/*.csv, not the generated Markdown.
 """
 import os
+import re
 from dataclasses import asdict
 
-from .dataio import load_rows, load_params
+from .dataio import (
+    load_rows, load_params, PROVENANCE_REGISTERS,
+    ESTIMATE_PROVENANCE, ESTIMATE_REGISTERS,
+)
 from .tables import md_table
 from .balance import run_all
 from .flowsheet import render as render_flowsheet
@@ -41,9 +45,18 @@ def gen_registers():
     specs = [
         ("parameters", "registers/parameters.md", "Parameter register",
          "Every numeric input lives here once. `provenance` is one of **fact** "
-         "(from a cited source), **inference** (our reasoning/arithmetic), or "
-         "**assumption** (illustrative placeholder, registered as a gap). "
-         "Blank values are unfilled gaps, never invented. The last column is **joined from "
+         "(from a cited source), **inference** (our reasoning/arithmetic), "
+         "**assumption** (illustrative placeholder, registered as a gap) or **judgement** "
+         "(an educated estimate, defended on stated grounds, which no document states). "
+         "Blank values are unfilled gaps, never invented.\n\n"
+         "**A `judgement` row carries no `value`, and that is structural rather than tidy.** Its "
+         "number is in `est_value`, which `gen/balance.py` does not read - so an estimate cannot "
+         "reach a computed figure, and cannot close the question its `basis` names. `value` reads "
+         "**estimate only** on such a row so the column a reader scans does not show a bare blank; "
+         "`basis` says on what grounds and resolves its own references, and `falsifier` says what "
+         "observation would show the estimate wrong. Both are required, both are guarded, and every "
+         "estimate in the repository is collected on the [estimate census](estimates.md). "
+         "The last column is **joined from "
          "`data/envelopes.csv`** and is not stored here: it says whether a band's two endpoints are "
          "two independent citations or one document wearing two, which a single `source_key` per "
          "row cannot express. `one_source_both_ends` is not a defect - a band may be the honest "
@@ -56,7 +69,12 @@ def gen_registers():
          "Sizing basis, materials of construction (MOC), and turndown per item. "
          "Most sizing is a Tier-2 gap pending the balance inputs.", None),
         ("buffers", "registers/buffers.md", "Buffer & reagent register",
-         "Compositions from cited sources where available; blanks are gaps.", None),
+         "Compositions from cited sources where available; blanks are gaps. A composition is a "
+         "**recipe** and is kept in one row rather than split into one parameter per component, "
+         "which is why this register may carry an educated estimate of its own (`provenance = "
+         "judgement`): a `components` or `ph` cell reading **estimate only** means the row's "
+         "number is in `est_value`, with its `basis` and its `falsifier` beside it. See the "
+         "[estimate census](estimates.md).", None),
         ("utilities", "registers/utilities.md", "Utilities register", "", None),
         ("risks", "registers/risks.md", "Risk register",
          "Sorted view of process, product, purity, and microbial risks.", None),
@@ -100,7 +118,15 @@ def gen_registers():
          "but it is a weaker object than a band spanning two independent studies, and "
          "`one_source_both_ends` says which it is where the number is read. `low_drives` and "
          "`high_drives` name the equipment item, utility or control whose sizing each end sets; "
-         "that is the whole point of bracketing a number rather than picking one.", None),
+         "that is the whole point of bracketing a number rather than picking one.\n\n"
+         "**`endpoint_sourcing` is not `parameters.provenance`, and until slice 4 both columns "
+         "were called `provenance`.** This one says what standing the two *endpoints* have as "
+         "retrieved claims - a statement about the literature. That one says what kind of act "
+         "produced the number *this project carries* - a statement about this project. Eleven of "
+         "these rows read as flat contradictions of the parameter register while the columns "
+         "shared a name, and not one of them was a data error: `ENV-001`'s endpoints really are "
+         "published measurements, and the value `P-BLOCK-PUR` carries really is an assumption. "
+         "The columns were separated rather than reconciled.", None),
         ("couplings", "registers/couplings.md", "Coupling register",
          "A design space is a region, not a box, and the corners of a box are frequently "
          "unreachable together. Each row ties two parameters, states the direction of the tension, "
@@ -133,6 +159,8 @@ def gen_registers():
         rows = load_rows(name)
         if name == "parameters":
             rows = _with_bracket_verdicts(rows)
+        if name in ESTIMATE_REGISTERS:
+            rows = _with_provenance_markers(rows, name)
         body = BANNER + f"# {title}\n\n"
         if intro:
             body += intro + "\n\n"
@@ -168,6 +196,142 @@ def _with_bracket_verdicts(rows):
             r["bracket_verdict (from envelopes.csv)"] = ""
         out.append(r)
     return out
+
+
+#: What a `judgement` row's own number cell says. Markdown, not an HTML chip: the register
+#: tables are pipe tables by decision (`test_md_table_emits_markdown_only`), and the precedent
+#: for injecting a marker into a cell is `_with_bracket_verdicts`, which writes `**no audit**`.
+#: The CSS chips are for hand-written prose, where there is no column to carry the flag.
+ESTIMATE_CELL_MARKER = f"**{ESTIMATE_PROVENANCE}**"
+
+#: What the value column says on an estimate row. It must NOT be a number and must not read as
+#: one: the point is that no value exists, only an estimate that the balance cannot consume.
+VALUE_CELL_MARKER = "**estimate only**"
+
+
+def _with_provenance_markers(rows, register):
+    """Make an educated estimate visible IN THE CELL, not only in the provenance column.
+
+    The acceptance panel's first blocker was that this feature was invisible where numbers are
+    read: the `prov-*` chips existed only in hand-written prose, and the planning note that
+    "adding a value requires no rendering change" was the defect stated as a comfort. A reader
+    scanning the `value` column of the parameter register would have seen a blank on an estimate
+    row - indistinguishable from the unfilled gaps the register intro promises blanks are.
+
+    So two marks, and they say different things:
+
+      * the row's own quantity column (`value`, or `components`/`ph` on a buffer) reads
+        **estimate only** - there is no value here, and the blank is not a gap;
+      * the `est_value` cell reads the number followed by **judgement** - this figure is
+        defended on stated grounds and is not in any document.
+
+    Built as a transform over ROWS, in the shape of `_with_bracket_verdicts` above, so the guard
+    can assert on the transform's RETURN VALUE. It must not assert on the built page: those pages
+    are gitignored and CI runs pytest before `python -m gen.build`, which is the mistake that
+    broke CI once already (see test_every_data_csv_is_published_somewhere).
+    """
+    value_cols = ESTIMATE_REGISTERS[register]
+    out = []
+    for r in rows:
+        r = dict(r)
+        if (r.get("provenance") or "").strip() == ESTIMATE_PROVENANCE:
+            est = (r.get("est_value") or "").strip()
+            if est:
+                r["est_value"] = f"{est} {ESTIMATE_CELL_MARKER}"
+            for col in value_cols:
+                if not (r.get(col) or "").strip():
+                    r[col] = VALUE_CELL_MARKER
+        out.append(r)
+    return out
+
+
+#: The column that NAMES a row, per estimate register, for the census. `parameters` and
+#: `buffers` call it `name`; a scenario's name is its `label`.
+_CENSUS_NAME_COL = {"parameters": "name", "buffers": "name", "scenarios": "label"}
+
+
+def estimate_census():
+    """Every educated estimate in the repository, one row each, computed across the registers.
+
+    The user's decision was "marker in the cell AND a generated census page, not a CSS chip
+    alone", and the census is the half that makes the feature auditable rather than merely
+    visible. Two registers carry estimates and have a register page; `scenarios` has neither -
+    it is published through the balance results, which show `label` and nothing else. So a
+    per-page marker alone would leave a class of estimate with no page that shows its basis.
+    This function is the total view, derived from the registers rather than listed.
+    """
+    id_cols = dict(PROVENANCE_REGISTERS)
+    rows = []
+    for register in sorted(ESTIMATE_REGISTERS):
+        for r in load_rows(register):
+            if (r.get("provenance") or "").strip() != ESTIMATE_PROVENANCE:
+                continue
+            units = (r.get("units") or "").strip()
+            est = (r.get("est_value") or "").strip()
+            rows.append({
+                "Register": register,
+                "Row": r.get(id_cols[register], ""),
+                "What is estimated": (r.get(_CENSUS_NAME_COL[register]) or "").strip(),
+                "Estimate": f"{est} {units}".strip(),
+                "Basis": (r.get("basis") or "").strip(),
+                "Falsifier": (r.get("falsifier") or "").strip(),
+                "Leaves open": ", ".join(sorted(set(re.findall(r"\bQ-\d{3}",
+                                                              r.get("basis") or "")))),
+            })
+    return rows
+
+
+def render_estimates():
+    """The census page. Generated, so it cannot drift from the registers it counts."""
+    rows = estimate_census()
+    body = BANNER + "# Estimate census\n\n"
+    body += (
+        "Every number in this repository that is an **educated estimate** - `provenance = "
+        f"{ESTIMATE_PROVENANCE}` - is listed here, collected from the "
+        f"{len(ESTIMATE_REGISTERS)} registers where one is legal "
+        f"({', '.join('`' + n + '`' for n in sorted(ESTIMATE_REGISTERS))}). "
+        "The count is computed from the data, so this page cannot fall behind the registers.\n\n")
+    body += (
+        "**Why the fourth provenance exists.** `assumption` was covering two unlike things. "
+        "`P-EVAP-T-BOIL` = 50 °C is an illustrative placeholder the balance needs in order to run "
+        "at all; a bracket built from published conversions by someone who can say how is a "
+        "different object, and labelling both the same told a reader the second was as arbitrary "
+        "as the first. Calling either `inference` would have over-claimed in the other direction: "
+        "an inference is derived from things that are cited, and an estimate is not.\n\n"
+        "**What an estimate may not do.** It may not occupy the register's own value column. The "
+        "number lives in `est_value`, and `gen/balance.py` reads `value` - so an estimate is "
+        "*physically unable* to reach a computed figure, and cannot close the question its basis "
+        "names. That is a property of the columns rather than a rule anyone has to remember. Every "
+        "estimate states a **basis** whose `SRC-`/`P-`/`EQ-`/`Q-` references must resolve, and "
+        "which may not rest on a source graded `abstract-only`, `record-only` or `not-retrieved`; "
+        "and a **falsifier**, the observation that would show it wrong. Both are required and both "
+        "are guarded.\n\n")
+    if not rows:
+        body += (
+            "!!! note \"No estimate has been made yet, and that is the honest state\"\n"
+            "    The vocabulary, the three columns and the guards are in place; no row uses them. "
+            "The machinery landed before any number rested on it, so it could be reviewed on its "
+            "own - and so that the first estimate to arrive has something to be checked against "
+            "rather than a rule invented alongside it.\n\n")
+        body += "_No rows._\n"
+        return body
+    # The complement of the note above, and computed for the same reason: the page must not be
+    # able to say how many estimates exist, or which questions they leave open, from a number
+    # somebody typed. Phase 4 is where this branch first ran at all.
+    registers = sorted({r["Register"] for r in rows})
+    leaves = sorted({q for r in rows for q in r["Leaves open"].split(", ") if q})
+    body += (
+        f"!!! note \"{len(rows)} estimate{'s' if len(rows) != 1 else ''} on this page, and "
+        f"{len(leaves)} question{'s' if len(leaves) != 1 else ''} still open behind "
+        f"{'them' if len(rows) != 1 else 'it'}\"\n"
+        f"    The rows live in {', '.join('`' + n + '`' for n in registers)}. Every one names the "
+        f"question its basis does **not** answer - {', '.join(leaves)} - and none of those "
+        f"questions is closed by the estimate standing on it: that is what the `Leaves open` "
+        f"column is for, and a `resolved` question cited there fails the build. Read an estimate "
+        f"as this project's defended position, not as a measurement, and read the falsifier as "
+        f"the experiment that would settle it.\n\n")
+    body += md_table(rows)
+    return body
 
 
 def gen_streams_on_process():
@@ -211,6 +375,52 @@ def _excipient_sensitivity():
     return scn["label"], rows
 
 
+def _range_to_steel():
+    """The two registered bands that decide plant size, resolved into vessel and utility litres.
+
+    THE TABLE THE PLAN ASKED TO BE PUBLISHED FROM THE MODEL SO IT CANNOT DRIFT - the same reason
+    `_excipient_sensitivity` exists, and the same deep-copy idiom: the parameter dict is copied per
+    case, nothing is written to `data/`, and the figures are whatever gen/balance.py computes today.
+
+    Two bands, chosen because they are the ones that move steel rather than duty:
+
+      * `P-CONC-LIG` - ligation concentration. Its low end is not a bigger tank, it is a DIFFERENT
+        PLANT: the Mid scenario needs a single vessel of tens of thousands of litres, which is not
+        something you buy. So this band decides whether the concept exists at the middle demand, not
+        how big one item is.
+      * `P-DF-DIAVOL` - diafiltration diavolumes. It moves buffer and clean water and leaves the
+        retentate alone, which is itself informative: the retentate is back-calculated from demand
+        through the downstream yields, so upstream losses cannot change it.
+
+    Both are `assumption` placeholders (Q-017, Q-020), so the SPREAD is the finding and no column
+    here is a design basis.
+    """
+    from .balance import run_scenario
+    params = load_params()
+    scns = load_rows("scenarios")
+    rows = []
+    for pid, label, cases, fields in (
+        ("P-CONC-LIG", "Ligation concentration (g/L)", ("5", "15", "20"),
+         (("ligation_volume_L", "Ligation batch volume (L)"),)),
+        ("P-DF-DIAVOL", "Diafiltration diavolumes", ("4", "7", "20"),
+         (("df_buffer_volume_L", "Diafiltration buffer (L)"),
+          ("wfi_approx_L", "Clean water demand (L)"))),
+    ):
+        registered = (params[pid].get("value") or "").strip()
+        for case in cases:
+            p = {k: dict(v) for k, v in params.items()}
+            p[pid]["value"] = case
+            res = [run_scenario(s, p) for s in scns]
+            for field, fl in fields:
+                row = {"Band": label,
+                       "Value": case + (" (registered)" if case == registered else ""),
+                       "Drives": fl}
+                for s, r in zip(scns, res):
+                    row[s["label"]] = _fmt(getattr(r, field))
+                rows.append(row)
+    return rows
+
+
 def render_balance():
     results = [asdict(r) for r in run_all()]
     body = BANNER + "# Mass & energy balance (results)\n\n"
@@ -219,7 +429,10 @@ def render_balance():
              "flagged **assumption** (illustrative placeholders registered as gaps). They are "
              "*not* validated values. Change `data/parameters.csv` and `data/scenarios.csv` and "
              "re-run `python -m gen.build`; every figure updates. The throughput scenarios are "
-             "illustrative (see Q-002).\n\n")
+             "illustrative (see Q-002). No figure here rests on an **educated estimate**: an "
+             "estimate is carried in `est_value` and the balance reads `value`, so it cannot "
+             "reach this page at all — see the "
+             "[estimate census](../registers/estimates.md).\n\n")
 
     # Per-scenario key results as a comparison table
     keys = [
@@ -239,6 +452,9 @@ def render_balance():
         ("dryer_feed_mass_kg", "Spray-dryer feed (kg)"),
         ("dryer_water_evaporated_kg", "Dryer water evaporated (kg)"),
         ("drying_gas_kg", "Drying gas required, derived (kg)"),
+        ("ufdf_holdup_volume_L", "UF/DF hold-up volume implied by the loss fraction (L)"),
+        ("cip_circuits", "CIP circuits, derived from the equipment register"),
+        ("cip_water_approx_L", "Cleaning water, caustic wash only (L)"),
         ("wfi_approx_L", "Clean water demand approx (L)"),
         ("aqueous_waste_approx_L", "Aqueous waste approx (L)"),
         ("evap_duty_MJ", "Evaporation duty, latent minimum (MJ)"),
@@ -249,6 +465,7 @@ def render_balance():
         ("dryer_feed_sensible_MJ", "Dryer feed sensible heat (MJ)"),
         ("dryer_process_duty_MJ", "Dryer process duty, what drying requires (MJ)"),
         ("dryer_heater_duty_MJ", "Dryer heater duty, inlet gas from ambient (MJ)"),
+        ("anneal_topfill_duty_MJ", "Ligation anneal jacket duty at top fill (MJ)"),
     ]
     header = ["Quantity"] + [r["label"] for r in results]
     lines = ["| " + " | ".join(header) + " |",
@@ -269,6 +486,53 @@ def render_balance():
              "is **derived** from the process duty rather than assumed, so no gas:water ratio is "
              "carried. Operating temperatures are assumptions (Q-045, Q-046); MVR recovers most of "
              "the evaporator's latent load as recompressed vapour.\n\n")
+
+    body += ("\n## From a registered band to steel\n\n"
+             "Two of the bands in the parameter register decide plant SIZE rather than duty. "
+             "Holding everything else at its placeholder and moving one at a time, computed here "
+             "rather than quoted:\n\n")
+    body += md_table(_range_to_steel())
+    body += ("\nThe finding is not the width, it is what the bottom of the concentration envelope "
+             "asks for: at 5 g/L the Mid scenario needs a single ligation vessel of over thirty "
+             "thousand litres, which is not a vessel anyone buys — so `P-CONC-LIG` (Q-017) decides "
+             "whether this plant can be built at that demand, not merely how large one item is. "
+             "Diavolumes behave differently and the difference is worth reading: `P-DF-DIAVOL` "
+             "(Q-020) triples the diafiltration buffer and leaves the **UF retentate volume "
+             "unchanged**, because the retentate is back-calculated from DS demand through the "
+             "downstream yields — so a loss upstream of it cannot move it. Both rows are "
+             "`assumption` placeholders, so the spread is the result and no column is a basis.\n\n"
+             "## Cleaning, which used to be zero litres\n\n"
+             "The clean-water figure above now contains cleaning. Until this slice it was "
+             "`diafiltration buffer + ligation volume` and nothing else, so `U06-CIP` sat in the "
+             "equipment register contributing to no number at all. The circuit count is **derived** "
+             "from the equipment register rather than written down — every unit operation is wetted "
+             "and therefore cleaned, which `cip_coverage_offenders()` proves — so adding a unit "
+             "operation raises the cleaning demand without anyone remembering to.\n\n"
+             "**It is a floor, not an estimate, for three stated reasons** (all Q-076). "
+             "`P-CIP-WASH-VOL` carries 400 L per circuit per wash from a facility whose circuits "
+             "average 200 L of hold-up, while the ligation vessel here is thousands of litres. Only "
+             "the caustic wash is counted, because caustic is the only chemistry registered "
+             "(`BUF-CIP`, `BUF-MEMBRANE-CLEAN`) while the source facility runs caustic *and* acid. "
+             "And **no rinse is counted at all**, although PIC/S §7.9.1 requires the caustic itself "
+             "be removed to a defined limit and WHO permits a carryover limit expressed *in rinse "
+             "water as ppm* — which makes the rinse both mandatory and the medium the limit is "
+             "measured in (`P-CARRYOVER-PPM`, SRC-PICS-PI006-3, SRC-WHO-TRS1019-A3).\n\n"
+             "**There is no CIP steam duty here, and that is the fourth provenance working.** The "
+             "only wash temperature in the register is `BUF-CIP`\u2019s *ambient to 50 °C*, which is "
+             "an **educated estimate** and therefore lives in `est_value`; every read in "
+             "`gen/balance.py` goes through `param_value`, which reads `value`. So the estimate is "
+             "*physically unable* to reach a duty, and the honest outcome is a missing number with a "
+             "named reason (Q-074) rather than a duty resting on a judgement. Registering an "
+             "`assumption` placeholder for the same temperature would give one figure two homes. "
+             "The anneal jacket duty above is the steam load that *could* be computed, because "
+             "every input to it is a registered value.\n\n"
+             "**The hold-up row is the loss fraction made visible.** `P-UFDF-HOLDUP-LOSS` is a "
+             "single fraction, and the same 0.10 stands for 23 L of unrecoverable hardware volume at "
+             "the low scenario and four times that at the high one. Its own source measured 30–40% "
+             "at 20–80 mL, so the fraction is scale-dependent and carrying one value across the "
+             "scenarios is a modelling choice (Q-036). No membrane area is published from it: that "
+             "would need a specific hold-up in L/m², and no such figure is registered anywhere "
+             "here.\n\n")
 
     label, sens = _excipient_sensitivity()
     body += ("## Where evaporation earns its place\n\n"
@@ -292,6 +556,7 @@ def main():
     written = []
     written += gen_registers()
     written.append(gen_streams_on_process())
+    written.append(_write("registers/estimates.md", render_estimates()))
     written.append(_write("balance/results.md", render_balance()))
     written.append(_write("balance/impurities.md", render_impurities()))
     written.append(_write("process/controls.md", render_controls()))

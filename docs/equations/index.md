@@ -74,7 +74,11 @@ N = -\frac{\ln(C/C_0)}{\sigma}
 S = \frac{C_{\text{permeate}}}{C_{\text{retentate}}}, \qquad R = 1 - S
 \]
 
-- MWCO is conventionally the molecular weight at 90% rejection (\(S = 0.1\)).
+- MWCO is conventionally the molecular weight at 90% rejection (\(S = 0.1\)) —
+  verbatim, *"the MW of the organic tracer that is 90 % retained by the membrane"*
+  (<span class="prov-fact">fact</span>, definition;
+  [SRC-MWCO-REVIEW-2024](../registers/sources.md)). It is a **convention, not a measurement**,
+  and real membranes have broad pore-size distributions, so the cut-off is blurred.
 - **Cut-off selection points below the product mass, not above it.** An oligonucleotide should be
   **at least twice the reported membrane cut-off** for robust retention
   (<span class="prov-fact">fact</span>, single-strand antisense, abstract;

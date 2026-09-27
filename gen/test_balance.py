@@ -1,13 +1,26 @@
 """Integrity + balance tests. Run: python -m pytest gen/ -q"""
 import os
-from gen.dataio import load_rows, load_params, param_value
+from dataclasses import fields
+
+import pytest
+
+from gen.dataio import (
+    load_rows, load_params, param_value,
+    PROVENANCE_VOCAB, PROVENANCE_REGISTERS, ENDPOINT_SOURCING, provenance_offenders,
+    risk_unit_ops, RISK_UNIT_OPS_UNSCOPED, RISK_CATEGORIES,
+    ESTIMATE_PROVENANCE, ESTIMATE_COLUMNS, ESTIMATE_REGISTERS,
+    QUESTION_STATUS, ACCESS_GRADES_UNREAD, question_status_offenders,
+)
 from gen.balance import run_all, purity_floor
 
 
 def test_all_source_keys_resolve():
     sources = {r["source_key"] for r in load_rows("sources")}
     # parameters, risks, impurities, controls and instruments reference source_key; blanks allowed
-    for name in ("parameters", "risks", "impurities", "controls", "instruments"):
+    # buffers was absent until slice 4, so a typo'd source_key in a buffer row resolved
+    # against nothing in CI - the only thing that would have caught it reads the RENDERED
+    # page, which CI never builds before pytest.
+    for name in ("parameters", "risks", "impurities", "controls", "instruments", "buffers"):
         for r in load_rows(name):
             key = (r.get("source_key") or "").strip()
             if key:
@@ -32,10 +45,69 @@ def test_assumption_params_reference_a_question():
 
 
 def test_no_value_without_provenance():
+    """A written value must declare how it was arrived at.
+
+    The vocabulary is IMPORTED, not re-listed. This guard used to spell out
+    `("fact", "inference", "assumption")` inline, which meant adding a fourth provenance
+    required finding and editing every copy of the list - and a copy that was missed would
+    not fail, it would refuse a legitimate value.
+
+    Note what this guard does NOT do, because it was read as doing it: it polices the
+    VOCABULARY of a row that has a value. It says nothing about whether the row should have
+    a value at all. `value_written_where_refused` is the guard for that.
+    """
     for r in load_rows("parameters"):
         if (r.get("value") or "").strip():
-            assert r["provenance"] in ("fact", "inference", "assumption"), \
+            assert r["provenance"] in PROVENANCE_VOCAB, \
                 f"{r['param_id']} has a value but bad provenance {r['provenance']!r}"
+
+
+def test_provenance_is_a_controlled_vocabulary_in_every_register():
+    """`provenance` is enforced on all eleven registers that carry it, and
+    `endpoint_sourcing` on the twelfth.
+
+    Before slice 4 it was enforced on three - `parameters` (and there only when the row had a
+    non-blank `value`), `controls` and `instruments`. `buffers`, `couplings`, `equipment`,
+    `impurities`, `infoneeds`, `scenarios`, `utilities` and `verdicts` were unchecked, so a
+    misspelling in any of them rendered as a confident statement about how well a number is
+    known. That mattered most for `buffers`, which is where slice 4's own estimates land.
+    """
+    offenders = provenance_offenders()
+    assert not offenders, "provenance vocabulary violation(s):\n  " + "\n  ".join(offenders)
+
+
+def test_the_two_provenance_axes_are_separate_columns():
+    """`envelopes` must not carry `provenance`, and must carry `endpoint_sourcing`.
+
+    The two columns were both called `provenance` and answered different questions: whether the
+    ENDPOINTS are published figures, versus what kind of act produced the number THIS PROJECT
+    carries. Eleven of seventeen envelope rows consequently read as flat contradictions of
+    `parameters.csv` - every one of them in the same direction, and not one of them a data error.
+    `P-BLOCK-PUR` is the case that shows why reconciling the data would have been wrong: ENV-001's
+    endpoints really are published measurements and the value the parameter carries really is an
+    assumption.
+
+    This guard is the rename made permanent. Re-adding a `provenance` column to `envelopes.csv`
+    would recreate the polysemy silently, because both spellings would validate.
+    """
+    header = load_rows("envelopes")[0].keys()
+    assert "provenance" not in header, (
+        "envelopes.csv carries a `provenance` column again. That column is `endpoint_sourcing`: "
+        "it says what standing the two ENDPOINTS have as retrieved claims, which is not the "
+        "question `parameters.provenance` answers"
+    )
+    assert "endpoint_sourcing" in header, "envelopes.csv is missing endpoint_sourcing"
+    assert not (PROVENANCE_REGISTERS and
+                any(name == "envelopes" for name, _ in PROVENANCE_REGISTERS)), (
+        "envelopes must not be in PROVENANCE_REGISTERS - it carries the other axis"
+    )
+    # The two vocabularies share tokens today. They are separate constants so that a value
+    # added to one axis does not become legal on the other, which is the whole point of the
+    # rename; if they were the same object, phase 2's fourth provenance would silently become
+    # a legal endpoint verdict.
+    assert PROVENANCE_VOCAB is not ENDPOINT_SOURCING, (
+        "the two axes must be two constants, or widening one widens the other"
+    )
 
 
 def test_questions_referenced_exist():
@@ -487,8 +559,25 @@ def test_every_csv_row_has_the_right_number_of_fields():
 # caught nearly every citation defect found in the 2026-09-17 audit: an unsourced RNA recovery
 # figure, a vendor titre that existed nowhere, a concentration ceiling belonging to another
 # paper, a film thickness absent from both cited pages.
+# `%` SITS OUTSIDE THE TRAILING `\b`, AND THAT IS THE WHOLE POINT OF THE SHAPE.
+# For most of this guard's life the alternation read `(?:%|percent|g/L|...)\b`, with one word
+# boundary after the whole group. `%` is not a word character, so `\b` after it demanded a WORD
+# character next - and `0.5%`, `0.5 %.` and `0.5% of` therefore all failed to match. The guard
+# had never policed a percentage in prose at all, for every percentage that ends a clause.
+# Measured when it was corrected: SEVEN lines across three pages were quantities under the
+# corrected pattern, carried no citation in their window, and passed. One of them
+# (findings/filtration.md, the internal-limited purity) was carrying a block-purity band that
+# `Q-011` had already retracted, so the hole was hiding a live contradiction and not just a
+# formatting miss. Keep `%` on its own branch with no boundary assertion; the word-spelled units
+# keep theirs, because `10 mMol` must not match `mM`.
 _QUANTITY = re.compile(
-    r"(?<![\w.-])\d+(?:\.\d+)?\s?(?:%|percent|g/L|mg/mL|kDa|Da|kJ/kg|EU/mL|CFU|LMH|mM|°C|kWh|MJ)\b"
+    r"(?<![\w.-])\d+(?:\.\d+)?\s?"
+    # `ppm` added in slice 4 phase 5, when P-CARRYOVER-PPM made it the register's first
+    # parts-per-million criterion. Measured before adding: zero existing prose lines are
+    # newly caught, so this closes a class rather than creating work - and the branch is
+    # proved against the old pattern in gen/test_mutations.py, the method phase 3 used for
+    # the `%` hole.
+    r"(?:%|(?:percent|ppm|g/L|mg/mL|kDa|Da|kJ/kg|EU/mL|CFU|LMH|mM|°C|kWh|MJ)\b)"
 )
 _CITATION = re.compile(
     r"SRC-[A-Z0-9-]+|\bP-[A-Z0-9-]{3,}|\bEQ-[A-Z]+|\bQ-\d{3}|\bR-\d{3}"
@@ -1060,26 +1149,34 @@ def test_impurity_gaps_carry_a_registered_reference():
 # (a value tuned until a test passed).
 # ---------------------------------------------------------------------------
 
-#: Controlled vocabulary for risks.csv. Neither column was enforced before, so a new
-#: risk row could ship an invalid unit_op or category silently and simply never be
-#: found by anyone filtering the register.
-RISK_UNIT_OPS = {"All", "Cleaning", "Evaporation", "Filtration", "Ligation",
-                 "Spray drying", "UF/DF"}
-RISK_CATEGORIES = {"formulation", "microbial", "process", "product", "purity", "quality"}
+# RISK_CATEGORIES lives in gen/dataio.py beside risk_unit_ops() and both are imported at the top of
+# this module. They were defined HERE, which made a test file the owner of a data vocabulary:
+# nothing raised at build time, and the only enforcement was a guard checking the register
+# against a list that lived beside it. Importing is the point - a guard that re-lists its own
+# expectation proves only that someone typed the same thing twice.
 
 
 def test_risk_unit_op_and_category_are_a_controlled_vocabulary():
     """A risk filed under a misspelt unit operation or category is invisible to anyone
-    filtering the register, and nothing detected that before this guard."""
+    filtering the register, and nothing detected that before this guard.
+
+    The unit-operation half is now checked against a vocabulary DERIVED from equipment.csv
+    rather than typed out: `risk_unit_ops()` is every `equip_id` plus `All`. That is what
+    phase 4 changed, and it closes a hole a hardcoded set could not - `Utilities` was simply
+    absent from the old literal, so a risk against the buffer-prep and CIP utilities had
+    nowhere legal to go, and two of the values it did list (`Ligation`, `UF/DF`) were spellings
+    that resolved to no register anywhere.
+    """
+    vocab = risk_unit_ops()
     offenders = []
     for r in load_rows("risks"):
-        if r["unit_op"] not in RISK_UNIT_OPS:
+        if r["unit_op"] not in vocab:
             offenders.append(f"{r['risk_id']}: unit_op {r['unit_op']!r}")
         if r["category"] not in RISK_CATEGORIES:
             offenders.append(f"{r['risk_id']}: category {r['category']!r}")
     assert not offenders, (
         f"risks.csv value(s) outside the vocabulary "
-        f"(unit_op {sorted(RISK_UNIT_OPS)}, category {sorted(RISK_CATEGORIES)}): "
+        f"(unit_op {sorted(vocab)}, category {sorted(RISK_CATEGORIES)}): "
         + "; ".join(offenders)
     )
 
@@ -1246,9 +1343,6 @@ def test_the_declared_tag_scheme_does_not_claim_to_be_isa():
 
 # --- B/E. The control matrix, and referential integrity across both new files ---
 
-PROVENANCE_VOCAB = {"fact", "inference", "assumption"}
-
-
 def _refs(value):
     """A reference cell holds one id, or several separated by ';'.
 
@@ -1261,8 +1355,14 @@ def _refs(value):
 
 
 def _equation_ids():
-    text = open(os.path.join(ROOT, "docs", "equations", "index.md"), encoding="utf-8").read()
-    return set(re.findall(r"^##\s*(EQ-[A-Z]+)", text, re.M))
+    """Delegated to gen/envelope.py, which is where the universe now lives.
+
+    It had a second consumer as of slice 4 - an estimate's `basis` may cite an `EQ-` id and the
+    reference has to resolve - and two copies of "which equations exist" is how the control
+    register and the estimate census would start disagreeing about it.
+    """
+    from gen.envelope import equation_ids
+    return equation_ids()
 
 
 def test_control_types_are_a_controlled_vocabulary():
@@ -1816,10 +1916,16 @@ def test_the_pfd_does_not_claim_a_standard_symbol_set():
 def test_csv_line_endings_match_the_declared_convention():
     """Line endings are a convention here, and an editing tool will silently rewrite them.
 
-    Ten of the twelve CSVs are CRLF and two are LF. Nothing enforced it, so a generated or
-    rewritten file could flip wholesale and show as a diff on every line - which buries the one
-    row that actually changed, and is exactly how a real edit gets reviewed without being read.
-    The rule is per-file, taken from the file itself: every line ends the same way.
+    FOURTEEN of the sixteen CSVs are CRLF and two are LF. The docstring said "ten of the twelve"
+    from slice 2 until slice 4 phase 5 and was simply out of date - four registers were added
+    underneath it - which is its own small lesson: a comment stating a count is a claim, and this
+    one was wrong in a file whose whole job is refusing unchecked claims. Measured, not counted by
+    eye: 14 CRLF and 2 LF across 16 files.
+
+    Nothing enforced the convention, so a generated or rewritten file could flip wholesale and show
+    as a diff on every line - which buries the one row that actually changed, and is exactly how a
+    real edit gets reviewed without being read. The rule is per-file, taken from the file itself:
+    every line ends the same way.
     """
     lf_only = {"streams.csv", "scenarios.csv"}
     offenders = []
@@ -1834,7 +1940,7 @@ def test_csv_line_endings_match_the_declared_convention():
         elif crs != lines:
             offenders.append(f"{name}: {crs} CR byte(s) for {lines} line(s) - mixed endings")
     assert not offenders, (
-        "CSV line-ending convention broken (10 files CRLF, streams.csv and scenarios.csv LF); "
+        "CSV line-ending convention broken (14 files CRLF, streams.csv and scenarios.csv LF); "
         "re-save preserving the file's own endings: " + "; ".join(offenders)
     )
 
@@ -1972,6 +2078,27 @@ def test_a_refused_bracket_is_not_written_as_a_range():
     assert not offenders, (
         "parameter(s) carrying a range that envelopes.csv rules is not one; blank the range and "
         "register the question instead: " + "; ".join(offenders)
+    )
+
+
+def test_a_refused_bracket_is_not_written_as_a_value_either():
+    """The other half of the standing rule, and the half that was missing.
+
+    Its sibling above polices the BAND. Nothing policed the POINT, so the register's most carefully
+    argued deliberate blank - `P-LIG-SEG-CONC`, whose own note says "Value deliberately BLANK and
+    DELIBERATELY NO RANGE" because its low end is a demonstrated success and its high end a reported
+    failure - could be filled with a fabricated number and every gate stayed green. That was proved
+    by reproduction rather than argued: see the mutation case of the same name.
+
+    `P-HBEL-DS` (:840) and `P-LIG-ENZ-LOAD`/`P-ENZ-CLEARANCE-LRV` (:1473) each already have a guard
+    naming them and asserting a blank value. This one is derived from the envelope register instead,
+    so it covers any future refused bracket without anyone remembering to add a row to a list.
+    """
+    from gen.envelope import value_written_where_refused
+    offenders = value_written_where_refused()
+    assert not offenders, (
+        "parameter(s) carrying a value where envelopes.csv rules the span is not a range; blank it "
+        "and leave the question registered: " + "; ".join(offenders)
     )
 
 
@@ -2184,6 +2311,31 @@ def test_every_page_is_in_the_nav_and_every_nav_entry_is_a_real_page():
         + ", ".join(dead))
 
 
+def test_every_generated_page_is_gitignored():
+    """A generated page committed to the repository is a build artefact in the history.
+
+    .gitignore ENUMERATES the generated pages one by one rather than matching a pattern, so adding
+    a page to gen/build.py and forgetting the line leaves it tracked - and it then shows up as a
+    diff on every build, which buries the data change that caused it. That is the same
+    review-by-not-reading failure the CSV line-ending guard exists to stop.
+
+    Found by walking into it: slice 4's census page was generated, wired, navigated and linked, and
+    `git status` reported it as a new untracked file. Nothing related the set of generated pages to
+    the ignore list, which is the one relation that catches it.
+
+    Derived from `_generated_pages()` rather than from a second list, for the reason
+    test_every_data_csv_is_published_somewhere gives about enumerations. The per-unit SVGs are
+    deliberately NOT covered: they are committed on purpose so a byte-drift test can compare
+    against them, and `_generated_pages()` returns Markdown only.
+    """
+    ignored = {l.strip() for l in open(os.path.join(ROOT, ".gitignore"), encoding="utf-8")
+               if l.strip() and not l.startswith("#")}
+    missing = sorted(p for p in _generated_pages() if "docs/" + p not in ignored)
+    assert not missing, (
+        "these pages are generated by gen/build.py and not listed in .gitignore, so they would be "
+        "committed as build artefacts: " + ", ".join("docs/" + p for p in missing))
+
+
 def test_every_generated_page_is_linked_from_a_hand_written_page():
     """The sidebar is not the only way in, and for a generated page it is the weakest one.
 
@@ -2231,3 +2383,570 @@ def test_the_access_legend_covers_the_whole_vocabulary():
     assert not (legend - expected), (
         "the reading-list legend explains labels that are not in ACCESS_VOCAB, so it describes a "
         "vocabulary the register does not use: " + ", ".join(sorted(legend - expected)))
+
+
+# ---------------------------------------------------------------------------
+# Tier-3 slice 4 phase 2: engineering judgement as a labelled provenance.
+#
+# `assumption` was one word over two unlike things - an illustrative placeholder the balance
+# needs in order to run at all, and a bracket somebody built from published figures and can
+# defend. Splitting them is only an improvement if the second label is harder to earn than the
+# first, so every obligation below is enforced rather than described:
+#
+#   * an estimate may not occupy a value column, which is what makes gen/balance.py unable to
+#     consume one - a property of columns, not a rule anyone remembers;
+#   * `basis` must resolve its own references and may not rest on a document nobody read;
+#   * `falsifier` must name the observation that would refute the estimate;
+#   * the question the estimate leaves open must still be open;
+#   * and it must be VISIBLE where the number is read. The acceptance panel's first blocker was
+#     that the `prov-*` chips existed only in hand-written prose, so a reader of the parameter
+#     register would have seen an estimate row as a bare blank.
+# ---------------------------------------------------------------------------
+
+def test_an_educated_estimate_carries_its_obligations():
+    """One call, because gen/envelope.py reports every problem rather than the first.
+
+    This is the guard the whole fourth provenance rests on. Without it `judgement` is a nicer word
+    for `assumption`, available for free, and the split makes the register worse rather than better
+    - a reader would have a label that promises a defence with nothing behind it.
+    """
+    from gen.envelope import estimate_offenders
+    offenders = estimate_offenders()
+    assert not offenders, (
+        "educated estimate(s) that do not meet the obligations of the fourth provenance:\n  "
+        + "\n  ".join(offenders))
+
+
+def test_question_status_is_a_controlled_vocabulary():
+    """`questions.status` was free text, and slice 4 made it load-bearing.
+
+    An estimate has to name the question it leaves open, and that obligation is empty if the
+    question's state cannot be read mechanically: `open`, `Open`, `still open` and `opne` would all
+    have satisfied a non-blank check while only one of them can be compared against anything.
+    """
+    offenders = question_status_offenders()
+    assert not offenders, "question status vocabulary violation(s):\n  " + "\n  ".join(offenders)
+
+
+#: The modules that turn a register row into a number. If none of them reads `est_value`, an
+#: educated estimate cannot reach a computed figure - and that is the whole structural claim of
+#: the fourth provenance. `gen/dataio.py` is in this list and it is the one that matters most:
+#: `param_value` is the accessor every consumer goes through, so a fallback to `est_value` THERE
+#: would hand an estimate to the balance, the impurity overlay and the envelope page at once,
+#: while gen/balance.py itself stayed clean. A guard scoped to the balance would not have seen it.
+_NUMERIC_READERS = ("dataio.py", "balance.py")
+
+
+def test_no_numeric_reader_consumes_an_estimate():
+    """The structural claim, checked against the code rather than trusted.
+
+    "An estimate never closes its question" is only structural while the numeric path reads `value`
+    and nothing else. One `row.get("est_value")` in `param_value` and the property silently becomes
+    a convention - and a convention is what this slice exists to replace.
+
+    Checked by ABSENCE, which is a weak shape of test in general and the right one here: the claim
+    *is* an absence. Comment lines are stripped first, so explaining the property in a comment
+    cannot fail the guard that enforces it - the same carve-out reasoning as the sign-off sweep's
+    negation list, and for the same reason: a guard that refuses its own explanation creates
+    pressure to delete the explanation.
+    """
+    offenders = []
+    for name in _NUMERIC_READERS:
+        src = open(os.path.join(ROOT, "gen", name), encoding="utf-8").read()
+        body = "\n".join(l for l in src.split("\n") if not l.strip().startswith("#"))
+        for shape in ('["est_value"]', "['est_value']", '.get("est_value")', ".get('est_value')"):
+            if shape in body:
+                offenders.append(f"gen/{name} reads est_value ({shape})")
+    assert not offenders, (
+        "an educated estimate must be unable to reach a computed figure, and that is a property of "
+        "which column these modules read: " + "; ".join(offenders))
+
+
+def test_an_estimate_is_marked_in_the_cell_where_the_number_is_read():
+    """The panel's first blocker, made mechanical: the feature must be visible, not merely present.
+
+    Asserted over the TRANSFORM'S RETURN VALUE and never over the built page. Those pages are
+    gitignored and CI runs pytest before `python -m gen.build`, so a test that reads docs/ is
+    testing the order of the last two commands somebody ran - the mistake that broke CI once (see
+    test_every_data_csv_is_published_somewhere).
+
+    Both directions. A missing marker hides an estimate among the gaps; a marker on a row that is
+    not an estimate claims a defence that was never written.
+    """
+    from gen.build import (_with_provenance_markers, ESTIMATE_CELL_MARKER, VALUE_CELL_MARKER)
+    id_cols = dict(PROVENANCE_REGISTERS)
+    offenders = []
+    for register, value_cols in sorted(ESTIMATE_REGISTERS.items()):
+        for r in _with_provenance_markers(load_rows(register), register):
+            rid = r[id_cols[register]]
+            est = r.get("est_value") or ""
+            if (r.get("provenance") or "").strip() == ESTIMATE_PROVENANCE:
+                if ESTIMATE_CELL_MARKER not in est:
+                    offenders.append(f"{register} {rid}: est_value {est!r} carries no "
+                                     f"{ESTIMATE_CELL_MARKER} marker")
+                for col in value_cols:
+                    if (r.get(col) or "").strip() != VALUE_CELL_MARKER:
+                        offenders.append(f"{register} {rid}: {col} reads {r.get(col)!r}, not "
+                                         f"{VALUE_CELL_MARKER} - an estimate row's value column "
+                                         f"must not render as an unfilled gap")
+            else:
+                for col in ("est_value",) + tuple(value_cols):
+                    cell = r.get(col) or ""
+                    if ESTIMATE_CELL_MARKER in cell or VALUE_CELL_MARKER in cell:
+                        offenders.append(f"{register} {rid}: {col} carries an estimate marker on a "
+                                         f"{r.get('provenance')!r} row")
+    assert not offenders, "provenance marker(s) wrong in the cell:\n  " + "\n  ".join(offenders)
+
+
+def test_the_marker_transform_is_wired_into_every_estimate_register():
+    """A transform nothing calls is dead code that a guard can still prove correct.
+
+    Read from gen/build.py's source for the same reason test_every_data_csv_is_published_somewhere
+    does: the evidence has to be the generator, because the pages are not on disk under CI.
+    """
+    src = open(os.path.join(ROOT, "gen", "build.py"), encoding="utf-8").read()
+    assert re.search(r"if name in ESTIMATE_REGISTERS:\s*\n\s*rows = _with_provenance_markers\("
+                     r"rows, name\)", src), (
+        "gen_registers() must apply _with_provenance_markers to every register in "
+        "ESTIMATE_REGISTERS, keyed off the constant rather than off a list of names - otherwise a "
+        "register added to the constant renders its estimates unmarked")
+
+
+def test_every_estimate_reaches_the_census():
+    """The census claims to list every educated estimate in the repository, so it has to.
+
+    Same shape as test_the_unread_census_is_complete (:1927), and for the same reason: a census
+    that is complete for the rows somebody remembered is not a census. It matters most for
+    `scenarios`, which has no register page at all - it is published through the balance results,
+    which show `label` and nothing else - so for a scenario estimate this page is the ONLY place a
+    reader can see the basis.
+    """
+    from gen.build import estimate_census
+    listed = {(r["Register"], r["Row"]) for r in estimate_census()}
+    id_cols = dict(PROVENANCE_REGISTERS)
+    expected = {(name, r[id_cols[name]]) for name in ESTIMATE_REGISTERS
+                for r in load_rows(name)
+                if (r.get("provenance") or "").strip() == ESTIMATE_PROVENANCE}
+    assert not (expected - listed), (
+        "estimate(s) in the registers that the census does not list: "
+        + ", ".join(f"{a} {b}" for a, b in sorted(expected - listed)))
+    assert not (listed - expected), (
+        "census row(s) with no estimate behind them: "
+        + ", ".join(f"{a} {b}" for a, b in sorted(listed - expected)))
+
+
+def test_the_provenance_legend_covers_the_whole_vocabulary():
+    """The legend a reader consults to interpret the flags must list all of them.
+
+    In the idiom of test_the_access_legend_covers_the_whole_vocabulary (:2297), and written because
+    slice 4 found the same defect in the provenance axis that the ligation slice found in `access`:
+    the vocabulary had three values and the chips were hand-written prose, so nothing related the
+    two and nothing would have noticed the legend going stale. Checked both ways against the
+    constant, never against a re-typed list.
+    """
+    text = open(os.path.join(ROOT, "docs", "index.md"), encoding="utf-8").read()
+    legend = set(re.findall(r'<span class="prov-([a-z]+)">', text))
+    assert not (PROVENANCE_VOCAB - legend), (
+        "these provenance values are in PROVENANCE_VOCAB and absent from the docs/index.md "
+        "legend: " + ", ".join(sorted(PROVENANCE_VOCAB - legend)))
+    assert not (legend - PROVENANCE_VOCAB), (
+        "the docs/index.md legend explains flags that are not in PROVENANCE_VOCAB: "
+        + ", ".join(sorted(legend - PROVENANCE_VOCAB)))
+    css = open(os.path.join(ROOT, "docs", "stylesheets", "extra.css"), encoding="utf-8").read()
+    styled = set(re.findall(r"\.prov-([a-z]+)\s*\{", css))
+    assert not (PROVENANCE_VOCAB - styled), (
+        "chip class(es) used by the legend with no style behind them, so they render as plain "
+        "text: " + ", ".join(sorted(PROVENANCE_VOCAB - styled)))
+
+
+def test_an_estimated_quantity_in_prose_names_the_parameter_it_estimates():
+    """The chip must not satisfy `_CITATION` on its own, and the other half of that rule.
+
+    `_CITATION` accepts `prov-assumption` and `prov-inference` alone, which is right for those two:
+    an assumption's whole content is that it is not sourced, and an inference's reasoning is on the
+    page around it. An estimate is a different kind of claim - it says somebody can defend a
+    SPECIFIC number - so it has to be traceable to the row carrying the basis and the falsifier.
+    `prov-judgement` is therefore deliberately ABSENT from `_CITATION`, and this guard adds the
+    requirement that completes the rule: a quantity labelled with the chip must also name a `P-` id.
+
+    Keyed on the QUANTITY and not on the chip, in the same ±3-line window as
+    test_numeric_claims_in_prose_carry_a_citation (:571), so the two guards agree about what counts
+    as a numeric claim. The first version of this keyed on the chip and immediately failed on
+    docs/index.md's own legend - which labels no number at all and must not name a parameter,
+    because no parameter carries an estimate yet. That failure was the guard working: a rule about
+    numeric claims had been written as a rule about a string.
+
+    Zero occurrences today, and still worth writing now: the rule is cheaper to state while nothing
+    depends on it than to retrofit across the prose that will carry the first estimates.
+    """
+    assert "prov-judgement" not in _CITATION.pattern, (
+        "prov-judgement must not be in _CITATION: a numeric claim near the chip would then be "
+        "satisfied by the chip alone, and an estimate's whole content is that a specific number "
+        "is being defended from a named row")
+    offenders = []
+    for path in _doc_files():
+        rel = os.path.relpath(path, ROOT)
+        lines = open(path, encoding="utf-8").read().split("\n")
+        for i, line in enumerate(lines):
+            if not _QUANTITY.search(line):
+                continue
+            window = "\n".join(lines[max(0, i - 3): i + 4])
+            if "prov-judgement" not in window:
+                continue
+            if not re.search(r"\bP-[A-Z0-9-]{3,}", window):
+                offenders.append(f"{rel}:{i + 1}  {line.strip()[:90]}")
+    assert not offenders, (
+        "quantity(ies) flagged as an educated estimate with no parameter named, so the number "
+        "cannot be traced to the row that carries its basis and falsifier:\n  "
+        + "\n  ".join(offenders))
+
+
+_BUFFER_TOKEN = re.compile(r"\bBUF-[A-Z0-9][A-Z0-9-]*\b")
+
+
+def test_every_buffer_reference_resolves_and_every_buffer_is_referenced():
+    """Buffer ids were named across nine registers and resolved by nothing.
+
+    Eighteen mentions, in `notes`, `mitigation`, `intro_stream`, `scope_reviewed` and
+    `satisfied_by`, and the referential sweep at :1313 resolves `unit_op`, `equation_ref`,
+    `risk_ref`, `instrument_ref` and `gap_ref` - never buffers. So a typo'd buffer id rendered as
+    a confident cross-reference to nothing.
+
+    Swept out of prose rather than moved into a `buffer_ref` column, which is the idiom this repo
+    already uses for exactly this: `test_every_question_reference_exists_in_every_csv` resolves
+    `Q-\\d{3}` the same way. A column would also have duplicated `infoneeds.satisfied_by`, whose
+    three buffer references are already structured and already resolved by `satisfied_universe()`
+    in gen/envelope.py. Carrying the reference twice is how two registers start disagreeing.
+
+    Both directions, because each fails differently. An unresolved token is a dangling
+    cross-reference. A buffer nothing references is a solution registered for a process that does
+    not use it - the same defect as a generated page no page links to, which shipped once already.
+    """
+    ids = {r["buffer_id"] for r in load_rows("buffers")}
+    dangling, referenced = [], set()
+    for path in sorted(glob.glob(os.path.join(ROOT, "data", "*.csv"))):
+        name = os.path.basename(path)[:-4]
+        for r in load_rows(name):
+            for tok in _BUFFER_TOKEN.findall(" ".join(str(v or "") for v in r.values())):
+                if tok not in ids:
+                    dangling.append(f"{name}.csv: {tok}")
+                elif name != "buffers":
+                    referenced.add(tok)
+    assert not dangling, (
+        "reference(s) to undefined buffer(s): " + "; ".join(sorted(set(dangling))))
+    orphans = sorted(ids - referenced)
+    assert not orphans, (
+        "buffer(s) no other register names, so nothing in the process uses them: "
+        + ", ".join(orphans))
+
+
+def test_every_solution_names_the_unit_operation_that_consumes_it():
+    """The unit-operation join, and the vocabulary fix it needed first.
+
+    The prerequisite is the point. Three registers carried a unit-operation reference in three
+    different spellings and `risks.unit_op` matched none of the others on two of its values, so
+    this guard could not have been written before the key was reconciled onto `equip_id` - a
+    solution naming `UF/DF` would have pointed at a string no register defines. See the note
+    above `risk_unit_ops()` in gen/dataio.py for what was measured before choosing which register
+    to change.
+
+    Reported through `solution_offenders()` rather than inline, so `python -m gen.build` raises on
+    a dangling unit operation too: a guard only pytest can reach does not stop a page publishing.
+    """
+    from gen.envelope import solution_offenders
+    offenders = solution_offenders()
+    assert not offenders, (
+        "solution(s) and unit operation(s) that do not resolve to each other:\n  "
+        + "\n  ".join(offenders))
+
+
+def test_the_unit_operation_vocabularies_resolve_to_one_key():
+    """Four registers, one key - asserted against the registers rather than against a list.
+
+    `instruments.unit_op` and `streams.from_unit`/`to_unit` already held `equip_id` before slice
+    4; `risks.unit_op` held a third spelling and `equipment.unit_op` is a display label. This
+    checks the three that are KEYS all resolve to `equip_id`, and it is deliberately silent about
+    `equipment.unit_op`, which stays a label on purpose.
+
+    The stream register's three boundary pseudo-nodes are exempt by name and not by pattern:
+    SUPPLY, WASTE and DS-STORE are where the process ENDS, so they are the one legitimate
+    non-equipment value, and listing them means a fourth one cannot appear silently.
+    """
+    from gen.dataio import equip_ids
+    ids = equip_ids()
+    boundary = {"SUPPLY", "WASTE", "DS-STORE"}
+    offenders = []
+    for r in load_rows("risks"):
+        op = r["unit_op"]
+        if op not in ids and op not in RISK_UNIT_OPS_UNSCOPED:
+            offenders.append(f"risks.csv {r['risk_id']}: unit_op {op!r} is not an equip_id")
+    for r in load_rows("instruments"):
+        if r["unit_op"] not in ids:
+            offenders.append(
+                f"instruments.csv {r['instrument_id']}: unit_op {r['unit_op']!r} is not an "
+                f"equip_id")
+    for r in load_rows("streams"):
+        for col in ("from_unit", "to_unit"):
+            if r[col] not in ids and r[col] not in boundary:
+                offenders.append(
+                    f"streams.csv {r['stream_id']}: {col} {r[col]!r} is neither an equip_id nor "
+                    f"one of the boundary nodes {sorted(boundary)}")
+    assert not offenders, (
+        "unit-operation reference(s) that do not resolve to equipment.csv:\n  "
+        + "\n  ".join(offenders))
+
+
+# ---------------------------------------------------------------------------
+# Slice 4 phase 5: the sizing work, and the carryover criteria.
+# ---------------------------------------------------------------------------
+
+def test_cleaning_demand_reaches_the_water_balance():
+    """Cleaning was ZERO LITRES in the balance until this phase, and must not go back.
+
+    `wfi` read `df_buffer + lig_vol` and nothing else, so the figure sizing `U00-BUF` and `UT-WFI`
+    contained no cleaning water while `U06-CIP` sat in the equipment register contributing to no
+    number at all. This checks the three things that make the new term mean something rather than
+    merely exist: it is positive, it is the product of its registered inputs, and the circuit count
+    is DERIVED from the equipment register rather than typed into the code.
+    """
+    from gen.dataio import equip_ids
+    params = load_params()
+    vol = param_value(params, "P-CIP-WASH-VOL")
+    washes = param_value(params, "P-CIP-WASHES-PER-CAMPAIGN")
+    assert vol and washes, "the CIP inputs must both carry a value the balance can read"
+    expected_circuits = len(equip_ids())
+    for res in run_all():
+        assert res.cip_circuits == expected_circuits, (
+            f"{res.scenario_id}: circuit count {res.cip_circuits} is not the number of equipment "
+            f"rows ({expected_circuits}) - the count must be derived, or adding a unit operation "
+            f"stops raising the cleaning demand")
+        assert res.cip_water_approx_L > 0, f"{res.scenario_id}: cleaning demand is back to zero"
+        assert abs(res.cip_water_approx_L - expected_circuits * washes * vol) < 1e-9, (
+            f"{res.scenario_id}: cleaning water is not the product of its registered inputs")
+        assert res.wfi_approx_L > res.df_buffer_volume_L + res.ligation_volume_L, (
+            f"{res.scenario_id}: the clean-water demand does not include the cleaning water")
+        assert res.aqueous_waste_approx_L > 0 and (
+            res.aqueous_waste_approx_L >= res.cip_water_approx_L), (
+            f"{res.scenario_id}: spent wash goes to drain, so it must reach the waste figure")
+
+
+def test_every_unit_operation_has_a_registered_cleaning_chemistry():
+    """The premise the derived circuit count rests on, checked rather than assumed.
+
+    `solution_offenders` asks the WIDER question - is every unit operation named by some solution -
+    and `BUF-LIG` names `U01-LIG`, so it passes on a vessel nothing cleans. The balance charges
+    cleaning water per unit operation, so it needs the narrower one.
+    """
+    from gen.envelope import cip_coverage_offenders
+    offenders = cip_coverage_offenders()
+    assert not offenders, "cleaning-coverage defect(s):\n  " + "\n  ".join(offenders)
+
+
+def test_a_loss_fraction_that_consumes_the_step_raises_instead_of_publishing():
+    """FOUND BY EXECUTION, not by reading: the additive UF/DF loss terms were unbounded.
+
+    `y_ufdf = membrane_yield - holdup_loss - adsorp_loss` with nothing checking the result. Setting
+    `P-UFDF-HOLDUP-LOSS` to 1.2 gave a yield of -0.2917, a ligation volume of MINUS 30,483 L and a
+    negative clean-water demand, and `python -m gen.build` published all of it. At 0.85 the yield is
+    +0.0583 and the same scenario asks for a 152,578 L vessel - absurd but positive, so no sign
+    check on the outputs would have caught it either. Both cases are here, and the 0.85 one is the
+    reason the bound is on the YIELD rather than on the fractions.
+    """
+    from gen.balance import run_scenario
+    params = load_params()
+    scn = load_rows("scenarios")[1]
+    for bad in ("1.2", "0.99"):
+        p = {k: dict(v) for k, v in params.items()}
+        p["P-UFDF-HOLDUP-LOSS"]["value"] = bad
+        with pytest.raises(ValueError, match="outside .0, 1."):
+            run_scenario(scn, p)
+    # And the registered value is not merely legal - it leaves a realisable step.
+    assert 0.0 < run_scenario(scn, params).ufdf_yield_frac <= 1.0
+
+
+def test_the_holdup_volume_is_derived_and_bounded():
+    """The loss FRACTION made visible as a volume, because one number stands for four.
+
+    0.10 of the low scenario's retentate is ~23 L of unrecoverable hardware volume and of the high
+    scenario's is four times that. No membrane area is derived from it, and that is deliberate: a
+    specific hold-up in L/m2 would be needed and no such figure is registered anywhere here, so
+    publishing an area would rest on an unregistered number.
+    """
+    params = load_params()
+    frac = param_value(params, "P-UFDF-HOLDUP-LOSS")
+    for res in run_all():
+        assert abs(res.ufdf_holdup_volume_L - frac * res.uf_retentate_volume_L) < 1e-9, (
+            f"{res.scenario_id}: hold-up volume is not the registered fraction of the retentate")
+        assert 0 < res.ufdf_holdup_volume_L < res.uf_retentate_volume_L, (
+            f"{res.scenario_id}: hold-up volume must be a positive part of the retentate")
+
+
+def test_the_anneal_duty_is_the_top_fill_case_and_reads_only_registered_values():
+    """The one steam duty phase 5 could compute, and the proof that it rests on no estimate.
+
+    The fill requirement is 2x or 5x depending on which of one paper's two figures is right
+    (ENV-020), so the jacket has to deliver the 65 C anneal at whatever the top fill is - which is
+    the full ligation volume under either reading. Every input is a registered `value`; the CIP wash
+    temperature, by contrast, exists ONLY as an estimate, which is the next test.
+    """
+    params = load_params()
+    cp = param_value(params, "P-CP-SOLN")
+    rho = param_value(params, "P-SOLN-DENSITY")
+    t_anneal = param_value(params, "P-LIG-ANNEAL-T")
+    t_amb = param_value(params, "P-DRY-T-AMBIENT")
+    loss = param_value(params, "P-HEAT-LOSS-FRAC")
+    assert None not in (cp, rho, t_anneal, t_amb, loss), (
+        "every input to the anneal duty must be a registered value, or the duty rests on a gap")
+    for res in run_all():
+        expected = (res.ligation_volume_L * rho * cp * (t_anneal - t_amb) / 1000.0) * (1.0 + loss)
+        assert abs(res.anneal_topfill_duty_MJ - expected) < 1e-6, (
+            f"{res.scenario_id}: the anneal duty is not the top-fill sensible duty on the full "
+            f"ligation volume")
+        assert abs(res.anneal_topfill_duty_kWh - res.anneal_topfill_duty_MJ / 3.6) < 1e-9
+
+
+def test_no_cip_steam_duty_exists_because_its_temperature_is_an_estimate():
+    """A DELIBERATE ABSENCE, guarded so it cannot be filled in by accident.
+
+    The plan asked for CIP water AND steam. The water landed; the steam did not, and the reason is
+    the fourth provenance doing exactly what it was built for. The only wash temperature anywhere in
+    the register is `BUF-CIP`'s, and `BUF-CIP` is a `judgement` row - so the temperature is in
+    `est_value`, `param_value` reads `value`, and the balance is PHYSICALLY unable to compute the
+    duty. Registering an `assumption` placeholder for the same temperature would give one figure two
+    homes, which is the defect ESTIMATE_REGISTERS exists to prevent.
+
+    So this guard says: the temperature lives only in the estimate, and no parameter has quietly
+    appeared to let the balance around it. If someone adds one, this fails and they have to decide
+    on purpose.
+    """
+    buffers = {r["buffer_id"]: r for r in load_rows("buffers")}
+    cip = buffers["BUF-CIP"]
+    assert cip["provenance"] == ESTIMATE_PROVENANCE, (
+        "BUF-CIP is the estimate this absence depends on")
+    assert "50 C" in cip["est_value"], (
+        "the wash temperature must be inside BUF-CIP's est_value, which the balance cannot read")
+    src = open(os.path.join(ROOT, "gen", "balance.py"), encoding="utf-8").read()
+    assert "est_value" not in src.split('"""', 2)[-1] or "param_value" in src, (
+        "the balance must not start reading est_value")
+    strays = [r["param_id"] for r in load_rows("parameters")
+              if "CIP" in r["param_id"] and (r.get("units") or "").strip() == "degC"]
+    assert not strays, (
+        "a CIP temperature has appeared in parameters.csv: " + ", ".join(strays) + ". That would "
+        "give BUF-CIP's estimated wash temperature a second home and let the balance consume it "
+        "without the estimate's obligations. Decide on purpose - see Q-074.")
+    assert not any(f.name == "cip_steam_duty_MJ" for f in fields(run_all()[0])), (
+        "a CIP steam duty has appeared; check what temperature it rests on")
+
+
+def test_the_carryover_criteria_are_carried_as_criteria_and_not_as_limits():
+    """The criteria are printed figures, not this project's acceptance limits.
+
+    Converting any of them into a swab or rinse limit needs a maximum allowable carryover, which
+    needs the shared surface area and the following product's batch size - neither registered. So
+    both rows must be `fact` with a source that was READ, must carry NO range (they are three
+    alternative criteria under a most-stringent rule, not a band), and the page that publishes them
+    must say the rule.
+    """
+    params = load_params()
+    sources = {r["source_key"]: r for r in load_rows("sources")}
+    for pid in ("P-CARRYOVER-PPM", "P-CARRYOVER-DOSE-FRAC"):
+        row = params.get(pid)
+        assert row is not None, f"{pid} is not registered"
+        assert row["provenance"] == "fact", f"{pid}: a printed criterion is a fact"
+        key = (row.get("source_key") or "").strip()
+        assert key in sources, f"{pid}: source_key {key!r} does not resolve"
+        assert sources[key]["access"] not in ACCESS_GRADES_UNREAD, (
+            f"{pid} cites {key}, which nobody here has read")
+        assert not (row.get("range_low") or "").strip(), (
+            f"{pid}: the three criteria are alternatives under a most-stringent rule, so a range "
+            f"between two of them is not a window of anything")
+    text = open(os.path.join(ROOT, "docs", "process", "microbial.md"), encoding="utf-8").read()
+    assert "most stringent" in text.lower(), (
+        "the page carrying the criteria must state the most-stringent-of-three rule, or a reader "
+        "will take whichever number is convenient")
+
+
+def test_the_carryover_criteria_do_not_cite_the_technology_transfer_guideline():
+    """THE TRAP THIS PHASE WAS WARNED ABOUT, made mechanical.
+
+    `SRC-WHO-TRS1044` is WHO TRS 1044 Annex 4, the TECHNOLOGY TRANSFER guideline, and it is the
+    right citation for the PDE-then-MACO derivation METHOD - which is why it is already cited in the
+    contamination-control section. The carryover criteria live in a DIFFERENT document, TRS 1019
+    Annex 3 Appendix 3. Citing TRS 1044 for the criteria would be wrong in a way no guard in this
+    repository could catch: both keys resolve, both are WHO, both are read in full, and every
+    existing check would pass. So this is the guard, and it is stated in both directions - the
+    criteria must cite the validation guideline, and must not cite the transfer one.
+    """
+    params = load_params()
+    for pid in ("P-CARRYOVER-PPM", "P-CARRYOVER-DOSE-FRAC"):
+        row = params[pid]
+        blob = " ".join((row.get(c) or "") for c in ("source_key", "notes", "scale_system"))
+        assert "SRC-WHO-TRS1044" not in blob, (
+            f"{pid} names SRC-WHO-TRS1044. That is TRS 1044 Annex 4, the technology-transfer "
+            f"guideline; the carryover criteria are in TRS 1019 Annex 3 Appendix 3 "
+            f"(SRC-WHO-TRS1019-A3). Two different documents, both WHO, both read - which is exactly "
+            f"why this needs a guard rather than a reader.")
+        assert "SRC-PICS-PI006-3" in blob or "SRC-WHO-TRS1019-A3" in blob, (
+            f"{pid} must name a document that actually prints the criterion")
+    trs1019 = {r["source_key"]: r for r in load_rows("sources")}["SRC-WHO-TRS1019-A3"]
+    assert "TRS 1044" in trs1019["notes"], (
+        "the TRS 1019 row must warn about the TRS 1044 confusion, because the next person to look "
+        "for a WHO cleaning citation will find the wrong one first")
+    assert "Appendix 3" in trs1019["citation"], (
+        "the citation must name Appendix 3: Annex 3 contains four separate section 11s, so "
+        "'Annex 3 s11.6' alone does not identify a clause")
+
+
+def test_the_fill_ratio_stays_a_refused_span():
+    """A published contradiction is not an operating window, and must not be written as one.
+
+    Two readings of one charge concentration in one paper - main text 5 mM, its own SI 2 mM against
+    1 mM at ligation - give a vessel fill of 2x or 5x. ENV-020 rules that span `not_a_range`, so the
+    parameter carries no value and no range, and `value_written_where_refused` enforces the second
+    half. The row exists to publish the SIZING consequence of the contradiction Q-071 registered.
+    """
+    from gen.envelope import value_written_where_refused, range_written_where_refused
+    params = load_params()
+    row = params.get("P-LIG-FILL-RATIO")
+    assert row is not None, "P-LIG-FILL-RATIO is not registered"
+    assert not (row.get("value") or "").strip(), "P-LIG-FILL-RATIO must carry no value"
+    assert not (row.get("range_low") or "").strip(), "P-LIG-FILL-RATIO must carry no range"
+    assert "Q-071" in (row.get("notes") or ""), "it must point at the registered contradiction"
+    env = {r["envelope_id"]: r for r in load_rows("envelopes")}["ENV-020"]
+    assert env["param_id"] == "P-LIG-FILL-RATIO"
+    assert env["bracket_verdict"] == "not_a_range"
+    assert env["endpoint_sourcing"] == "inference", (
+        "the concentrations are quoted but the ratios are our division, so the endpoints are "
+        "inferred rather than printed")
+    assert not value_written_where_refused() and not range_written_where_refused()
+
+
+def test_the_range_to_steel_table_is_computed_and_writes_nothing():
+    """The table the plan asked to be published FROM THE MODEL so it cannot drift.
+
+    Same hazard as the excipient-sensitivity table, which had already drifted from the model it
+    described before it was generated. Two checks: every figure is reproducible from
+    `run_scenario`, and generating it leaves `data/` untouched - the deep-copy idiom really is a
+    copy, so a sensitivity table cannot mutate the register it reads.
+    """
+    import glob as _glob
+    from gen.build import _range_to_steel
+    before = {p: open(p, "rb").read() for p in _glob.glob(os.path.join(ROOT, "data", "*.csv"))}
+    rows = _range_to_steel()
+    after = {p: open(p, "rb").read() for p in _glob.glob(os.path.join(ROOT, "data", "*.csv"))}
+    assert before == after, "generating the sensitivity table wrote to data/"
+    assert rows, "the range-to-steel table is empty"
+    labels = [r["label"] for r in load_rows("scenarios")]
+    for row in rows:
+        for lab in labels:
+            assert lab in row, f"the table must cover every scenario; {lab} is missing"
+    # The registered column must be present exactly once per band, and must agree with the
+    # unmodified model - which is what makes the table a check on itself rather than a picture.
+    registered = [r for r in rows if "(registered)" in r["Value"]]
+    assert registered, "no column is marked as the registered value"
+    live = {r.label: r for r in run_all()}
+    for row in registered:
+        if row["Drives"] == "Ligation batch volume (L)":
+            for lab, res in live.items():
+                assert row[lab] == f"{res.ligation_volume_L:,.1f}", (
+                    f"the registered column disagrees with the live model for {lab}")

@@ -23,6 +23,12 @@ what already exists here.
 - **Measured inputs for the mass & energy balance.** The balance now computes the full evaporator and
   drying-gas duties and the species-resolved impurity fate, but on assumption-flagged inputs; the
   package still needs measured thermal (Q-045, Q-046) and clearance (Q-036) data to replace them.
+  Read the provenance flag before quoting any number: a
+  <span class="prov-judgement">judgement</span> row is an **educated estimate this project is
+  prepared to defend**, not a specification and not a measurement, and it is deliberately kept out
+  of every computed figure — the register's `value` column is blank on such a row and the estimate
+  sits in `est_value`. All of them, with the basis and the observation that would refute each, are
+  on the [estimate census](../registers/estimates.md).
 - **Equipment specifications and sizing basis** per item (the [equipment register](../registers/equipment.md)
   now carries a sizing basis, materials of construction, and a turndown basis per item; absolute sizes
   remain a function of demand, Q-002).

@@ -10,7 +10,10 @@ The [results page](results.md) is generated from it; change the CSV inputs, run
     Most balance inputs are flagged **assumption** — illustrative placeholders registered as open
     questions, not validated values. The module **refuses to run on a blank input** (it raises
     rather than inventing one), so a gap can never silently become a fabricated result. The
-    throughput scenarios themselves are illustrative (Q-002).
+    throughput scenarios themselves are illustrative (Q-002). None of these inputs is an
+    **educated estimate** and none can be: an estimate is carried in `est_value` and every read
+    here goes through `value`, so the fourth provenance cannot reach a computed figure
+    ([estimate census](../registers/estimates.md)).
 
 ## Boundary and basis
 

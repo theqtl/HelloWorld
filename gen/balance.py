@@ -6,6 +6,13 @@ so ALL outputs of this module are assumption-driven until real values are suppli
 The module never invents a number: if a required input is blank it raises, so a
 gap cannot silently become a fabricated result.
 
+AND IT CANNOT READ AN EDUCATED ESTIMATE. `provenance = judgement` rows carry their
+number in `est_value` with `value` blank, and every read here goes through
+`param_value`, which reads `value`. So an estimate reaching a computed figure is not
+a thing anyone has to remember not to do - `_require` raises on the blank instead.
+That is the whole structural claim of the fourth provenance, and it is a property of
+which column this module reads rather than a rule written down somewhere.
+
 Boundary: received purified 5'-phosphorylated blocks -> ligation -> clarification
 -> UF/DF -> evaporation -> spray drying -> DS powder. Fully aqueous, no solvents.
 
@@ -21,7 +28,7 @@ Basis: DS demand is taken as siRNA active mass (API); powder also carries excipi
 """
 import math
 from dataclasses import dataclass, asdict
-from .dataio import load_params, load_rows, param_value
+from .dataio import load_params, load_rows, param_value, equip_ids
 
 
 def _require(params, pid):
@@ -30,6 +37,36 @@ def _require(params, pid):
         raise ValueError(f"Required parameter {pid} is blank; cannot run balance "
                          f"(register it as a gap rather than inventing a value).")
     return v
+
+
+def _require_realisable_yield(y, terms):
+    """A composed yield outside (0, 1] is a DATA error, so raise rather than publish it.
+
+    Found by execution in slice 4 phase 5, not by reading. `y_ufdf` is a membrane-passage yield
+    with two ADDITIVE loss terms subtracted from it, and nothing bounded the result: setting
+    P-UFDF-HOLDUP-LOSS to 1.2 gave y_ufdf = -0.2917, a ligation volume of MINUS 30,483 L and a
+    negative WFI demand, and `python -m gen.build` published all of it. At 0.85 the yield is
+    +0.0583 and the same scenario asks for a 152,578 L ligation vessel - physically absurd, but
+    positive, so no sign check would catch it either.
+
+    This is the hold-up/area coupling the plan asked for a consistency guard on, in the only form
+    the data supports. The plan wanted the loss fraction checked against a membrane area implied by
+    a specific hold-up of 1-2 L/m2 - but NO specific hold-up figure is registered anywhere in this
+    repository (measured: no parameter, source or register row carries L/m2), so that check would
+    rest on an unregistered number and could not be written honestly. What CAN be checked is that
+    the loss terms do not consume the whole step, which is the same defect one level up and was
+    genuinely open.
+
+    Deliberately the same shape as `_require_above`: legitimate process states pass, physically
+    impossible data raises, and the fix is in the registered values rather than in the code.
+    """
+    if not (0.0 < y <= 1.0):
+        raise ValueError(
+            f"Composed UF/DF yield is {y:.4f}, outside (0, 1]. The additive loss terms "
+            f"({terms}) consume the whole step, so every volume downstream of it is a "
+            f"back-calculation through a non-positive number - which publishes as a negative or "
+            f"absurd tank size rather than as an error. Fix the registered loss fractions."
+        )
 
 
 def _require_above(hi, lo, hi_id, lo_id):
@@ -67,6 +104,9 @@ class ScenarioResult:
     excip_frac_pre_evap: float
     evap_outlet_solids_kg: float
     wfi_approx_L: float
+    cip_water_approx_L: float
+    cip_circuits: int
+    ufdf_holdup_volume_L: float
     aqueous_waste_approx_L: float
     evap_duty_MJ: float
     evap_duty_kWh: float
@@ -82,6 +122,8 @@ class ScenarioResult:
     drying_gas_kg: float
     dryer_heater_duty_MJ: float
     dryer_heater_duty_kWh: float
+    anneal_topfill_duty_MJ: float
+    anneal_topfill_duty_kWh: float
 
 
 def run_scenario(scn, params):
@@ -107,6 +149,7 @@ def run_scenario(scn, params):
     t_dry_in = _require(params, "P-DRY-T-IN")      # degC
     t_dry_out = _require(params, "P-DRY-T-OUT")    # degC
     t_amb = _require(params, "P-DRY-T-AMBIENT")    # degC
+    t_anneal = _require(params, "P-LIG-ANNEAL-T")  # degC - the ligation anneal setpoint
     rho = _require(params, "P-SOLN-DENSITY")       # kg/L
     loss_frac = _require(params, "P-HEAT-LOSS-FRAC")  # fraction added for losses
 
@@ -127,6 +170,9 @@ def run_scenario(scn, params):
     vcf = c_uf / c_lig                                      # volume concentration factor
     membrane_yield = math.exp(-(1.0 - retention) * (math.log(vcf) + diavol))
     y_ufdf = membrane_yield - holdup_loss - adsorp_loss
+    _require_realisable_yield(
+        y_ufdf,
+        f"membrane {membrane_yield:.4f} - hold-up {holdup_loss} - adsorption {adsorp_loss}")
     overall = y_lig * y_ufdf * y_evap * y_dry
 
     annual = float(scn["annual_ds_demand_kg_yr"])
@@ -161,8 +207,39 @@ def run_scenario(scn, params):
     dryer_water = max(dryer_feed - dry_solids, 0.0)  # kg
     # (powder_camp already computed from spec; api_after_dry consistency check in tests)
 
-    wfi = df_buffer + lig_vol  # dominant clean-water demand (buffer prep + DF)
-    aq_waste = df_buffer + max(lig_vol - uf_vol, 0.0) + evap_water  # permeate + condensate
+    # CLEANING DEMAND, which was ZERO LITRES until slice 4 phase 5. The `wfi` line below read
+    # `df_buffer + lig_vol` and nothing else, so the figure that sizes U00-BUF and UT-WFI contained
+    # no cleaning water at all while U06-CIP sat in the equipment register contributing nothing to
+    # any number. Now that BUF-CIP and BUF-MEMBRANE-CLEAN exist as registered recipes, the volume
+    # per wash and the washes per campaign are what make them cost something.
+    #
+    # THE CIRCUIT COUNT IS DERIVED, NOT WRITTEN. Every unit operation in this train is wetted and
+    # therefore cleaned, and `cip_coverage_offenders()` in gen/envelope.py proves that every
+    # `equip_id` is named by one of the registered cleaning solutions - so the number of circuits IS
+    # the number of equipment rows, and adding a unit operation raises the cleaning demand without
+    # anyone remembering to. That is the same "derive the vocabulary from its owner" move phase 4
+    # made for `risk_unit_ops()`, applied to a quantity instead of a vocabulary.
+    #
+    # THE RESULT IS A FLOOR AND IS PUBLISHED AS ONE (Q-076). P-CIP-WASH-VOL carries 400 L from a
+    # facility whose circuits average 200 L of hold-up while our ligation vessel is 3,301-13,202 L;
+    # only the caustic wash is counted, because caustic is the only chemistry registered; and no
+    # rinse is counted, although PIC/S requires the caustic itself be rinsed out and WHO expresses a
+    # carryover limit in rinse water. Three reasons it is low, none of them hidden.
+    cip_wash_vol = _require(params, "P-CIP-WASH-VOL")               # L per circuit per wash
+    cip_washes = _require(params, "P-CIP-WASHES-PER-CAMPAIGN")      # per circuit per campaign
+    cip_circuits = len(equip_ids())
+    cip_water = cip_circuits * cip_washes * cip_wash_vol  # L per campaign
+
+    # The hold-up loss as a VOLUME, published because the fraction hides what it means. 0.10 of a
+    # 227 L retentate is ~23 L, and of a 907 L retentate ~91 L - the same fraction standing for four
+    # times the hardware. It is also the term whose own source measured 30-40% at 20-80 mL, so the
+    # scale dependence is real and carrying a flat fraction across the scenarios is a modelling
+    # choice rather than a measurement (Q-036, P-UFDF-HOLDUP-LOSS).
+    ufdf_holdup_vol = holdup_loss * uf_vol  # L
+
+    wfi = df_buffer + lig_vol + cip_water  # clean-water demand (buffer prep + DF + cleaning)
+    aq_waste = (df_buffer + max(lig_vol - uf_vol, 0.0) + evap_water
+                + cip_water)  # permeate + condensate + spent wash to drain
 
     evap_MJ = evap_water * lhv / 1000.0
     dry_MJ = dryer_water * lhv / 1000.0
@@ -191,6 +268,28 @@ def run_scenario(scn, params):
     #  * HEATER duty - the utility load, which is what UT-DRYGAS actually is: inlet gas heating
     #    from ambient. The gas MASS is derived from the process duty, so no tuned gas:water ratio
     #    is needed, and the result stays scale-parametric (it scales with the water evaporated).
+    # THE ANNEAL JACKET DUTY AT TOP FILL - the sizing consequence of the published contradiction
+    # ENV-020 refuses to resolve. Telescoping phosphorylation into ligation fills the vessel from V
+    # to 2V or to 5V depending on which of SRC-ALMAC-2023's two figures is right, and the 65 C
+    # anneal (P-LIG-ANNEAL-T) has to be delivered at whatever the top fill turns out to be. Computed
+    # on the FULL ligation volume because that is the top fill under either reading, from ambient
+    # because the buffer is made up cold. This is a sensible duty only: the registered 15 minute
+    # anneal hold adds a loss term, not a phase change, so unlike the evaporator there is no latent
+    # floor to exceed. (The hold parameter is deliberately NOT named here. `used_by` is policed by
+    # bare substring over this file, so naming a docs-only id in a COMMENT reads as consuming it -
+    # and the honest fix is the comment, since the balance really does not read the hold.)
+    #
+    # AND IT IS THE ONLY STEAM DUTY PHASE 5 COULD COMPUTE. The plan asked for CIP steam as well, and
+    # CIP steam is NOT here - not by oversight. The only wash temperature in the register is
+    # BUF-CIP's "ambient to 50 C", which is an ESTIMATE and therefore lives in `est_value`, and every
+    # read in this module goes through `param_value`, which reads `value`. So the fourth provenance
+    # blocks the calculation exactly as designed, and the honest outcome is a missing duty with a
+    # named reason rather than a duty resting on an estimate. Adding an `assumption` placeholder for
+    # the same temperature would give that number two homes, which is the defect ESTIMATE_REGISTERS
+    # exists to prevent. See Q-074.
+    anneal_topfill_MJ = (lig_vol * rho * cp_soln
+                         * max(t_anneal - t_amb, 0.0) / 1000.0) * (1.0 + loss_frac)
+
     dryer_feed_sensible_MJ = dryer_feed * cp_soln * max(t_dry_out - t_boil, 0.0) / 1000.0
     dryer_process_MJ = (dry_MJ + dryer_feed_sensible_MJ) * (1.0 + loss_frac)
     drying_gas_kg = dryer_process_MJ * 1000.0 / (cp_gas * (t_dry_in - t_dry_out))
@@ -205,7 +304,9 @@ def run_scenario(scn, params):
         df_buffer_volume_L=df_buffer, evap_water_removed_L=evap_water,
         dryer_feed_mass_kg=dryer_feed, dryer_water_evaporated_kg=dryer_water,
         excip_frac_pre_evap=f_pre, evap_outlet_solids_kg=evap_solids,
-        wfi_approx_L=wfi, aqueous_waste_approx_L=aq_waste,
+        wfi_approx_L=wfi, cip_water_approx_L=cip_water,
+        cip_circuits=cip_circuits, ufdf_holdup_volume_L=ufdf_holdup_vol,
+        aqueous_waste_approx_L=aq_waste,
         evap_duty_MJ=evap_MJ, evap_duty_kWh=evap_MJ / 3.6,
         dryer_evap_duty_MJ=dry_MJ, dryer_evap_duty_kWh=dry_MJ / 3.6,
         evap_feed_mass_kg=evap_feed_mass_kg, evap_sensible_MJ=evap_sensible_MJ,
@@ -214,6 +315,8 @@ def run_scenario(scn, params):
         dryer_process_duty_MJ=dryer_process_MJ, dryer_process_duty_kWh=dryer_process_MJ / 3.6,
         drying_gas_kg=drying_gas_kg,
         dryer_heater_duty_MJ=dryer_heater_MJ, dryer_heater_duty_kWh=dryer_heater_MJ / 3.6,
+        anneal_topfill_duty_MJ=anneal_topfill_MJ,
+        anneal_topfill_duty_kWh=anneal_topfill_MJ / 3.6,
     )
 
 

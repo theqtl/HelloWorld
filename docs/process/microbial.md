@@ -119,6 +119,57 @@ per-rinse acceptance limits (`P-HBEL-DS`, method after
 [SRC-WHO-TRS1044](../registers/sources.md)). **The HBEL value is left blank** against Q-047 rather than
 invented: a PDE cannot be derived without toxicology data, which does not exist in the public record
 for this molecule. That gap is **independent of annual demand (Q-002)** — it is blocked on data, not on
-scale — and it is a named technology-transfer deliverable (risk R-015). Until it exists, cleaning
-acceptance limits for the shared evaporator and dryer cannot be set, so it is a prerequisite for
-qualifying that equipment, not a detail to defer.
+scale — and it is a named technology-transfer deliverable (risk R-015).
+
+### But carryover criteria are citable, and this page used to say otherwise
+
+An earlier version of this section concluded that *until the HBEL exists, cleaning acceptance limits
+cannot be set*. **That was wrong, and it is the kind of wrong worth keeping visible**: the regulatory
+record has no numeric value for caustic concentration, temperature or contact time — genuinely absent
+from every document retrieved — and the absence was generalised into *no numeric cleaning value at
+all*. Residue acceptance is different. Two documents state criteria in mandatory phrasing, and both
+were retrieved and read for this slice:
+
+- **No more than 10 ppm** of one product in another (`P-CARRYOVER-PPM`).
+- **No more than 0.1%** of the normal therapeutic dose of one product in the maximum daily dose of
+  the next (`P-CARRYOVER-DOSE-FRAC`).
+- **No visible residue** on the equipment after cleaning, with spiking studies to establish the
+  concentration at which residue becomes visible. Not numeric, so not a parameter.
+- **The most stringent of the three** governs — [SRC-WHO-TRS1019-A3](../registers/sources.md),
+  Annex 3 Appendix 3 §11.10, with [SRC-PICS-PI006-3](../registers/sources.md) §7.11.3 giving the same
+  three.
+
+Limits may be expressed as a concentration in the following product, per unit surface area, **or in
+rinse water as ppm** (WHO Appendix 3 §11.6) — which is why the un-costed rinse in the
+[balance](../balance/results.md) matters twice over: PIC/S §7.9.1 requires the caustic itself be
+removed to a defined limit, and the rinse is also the medium the product limit is measured in (Q-076).
+
+**Three qualifications travel with these criteria, and without them they would be over-read.**
+
+1. **They are one convention, not two sources.** WHO's Appendix 3 states on its own first page that
+   its text was previously published in 2006 (TRS 937 Annex 4), and PI 006-3 records adoption in
+   December 1998. A 2019 reprint of 2006 text and a 2007 revision of a 1998 recommendation print the
+   same three criteria in nearly the same words. Citing both does not make the criteria
+   twice-sourced — the same shape as the membrane-cleaning bracket in Q-075. Registered as **Q-077**.
+2. **The 10 ppm figure is a borrowed heavy-metals limit.** WHO prints its provenance parenthetically:
+   *basis for heavy metals in starting materials*. So it is an impurity limit for starting materials
+   pressed into service as a cleaning criterion, and **not** a health-based number. That is precisely
+   why `P-HBEL-DS` is a *different quantity* that stays blank rather than a sharper version of this
+   one, and why carrying both is honest rather than redundant.
+3. **They govern product changeover, and nobody has said whether this plant has any.** Every
+   criterion is phrased as carryover into *another product* or *the following product*. This concept
+   describes campaigns of one drug substance. If the equipment is dedicated, PIC/S §7.3.3 applies
+   instead — *in case of batch-to-batch production it is not necessary to clean after each batch;
+   however, cleaning intervals and methods should be determined* — the dose criterion has no
+   following product to protect, and the residues of concern become this product's own degradants and
+   the caustic. Registered as **Q-078**, and it is a facility decision rather than a research gap.
+
+**What still cannot be set, and it is narrower than before.** Converting any criterion into a swab or
+rinse limit needs a maximum allowable carryover, which needs the shared product-contact surface area
+and the following product's batch size — neither registered here. So the criteria are carried and the
+*limit* remains open. `P-HBEL-DS` stays blank for its own reason: MACO and the swab limit are a
+division by one number, so a 10× band on the PDE gives a 10× band on the swab limit straddling the
+TOC/HPLC limit of quantitation, and a band that cannot select an analytical method is not worth
+publishing as one. PIC/S §7.10.2 makes that coupling explicit — the method's sensitivity must *reflect
+the level of cleanliness determined to be acceptable*. The HBEL remains a prerequisite for qualifying
+the shared evaporator and dryer, not a detail to defer.

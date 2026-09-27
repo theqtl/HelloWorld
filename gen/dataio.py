@@ -109,3 +109,348 @@ def param_range(params, pid):
         return (float(lo), float(hi), kind)
     except ValueError:
         raise ValueError(f"{pid}: range_low/range_high are not numeric: {lo!r}, {hi!r}")
+
+
+# ---------------------------------------------------------------------------
+# THE TWO AXES THAT WERE ONE COLUMN.
+#
+# `provenance` answers "what kind of act produced this number?" - did someone
+# read it out of a document, derive it here, or park a placeholder. That is a
+# question about THIS PROJECT's relationship to the figure.
+#
+# `envelopes.endpoint_sourcing` answers a different question: "what standing do
+# the two ENDPOINTS have as retrieved claims?" - a question about the literature,
+# answered without reference to what this project then does with the band.
+#
+# Both columns were called `provenance` and eleven envelope rows consequently
+# read as flat contradictions of `parameters.csv`: ENV-001/002/003/007/008/009/
+# 010/012/014/015/016 say `fact` or `inference` where the parameter they audit
+# says `assumption`. Verified by reproduction, 2026-09-27: eleven rows, every one
+# disagreeing in the same direction. None of them was a data error. `P-BLOCK-PUR`
+# is the clearest case - ENV-001's endpoints ARE published measurements (a fact
+# about the record) while the value this project carries for the parameter IS an
+# assumption (a fact about this project), and both statements are true at once.
+#
+# So the columns are separated rather than reconciled. They share three tokens
+# today and that is a coincidence of history, not a shared vocabulary: keeping
+# them as two constants is what stops a value added to one axis becoming
+# silently legal on the other.
+# ---------------------------------------------------------------------------
+
+#: The controlled vocabulary for the `provenance` column, wherever it appears.
+#: One value per row. Lived in gen/test_balance.py until slice 4: a vocabulary
+#: that only a test knows cannot raise at build time, and three of the eleven
+#: registers carrying the column were never checked against it at all.
+PROVENANCE_VOCAB = {
+    "fact",        # read out of a cited document. Must carry a source_key.
+    "inference",   # derived here, by arithmetic or argument, from things that are cited.
+    "assumption",  # an illustrative placeholder the model needs in order to run at all,
+                   # registered as a gap. Says nothing about what the real value is.
+    "judgement",   # an EDUCATED ESTIMATE: a number this project is prepared to defend on
+                   # stated grounds, while admitting that no document states it. Added in
+                   # slice 4 because one word - `assumption` - was covering two unlike
+                   # things. `P-EVAP-T-BOIL` = 50 degrees C is an illustrative placeholder
+                   # the balance needs in order to run at all; `P-EPS-260` = 20-25 mL/mg/cm
+                   # is bracketed from A260 conversions plus hypochromicity by someone who
+                   # can say why. Calling both `assumption` told a reader that the second
+                   # was as arbitrary as the first, and calling either `inference` would
+                   # have claimed a derivation from cited things that neither has.
+                   #
+                   # THREE OBLIGATIONS TRAVEL WITH IT, and all three are guarded, because a
+                   # provenance that is merely nicer to write is how a placeholder gets
+                   # promoted for free:
+                   #   1. the number goes in `est_value`, NEVER in the register's own value
+                   #      column - so the balance is PHYSICALLY unable to consume it
+                   #      (`param_value` reads `value`), and "an estimate never closes its
+                   #      question" is structural rather than a promise;
+                   #   2. `basis` says on what grounds, resolving its own SRC-/P-/EQ-/Q-
+                   #      tokens, and may not rest on a source nobody here has read;
+                   #   3. `falsifier` says what observation would show the estimate wrong.
+                   # See ESTIMATE_REGISTERS for where it is legal at all.
+}
+
+#: The controlled vocabulary for `envelopes.endpoint_sourcing` - deliberately a
+#: SEPARATE constant from PROVENANCE_VOCAB even though the tokens coincide. See
+#: the note above.
+ENDPOINT_SOURCING = {
+    "fact",        # both endpoints are figures printed in a retrieved document.
+    "inference",   # at least one endpoint is bracketed here rather than quoted.
+    "assumption",  # the endpoints are this project's own choice of span.
+}
+
+#: Registers carrying a `provenance` column, with the column that names a row.
+#: `envelopes` is absent on purpose: it carries `endpoint_sourcing` instead.
+PROVENANCE_REGISTERS = (
+    ("buffers", "buffer_id"),
+    ("controls", "control_id"),
+    ("couplings", "coupling_id"),
+    ("equipment", "equip_id"),
+    ("impurities", "impurity_id"),
+    ("infoneeds", "need_id"),
+    ("instruments", "instrument_id"),
+    ("parameters", "param_id"),
+    ("scenarios", "scenario_id"),
+    ("utilities", "utility_id"),
+    ("verdicts", "verdict_id"),
+)
+
+# ---------------------------------------------------------------------------
+# WHERE AN EDUCATED ESTIMATE MAY LIVE, and why the answer is three registers and
+# not eleven.
+#
+# The acceptance panel's second blocker was that the guards for this feature were
+# written against `parameters.csv` while the estimates it exists for land in
+# `buffers.csv` - so the rows the feature was built for escaped every check.
+# Scoping the columns to "wherever this slice happens to put a number" would
+# repeat that defect one slice later, so the line is drawn on a property of the
+# register instead:
+#
+#   AN ESTIMATE MAY LIVE WHERE THE ROW CARRIES A QUANTITY OF ITS OWN - one that
+#   cannot be referenced out to `parameters.csv` without putting a number in two
+#   places.
+#
+# Three registers qualify, and the reason differs in each:
+#   * `parameters` - the register that exists for numbers.
+#   * `buffers`    - a composition is a RECIPE. Splitting `Tris-HCl 50 mM; KCl
+#                    100 mM; MgCl2 10 mM; DTT 1 mM` into four parameters would put
+#                    one buffer in four rows and let them drift apart.
+#   * `scenarios`  - a scenario's demand and campaign count ARE the scenario;
+#                    `gen/balance.py:132-133` reads them off the row directly.
+#
+# The other eight provenance-carrying registers state no quantity of their own -
+# verified column by column: they carry ids, controlled-vocabulary values and
+# prose, and where they need a number they REFERENCE one (`controls.param_ref`,
+# `infoneeds.satisfied_by`, `envelopes.param_id`). `equipment.turndown` looks like
+# a counter-example and is not: all seven rows state a turndown BASIS in prose with
+# the numeric ratio explicitly pending. An estimate in any of them would be a
+# second home for a number, which is the defect `instruments.csv` has no
+# `control_loop` column in order to avoid. So `judgement` is REFUSED there, by
+# guard, rather than merely unused.
+# ---------------------------------------------------------------------------
+
+#: The provenance value that carries an educated estimate. Named once, because three
+#: modules and two test files have to agree on it.
+ESTIMATE_PROVENANCE = "judgement"
+
+#: The three columns an estimate needs, on every register where one is legal.
+#: `est_value` is deliberately NOT `value`: see the note on ESTIMATE_PROVENANCE's
+#: first obligation.
+ESTIMATE_COLUMNS = ("est_value", "basis", "falsifier")
+
+#: {register: the value columns an estimate may NOT write}. The keys are the registers
+#: where `judgement` is legal; the values are the quantity columns that must stay BLANK
+#: on an estimate row, which is what makes the balance unable to consume one.
+ESTIMATE_REGISTERS = {
+    "parameters": ("value",),
+    "buffers": ("components", "ph"),
+    "scenarios": ("annual_ds_demand_kg_yr", "campaigns_per_yr"),
+}
+
+#: The controlled vocabulary for `questions.status`. Free text until slice 4, which is
+#: why it needs one now: an estimate must name the question it does NOT close, and that
+#: obligation is empty if the question's state cannot be read mechanically.
+QUESTION_STATUS = {
+    "open",                # nobody here has answered it.
+    "partially_resolved",  # part of it is settled and the rest is not. Five rows today.
+    "resolved",            # EMPTY today, and informative rather than an oversight: this
+                           # register has never closed a question. The eighteen ids missing
+                           # from the Q-001..Q-073 sequence were never issued, not retired.
+                           # (Still eighteen after slice 4 phase 3 added Q-071 to Q-073:
+                           # 73 ids over 55 rows. Next free id is Q-074.)
+}
+
+#: Access grades meaning NOBODY HERE HAS READ THE DOCUMENT. An estimate's basis may not
+#: rest on one of these, because "we estimated it on the strength of a paper we did not
+#: read" is the citation defect the source register was built to stop, wearing the new
+#: provenance as cover.
+#:
+#: `redacted` and `partial-text-read` are deliberately NOT here, and the reason is worth
+#: stating: the four `redacted` rows are EPARs and FDA chemistry reviews that WERE read,
+#: with the numbers blacked out. A regulator publishing an assessment with the figure
+#: removed is precisely the condition that makes an estimate necessary, so citing it as a
+#: basis is honest - it is what happened.
+ACCESS_GRADES_UNREAD = frozenset({"abstract-only", "record-only", "not-retrieved"})
+
+
+def question_status_offenders():
+    """Rows of questions.csv whose `status` is outside QUESTION_STATUS."""
+    return [
+        f"questions.csv {r.get('question_id')}: status {(r.get('status') or '').strip()!r} is not "
+        f"in the controlled vocabulary; expected one of {sorted(QUESTION_STATUS)}"
+        for r in load_rows("questions")
+        if (r.get("status") or "").strip() not in QUESTION_STATUS
+    ]
+
+
+def provenance_offenders():
+    """Rows whose `provenance` is outside PROVENANCE_VOCAB, across every register.
+
+    Enforced everywhere rather than on the three registers a test happened to reach, for the
+    reason every other vocabulary here is enforced: a misspelling does not fail, it renders as a
+    confident statement about how well a number is known.
+    """
+    problems = []
+    for name, id_col in PROVENANCE_REGISTERS:
+        for r in load_rows(name):
+            value = (r.get("provenance") or "").strip()
+            if value not in PROVENANCE_VOCAB:
+                problems.append(
+                    f"{name}.csv {r.get(id_col)}: provenance {value!r} is not in the controlled "
+                    f"vocabulary; expected one of {sorted(PROVENANCE_VOCAB)}")
+    for r in load_rows("envelopes"):
+        value = (r.get("endpoint_sourcing") or "").strip()
+        if value not in ENDPOINT_SOURCING:
+            problems.append(
+                f"envelopes.csv {r.get('envelope_id')}: endpoint_sourcing {value!r} is not in the "
+                f"controlled vocabulary; expected one of {sorted(ENDPOINT_SOURCING)}")
+    return problems
+
+
+# ---------------------------------------------------------------------------
+# Vocabularies relocated here in slice 4. Each was a module constant somewhere a
+# consumer could not reach it: BRACKET_VERDICTS and DISPOSITIONS lived in the
+# RENDERER, so the vocabulary was owned by the thing that draws the page rather
+# than by the thing that loads the data, and RISK_UNIT_OPS lived in the TEST
+# FILE, so nothing raised at build time and the only enforcement was a guard
+# re-listing its own expectation.
+# ---------------------------------------------------------------------------
+
+#: What the two endpoints of a band ACTUALLY are. This is the column slice 3 exists for: a width
+#: says how far apart two numbers are and says nothing about whether they are two claims or one.
+BRACKET_VERDICTS = {
+    "two_independent",              # two endpoints citing two DIFFERENT sources. The only verdict
+                                    # under which a band is a band without qualification.
+    "one_source_both_ends",         # both endpoints citing the SAME source. NOT automatically
+                                    # refused - a band may still be the honest summary of what one
+                                    # study found - but the register has to disclose it.
+    "no_source_either_end",         # neither endpoint cites a source, because neither is a citation:
+                                    # the span is bracketed by argument, or it is a choice this
+                                    # project is making. Legitimate, and must not be dressed up as
+                                    # anything else.
+    "measurement_plus_unverifiable",  # one endpoint verified against its document, one whose
+                                    # document could not be re-read. Carried and labelled, never
+                                    # presented as two measurements.
+    "not_a_range",                  # the two ends are different KINDS of claim - a success and a
+                                    # failure, or two bases with a switched denominator - so no width
+                                    # between them is a window of operation. A parameter with this
+                                    # verdict must carry NO range of that kind in parameters.csv and
+                                    # NO value either, and `range_written_where_refused` and
+                                    # `value_written_where_refused` enforce the two halves.
+    "single_point",                 # one endpoint only, in this branch's own units: low == high. The
+                                    # per-branch enzyme loadings are this, because their units do not
+                                    # convert into one another at all.
+}
+# WHY THIS COLUMN ASKS EXACTLY ONE QUESTION. An earlier version of this vocabulary carried a
+# `measurement_plus_argument` value, and the acceptance panel caught it labelling two rows that have
+# no measured endpoint at all - `P-EPS-260`, which states "NO SOURCE AT EITHER END, by construction",
+# and the evaporator's `design_intent` band, whose endpoints are explicitly ours and not measured. The
+# fault was structural rather than clerical: that value mixed "how many independent citations do the
+# endpoints have" with "is this band measured or argued", and the second question is ALREADY answered
+# by `range_kind` (evidence versus argued versus design_intent). One column, one question - so every
+# verdict below is now checkable against the row's own data, which is what let the guard find nothing
+# wrong before.
+
+#: Verdicts under which a numeric interval may be published as a range at all.
+BRACKET_VERDICTS_RANGEABLE = frozenset(BRACKET_VERDICTS - {"not_a_range", "single_point"})
+
+#: How an information requirement is currently answered. The four-way split.
+DISPOSITIONS = {
+    "bracketed_evidence",   # answered by a band whose endpoints are published measurements
+    "bracketed_argument",   # answered by a band bracketed from physical or chemical argument
+    "point_justified",      # answered by ONE value, with a stated reason why no range is needed.
+                            # A bare point value is a claim that the variable does not matter, and
+                            # that claim needs defending - so `point_argument` may not be blank.
+    "not_knowable",         # cannot be answered from the public record at all
+}
+
+# ---------------------------------------------------------------------------
+# THE UNIT-OPERATION KEY, WHICH WAS THREE STRINGS FOR ONE THING.
+#
+# Slice 4 phase 0 moved RISK_UNIT_OPS here and recorded what it could not fix:
+# `risks.unit_op` was free text resolving to no `equip_id`, so `Ligation` and the
+# equipment register's `Enzymatic ligation` were different strings for one unit
+# operation and `Utilities` was absent from the risk vocabulary entirely. Phase 4
+# needs the key, because a solution has to name the unit operation that consumes
+# it and "the CIP wash cleans Ligation" resolves to nothing.
+#
+# MEASURED BEFORE CHOOSING A DIRECTION, and the measurement changed the answer.
+# FOUR registers carry a unit-operation reference, not three:
+#
+#   * `instruments.unit_op`  -> already `equip_id` (U00-BUF .. U06-CIP)
+#   * `streams.from_unit` / `to_unit` -> already `equip_id`, plus the boundary
+#                              pseudo-nodes SUPPLY, WASTE and DS-STORE
+#   * `equipment.unit_op`    -> a free-text DISPLAY LABEL ("Enzymatic ligation"),
+#                              rendered by gen/controls.py and never used as a key
+#   * `risks.unit_op`        -> a third spelling, matching the label on four values
+#                              ("Cleaning", "Evaporation", "Filtration", "Spray
+#                              drying") and diverging on two ("Ligation", "UF/DF")
+#
+# So `equip_id` was ALREADY the key for two of the four registers and `risks` was
+# the outlier - which inverts the obvious fix. Relabelling `risks.unit_op` to the
+# equipment LABEL would have made three spellings into two and left the key
+# unreachable; pointing it at `equip_id` makes four registers share one. The risk
+# rows were rewritten accordingly and this vocabulary is now DERIVED from
+# equipment.csv, so a unit operation added there cannot be missing from it - the
+# defect that hid `Utilities`.
+#
+# Left alone deliberately, and recorded so it is not mistaken for consistency:
+# `equipment.unit_op` stays a display label, and gen/pfd.py's `render_svg(unit_op)`
+# takes an `equip_id` under a parameter name that says otherwise (`equip = {r["equip_id"]:
+# r for r in load_rows("equipment")}` two lines in). That misnomer is a large part of
+# why three vocabularies could look like one; renaming it moves no data and is not
+# this phase's business.
+# ---------------------------------------------------------------------------
+
+#: The one `risks.unit_op` value that names no equipment row: a risk filed against the whole
+#: train rather than against a unit. Every other value must be an `equip_id`, which is what
+#: makes a risk resolvable to the thing it is about.
+RISK_UNIT_OPS_UNSCOPED = frozenset({"All"})
+
+
+def equip_ids():
+    """Every `equip_id` in equipment.csv. The unit-operation key, computed from its owner."""
+    return frozenset((r.get("equip_id") or "").strip() for r in load_rows("equipment"))
+
+
+def risk_unit_ops():
+    """The controlled vocabulary for `risks.unit_op`: every `equip_id`, plus `All`.
+
+    A FUNCTION and not a frozenset built at import time, for a reason the mutation harness
+    makes concrete: it monkeypatches `gen.dataio.DATA_DIR`, so a vocabulary frozen when the
+    module loaded would describe the real data directory while the guard under test read a
+    temporary copy. A derived vocabulary has to be derived when it is asked for.
+    """
+    return equip_ids() | RISK_UNIT_OPS_UNSCOPED
+
+
+RISK_CATEGORIES = {"formulation", "microbial", "process", "product", "purity", "quality"}
+
+
+# ---------------------------------------------------------------------------
+# THE CLEANING SOLUTIONS, NAMED, BECAUSE A DERIVED QUANTITY NOW DEPENDS ON THEM.
+#
+# gen/balance.py computes the campaign cleaning-water demand as
+# `len(equip_ids()) * washes * volume_per_wash` - the circuit count DERIVED from
+# the equipment register rather than written down. That is only honest if every
+# unit operation really does have a registered cleaning chemistry, so
+# `cip_coverage_offenders()` proves it, and this constant says which rows count
+# as cleaning duty.
+#
+# WHY A NAMED CONSTANT RATHER THAN A SEARCH OF `buffers.use`. Sniffing prose for
+# "clean" would make the balance's circuit count depend on wording, and the same
+# class of guard already burned this repository once: the first version of the
+# information-need clause check searched `notes` and blessed the very clause it
+# was written to refuse, because the sentence DENYING the clause contained it.
+# A delimited list is the only version of this that a rewording cannot break.
+#
+# `solution_offenders()` is the neighbouring guard and asks a WIDER question -
+# every unit operation must be named by SOME solution, process or cleaning. This
+# one is narrower and is the premise the balance needs: named by a CLEANING
+# solution specifically. BUF-LIG reaches U01-LIG, so the wider guard passes on a
+# unit operation that nothing cleans.
+# ---------------------------------------------------------------------------
+
+#: The `buffer_id`s whose duty is cleaning rather than processing. Two, and the split
+#: between them is SRC-ISPE-WIENCEK-2006's own instruction that TFF membranes need a
+#: different chemistry from every other unit operation - not a preference of ours.
+CIP_SOLUTIONS = ("BUF-CIP", "BUF-MEMBRANE-CLEAN")
