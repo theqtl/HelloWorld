@@ -6,6 +6,13 @@ so ALL outputs of this module are assumption-driven until real values are suppli
 The module never invents a number: if a required input is blank it raises, so a
 gap cannot silently become a fabricated result.
 
+AND IT CANNOT READ AN EDUCATED ESTIMATE. `provenance = judgement` rows carry their
+number in `est_value` with `value` blank, and every read here goes through
+`param_value`, which reads `value`. So an estimate reaching a computed figure is not
+a thing anyone has to remember not to do - `_require` raises on the blank instead.
+That is the whole structural claim of the fourth provenance, and it is a property of
+which column this module reads rather than a rule written down somewhere.
+
 Boundary: received purified 5'-phosphorylated blocks -> ligation -> clarification
 -> UF/DF -> evaporation -> spray drying -> DS powder. Fully aqueous, no solvents.
 

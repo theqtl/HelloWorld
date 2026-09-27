@@ -4,6 +4,7 @@ site/
 # Generated Markdown (produced by `python -m gen.build` from data/*.csv).
 # Source of truth is data/*.csv, not these files. CI regenerates them.
 docs/registers/parameters.md
+docs/registers/estimates.md
 docs/registers/streams.md
 docs/registers/equipment.md
 docs/registers/buffers.md

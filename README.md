@@ -40,10 +40,19 @@ but not live.
 
 ## Provenance discipline
 
-Every numeric value is flagged **fact** (cited), **inference** (our reasoning/arithmetic), or
-**assumption** (illustrative placeholder, registered as an open question). Unsourced values are
+Every numeric value is flagged **fact** (cited), **inference** (our reasoning/arithmetic),
+**assumption** (illustrative placeholder, registered as an open question) or **judgement** (an
+educated estimate, defended on stated grounds, which no document states). Unsourced values are
 left blank and recorded as gaps — never invented. The mass balance runs on flagged assumption
 inputs and refuses to run on a blank, so a gap cannot become a fabricated result.
+
+The fourth flag exists because `assumption` was covering two unlike things — a placeholder the
+balance needs in order to run, and a bracket somebody can defend — and it comes with obligations
+enforced in the data model rather than by convention. An estimate's number goes in `est_value`,
+never in a value column, so `gen/balance.py` is *unable* to consume one and no estimate can reach a
+computed figure; it states a `basis` whose references must resolve and may not rest on a source
+nobody here has read, and a `falsifier` naming the observation that would show it wrong. All of
+them are collected on the generated estimate census.
 
 `data/sources.csv` carries a `verified` column recording who checked each source against the
 claims made from it, and when. A citation audit on 2026-09-17 checked all twenty-five original

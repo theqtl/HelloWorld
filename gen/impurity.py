@@ -86,7 +86,10 @@ def render():
              "balance (`P-BLOCK-PUR`, `P-LIG-CONV`, `P-DF-DIAVOL`) and is a **fate fraction**, "
              "independent of annual demand (Q-002). Classes with no oligo-specific clearance number "
              "are shown as registered **gaps**, never invented. Provenance and the source travel in "
-             "the table's own columns.\n\n")
+             "the table's own columns. No fraction rests on an **educated estimate**: this module "
+             "reads parameters through `param_value`, which reads `value`, and an estimate is "
+             "carried in `est_value` — so the fourth provenance cannot reach a number here either "
+             "(see the [estimate census](../registers/estimates.md)).\n\n")
 
     nblocks = param_value(params, "P-N-BLOCKS")
     nb = f"{nblocks:.0f} blocks" if nblocks is not None else "the registered block count"

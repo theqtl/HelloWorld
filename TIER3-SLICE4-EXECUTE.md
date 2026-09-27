@@ -30,12 +30,12 @@ Report at the end of each phase what you verified by execution versus what you t
 | --- | --- | --- |
 | 0 — separate the two axes | **done** | `bd9b91e` |
 | 1 — refuse a fabricated value; resolve buffer references | **done** | `35ec908` |
-| 2 — the vocabulary, the fields, the visibility | **next** | — |
-| 3 — the corrections the audits forced | open | — |
+| 2 — the vocabulary, the fields, the visibility | **done** | — |
+| 3 — the corrections the audits forced | **next** | — |
 | 4 — buffers | open | — |
 | 5 — sizing, and the citable cleaning criteria | open | — |
 
-**Baseline is now 163 tests, not 147.** Phase 0 took it to 155, phase 1 to 163.
+**Baseline is now 202 tests, not 147.** Phase 0 took it to 155, phase 1 to 163, phase 2 to 202.
 
 **What phase 0 delivered**, so phase 2 does not redo it: `envelopes.provenance` renamed to
 `endpoint_sourcing` with its own `ENDPOINT_SOURCING` constant kept deliberately separate from
@@ -61,11 +61,66 @@ registers start disagreeing — and prose sweeping is the idiom this repo alread
 problem (`Q-\d{3}`). The structured column is still worth having for rendering links; it is a
 feature, not an integrity fix, and it is **not** done.
 
-**Still true and unfixed, verified at `35ec908`:** the stale three-value enumerations remain in
-`docs/index.md`, `README.md` (3 places), `gen/build.py` (4), `gen/__init__.py` and
-`gen/impurity.py`. The `prov-*` chips still exist only in hand-written prose. The marker precedent
-phase 2 needs is `_with_bracket_verdicts` at `gen/build.py:152`, which injects `**no audit**` into a
-cell at `:174`.
+**What phase 2 delivered.** `judgement` as the fourth `PROVENANCE_VOCAB` value, with three
+obligations enforced rather than described. `est_value`/`basis`/`falsifier` on the three registers
+named by `ESTIMATE_REGISTERS` (`parameters`, `buffers`, `scenarios`), and `judgement` **refused by
+guard** on the other eight. `estimate_offenders()` in `gen/envelope.py`, called from `validate()` so
+it raises at build time: an estimate may not write its register's quantity column, must state a basis
+whose `SRC-`/`P-`/`EQ-`/`Q-` tokens resolve, may not rest on a source graded `abstract-only`,
+`record-only` or `not-retrieved`, must name a question, and that question's status must be `open`.
+`QUESTION_STATUS` added as a vocabulary (all 52 rows already passed it). `_with_provenance_markers`
+beside `_with_bracket_verdicts`, guarded over the transform's return value. Census page at
+`docs/registers/estimates.md`. **No row carries the new provenance** — the machinery landed before
+any number rested on it, which is why nine of the thirty-nine new tests are mutation cases that
+supply the row.
+
+**Where phase 2 chose differently from the plan, and why.**
+
+- **The scope of `est_value`/`basis`/`falsifier` is three registers, not eleven and not two.** The
+  plan said "every register where it is legal" without saying which. The line is drawn on a property
+  of the register — *does a row carry a quantity of its own that cannot be referenced out to
+  `parameters.csv`* — and `ESTIMATE_REGISTERS` records the reason for each of the three. `judgement`
+  is refused on the other eight **by guard**, so the line is enforced rather than assumed.
+  `equipment.turndown` looks like a fourth case and is not: all seven rows state a basis in prose
+  with the numeric ratio explicitly pending, verified row by row.
+- **The cell marker is Markdown, not the CSS chip.** `test_md_table_emits_markdown_only` locks the
+  register tables to pipe tables, and the precedent the plan itself points at
+  (`_with_bracket_verdicts`) injects `**no audit**`. So the cell reads `**estimate only**` /
+  `<n> **judgement**`, and `prov-judgement` is for hand-written prose, where there is no column.
+- **`_CITATION` is unchanged; the rule is a second guard keyed on the QUANTITY.** `prov-judgement` is
+  deliberately absent from `_CITATION`, so a quantity near the chip still needs a real reference, and
+  `test_an_estimated_quantity_in_prose_names_the_parameter_it_estimates` adds the other half. Keyed
+  on the chip it immediately failed on `docs/index.md`'s own legend — which labels no number and must
+  not name a parameter, since none carries an estimate yet.
+- **Most of the "stale three-value enumerations" were not enumerations.** Only three sites enumerate
+  the vocabulary as closed: `docs/index.md`, `README.md:42-44` and `gen/build.py:43-45`. Those are now
+  four-valued. `gen/__init__.py:2`, `gen/impurity.py:85`, `docs/balance/index.md:10`,
+  `docs/techtransfer/index.md:24` and `README.md:67` say "assumption-flagged inputs", which is
+  **still true** and stays true by construction — so each was strengthened to say *why* an estimate
+  cannot be among them, rather than edited to look updated. The plan's `gen/build.py:219` is
+  `return scn["label"], rows`; its build.py line numbers drifted in phases 0-1.
+
+**Two defects found while building phase 2, both by the guards rather than by reading.**
+
+1. **`.gitignore` enumerates the generated pages one by one, and nothing related that list to
+   `_generated_pages()`.** The census page was generated, navigated, linked — and tracked by git, so
+   every build would have shown it as a diff. Fixed, and `test_every_generated_page_is_gitignored`
+   now closes the class.
+2. **`test_numeric_claims_in_prose_carry_a_citation` has never policed a percentage.** `_QUANTITY`
+   ends its unit alternation with `\b`, and a word boundary after `%` needs a WORD character next —
+   so `0.5%`, `0.5 %.` and `0.5% of` all fail to match. Measured, not reasoned: **7 prose lines
+   across 4 pages** are quantities under a corrected regex, carry no citation within the ±3-line
+   window, and pass today (`docs/equations/index.md:77`, `docs/findings/filtration.md:54/152/156`,
+   `docs/sources/ligation-evidence.md:61/62/63`). **NOT fixed here** — it changes an existing guard's
+   semantics and each of the 7 needs judging, which is phase 3's kind of work. Registered here so it
+   is not lost.
+
+**Still true and unfixed, verified at `35ec908`, and now superseded by phase 2:** the stale
+three-value enumerations were in `docs/index.md`, `README.md` (3 places), `gen/build.py` (4),
+`gen/__init__.py` and `gen/impurity.py` — see phase 2's note above for which of those were really
+enumerations. The `prov-*` chips existed only in hand-written prose; `prov-judgement` now exists in
+the CSS and the legend is guarded against the vocabulary. The marker precedent phase 2 needed was
+`_with_bracket_verdicts` at `gen/build.py:152`, which injects `**no audit**` into a cell at `:174`.
 
 ## Working order
 

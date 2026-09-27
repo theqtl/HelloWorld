@@ -6,9 +6,13 @@ docs/process/, and the balance results under docs/balance/. These files are
 generated: edit data/*.csv, not the generated Markdown.
 """
 import os
+import re
 from dataclasses import asdict
 
-from .dataio import load_rows, load_params
+from .dataio import (
+    load_rows, load_params, PROVENANCE_REGISTERS,
+    ESTIMATE_PROVENANCE, ESTIMATE_REGISTERS,
+)
 from .tables import md_table
 from .balance import run_all
 from .flowsheet import render as render_flowsheet
@@ -41,9 +45,18 @@ def gen_registers():
     specs = [
         ("parameters", "registers/parameters.md", "Parameter register",
          "Every numeric input lives here once. `provenance` is one of **fact** "
-         "(from a cited source), **inference** (our reasoning/arithmetic), or "
-         "**assumption** (illustrative placeholder, registered as a gap). "
-         "Blank values are unfilled gaps, never invented. The last column is **joined from "
+         "(from a cited source), **inference** (our reasoning/arithmetic), "
+         "**assumption** (illustrative placeholder, registered as a gap) or **judgement** "
+         "(an educated estimate, defended on stated grounds, which no document states). "
+         "Blank values are unfilled gaps, never invented.\n\n"
+         "**A `judgement` row carries no `value`, and that is structural rather than tidy.** Its "
+         "number is in `est_value`, which `gen/balance.py` does not read - so an estimate cannot "
+         "reach a computed figure, and cannot close the question its `basis` names. `value` reads "
+         "**estimate only** on such a row so the column a reader scans does not show a bare blank; "
+         "`basis` says on what grounds and resolves its own references, and `falsifier` says what "
+         "observation would show the estimate wrong. Both are required, both are guarded, and every "
+         "estimate in the repository is collected on the [estimate census](estimates.md). "
+         "The last column is **joined from "
          "`data/envelopes.csv`** and is not stored here: it says whether a band's two endpoints are "
          "two independent citations or one document wearing two, which a single `source_key` per "
          "row cannot express. `one_source_both_ends` is not a defect - a band may be the honest "
@@ -56,7 +69,12 @@ def gen_registers():
          "Sizing basis, materials of construction (MOC), and turndown per item. "
          "Most sizing is a Tier-2 gap pending the balance inputs.", None),
         ("buffers", "registers/buffers.md", "Buffer & reagent register",
-         "Compositions from cited sources where available; blanks are gaps.", None),
+         "Compositions from cited sources where available; blanks are gaps. A composition is a "
+         "**recipe** and is kept in one row rather than split into one parameter per component, "
+         "which is why this register may carry an educated estimate of its own (`provenance = "
+         "judgement`): a `components` or `ph` cell reading **estimate only** means the row's "
+         "number is in `est_value`, with its `basis` and its `falsifier` beside it. See the "
+         "[estimate census](estimates.md).", None),
         ("utilities", "registers/utilities.md", "Utilities register", "", None),
         ("risks", "registers/risks.md", "Risk register",
          "Sorted view of process, product, purity, and microbial risks.", None),
@@ -141,6 +159,8 @@ def gen_registers():
         rows = load_rows(name)
         if name == "parameters":
             rows = _with_bracket_verdicts(rows)
+        if name in ESTIMATE_REGISTERS:
+            rows = _with_provenance_markers(rows, name)
         body = BANNER + f"# {title}\n\n"
         if intro:
             body += intro + "\n\n"
@@ -176,6 +196,127 @@ def _with_bracket_verdicts(rows):
             r["bracket_verdict (from envelopes.csv)"] = ""
         out.append(r)
     return out
+
+
+#: What a `judgement` row's own number cell says. Markdown, not an HTML chip: the register
+#: tables are pipe tables by decision (`test_md_table_emits_markdown_only`), and the precedent
+#: for injecting a marker into a cell is `_with_bracket_verdicts`, which writes `**no audit**`.
+#: The CSS chips are for hand-written prose, where there is no column to carry the flag.
+ESTIMATE_CELL_MARKER = f"**{ESTIMATE_PROVENANCE}**"
+
+#: What the value column says on an estimate row. It must NOT be a number and must not read as
+#: one: the point is that no value exists, only an estimate that the balance cannot consume.
+VALUE_CELL_MARKER = "**estimate only**"
+
+
+def _with_provenance_markers(rows, register):
+    """Make an educated estimate visible IN THE CELL, not only in the provenance column.
+
+    The acceptance panel's first blocker was that this feature was invisible where numbers are
+    read: the `prov-*` chips existed only in hand-written prose, and the planning note that
+    "adding a value requires no rendering change" was the defect stated as a comfort. A reader
+    scanning the `value` column of the parameter register would have seen a blank on an estimate
+    row - indistinguishable from the unfilled gaps the register intro promises blanks are.
+
+    So two marks, and they say different things:
+
+      * the row's own quantity column (`value`, or `components`/`ph` on a buffer) reads
+        **estimate only** - there is no value here, and the blank is not a gap;
+      * the `est_value` cell reads the number followed by **judgement** - this figure is
+        defended on stated grounds and is not in any document.
+
+    Built as a transform over ROWS, in the shape of `_with_bracket_verdicts` above, so the guard
+    can assert on the transform's RETURN VALUE. It must not assert on the built page: those pages
+    are gitignored and CI runs pytest before `python -m gen.build`, which is the mistake that
+    broke CI once already (see test_every_data_csv_is_published_somewhere).
+    """
+    value_cols = ESTIMATE_REGISTERS[register]
+    out = []
+    for r in rows:
+        r = dict(r)
+        if (r.get("provenance") or "").strip() == ESTIMATE_PROVENANCE:
+            est = (r.get("est_value") or "").strip()
+            if est:
+                r["est_value"] = f"{est} {ESTIMATE_CELL_MARKER}"
+            for col in value_cols:
+                if not (r.get(col) or "").strip():
+                    r[col] = VALUE_CELL_MARKER
+        out.append(r)
+    return out
+
+
+#: The column that NAMES a row, per estimate register, for the census. `parameters` and
+#: `buffers` call it `name`; a scenario's name is its `label`.
+_CENSUS_NAME_COL = {"parameters": "name", "buffers": "name", "scenarios": "label"}
+
+
+def estimate_census():
+    """Every educated estimate in the repository, one row each, computed across the registers.
+
+    The user's decision was "marker in the cell AND a generated census page, not a CSS chip
+    alone", and the census is the half that makes the feature auditable rather than merely
+    visible. Two registers carry estimates and have a register page; `scenarios` has neither -
+    it is published through the balance results, which show `label` and nothing else. So a
+    per-page marker alone would leave a class of estimate with no page that shows its basis.
+    This function is the total view, derived from the registers rather than listed.
+    """
+    id_cols = dict(PROVENANCE_REGISTERS)
+    rows = []
+    for register in sorted(ESTIMATE_REGISTERS):
+        for r in load_rows(register):
+            if (r.get("provenance") or "").strip() != ESTIMATE_PROVENANCE:
+                continue
+            units = (r.get("units") or "").strip()
+            est = (r.get("est_value") or "").strip()
+            rows.append({
+                "Register": register,
+                "Row": r.get(id_cols[register], ""),
+                "What is estimated": (r.get(_CENSUS_NAME_COL[register]) or "").strip(),
+                "Estimate": f"{est} {units}".strip(),
+                "Basis": (r.get("basis") or "").strip(),
+                "Falsifier": (r.get("falsifier") or "").strip(),
+                "Leaves open": ", ".join(sorted(set(re.findall(r"\bQ-\d{3}",
+                                                              r.get("basis") or "")))),
+            })
+    return rows
+
+
+def render_estimates():
+    """The census page. Generated, so it cannot drift from the registers it counts."""
+    rows = estimate_census()
+    body = BANNER + "# Estimate census\n\n"
+    body += (
+        "Every number in this repository that is an **educated estimate** - `provenance = "
+        f"{ESTIMATE_PROVENANCE}` - is listed here, collected from the "
+        f"{len(ESTIMATE_REGISTERS)} registers where one is legal "
+        f"({', '.join('`' + n + '`' for n in sorted(ESTIMATE_REGISTERS))}). "
+        "The count is computed from the data, so this page cannot fall behind the registers.\n\n")
+    body += (
+        "**Why the fourth provenance exists.** `assumption` was covering two unlike things. "
+        "`P-EVAP-T-BOIL` = 50 °C is an illustrative placeholder the balance needs in order to run "
+        "at all; a bracket built from published conversions by someone who can say how is a "
+        "different object, and labelling both the same told a reader the second was as arbitrary "
+        "as the first. Calling either `inference` would have over-claimed in the other direction: "
+        "an inference is derived from things that are cited, and an estimate is not.\n\n"
+        "**What an estimate may not do.** It may not occupy the register's own value column. The "
+        "number lives in `est_value`, and `gen/balance.py` reads `value` - so an estimate is "
+        "*physically unable* to reach a computed figure, and cannot close the question its basis "
+        "names. That is a property of the columns rather than a rule anyone has to remember. Every "
+        "estimate states a **basis** whose `SRC-`/`P-`/`EQ-`/`Q-` references must resolve, and "
+        "which may not rest on a source graded `abstract-only`, `record-only` or `not-retrieved`; "
+        "and a **falsifier**, the observation that would show it wrong. Both are required and both "
+        "are guarded.\n\n")
+    if not rows:
+        body += (
+            "!!! note \"No estimate has been made yet, and that is the honest state\"\n"
+            "    The vocabulary, the three columns and the guards are in place; no row uses them. "
+            "The machinery landed before any number rested on it, so it could be reviewed on its "
+            "own - and so that the first estimate to arrive has something to be checked against "
+            "rather than a rule invented alongside it.\n\n")
+        body += "_No rows._\n"
+        return body
+    body += md_table(rows)
+    return body
 
 
 def gen_streams_on_process():
@@ -227,7 +368,10 @@ def render_balance():
              "flagged **assumption** (illustrative placeholders registered as gaps). They are "
              "*not* validated values. Change `data/parameters.csv` and `data/scenarios.csv` and "
              "re-run `python -m gen.build`; every figure updates. The throughput scenarios are "
-             "illustrative (see Q-002).\n\n")
+             "illustrative (see Q-002). No figure here rests on an **educated estimate**: an "
+             "estimate is carried in `est_value` and the balance reads `value`, so it cannot "
+             "reach this page at all — see the "
+             "[estimate census](../registers/estimates.md).\n\n")
 
     # Per-scenario key results as a comparison table
     keys = [
@@ -300,6 +444,7 @@ def main():
     written = []
     written += gen_registers()
     written.append(gen_streams_on_process())
+    written.append(_write("registers/estimates.md", render_estimates()))
     written.append(_write("balance/results.md", render_balance()))
     written.append(_write("balance/impurities.md", render_impurities()))
     written.append(_write("process/controls.md", render_controls()))

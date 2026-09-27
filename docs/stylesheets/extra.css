@@ -13,6 +13,10 @@
 .prov-fact { color: #2e7d32; font-weight: 600; }
 .prov-inference { color: #1565c0; font-weight: 600; }
 .prov-assumption { color: #b26a00; font-weight: 600; }
+/* The fourth provenance: an educated estimate. Deliberately NOT coloured like `fact`
+   (green) - it is not a retrieved figure - and not like `assumption` (amber), which is
+   the thing it exists to be distinguished from. */
+.prov-judgement { color: #6a1b9a; font-weight: 600; }
 
 /* Diagram sizing */
 .bfd-svg { max-width: 100%; height: auto; }

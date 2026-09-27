@@ -99,6 +99,7 @@ nav:
   - Tech transfer: techtransfer/index.md
   - Registers:
       - Parameters: registers/parameters.md
+      - Estimate census: registers/estimates.md
       - Streams: registers/streams.md
       - Equipment: registers/equipment.md
       - Buffers & reagents: registers/buffers.md

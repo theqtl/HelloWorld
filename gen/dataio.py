@@ -146,6 +146,27 @@ PROVENANCE_VOCAB = {
     "inference",   # derived here, by arithmetic or argument, from things that are cited.
     "assumption",  # an illustrative placeholder the model needs in order to run at all,
                    # registered as a gap. Says nothing about what the real value is.
+    "judgement",   # an EDUCATED ESTIMATE: a number this project is prepared to defend on
+                   # stated grounds, while admitting that no document states it. Added in
+                   # slice 4 because one word - `assumption` - was covering two unlike
+                   # things. `P-EVAP-T-BOIL` = 50 degrees C is an illustrative placeholder
+                   # the balance needs in order to run at all; `P-EPS-260` = 20-25 mL/mg/cm
+                   # is bracketed from A260 conversions plus hypochromicity by someone who
+                   # can say why. Calling both `assumption` told a reader that the second
+                   # was as arbitrary as the first, and calling either `inference` would
+                   # have claimed a derivation from cited things that neither has.
+                   #
+                   # THREE OBLIGATIONS TRAVEL WITH IT, and all three are guarded, because a
+                   # provenance that is merely nicer to write is how a placeholder gets
+                   # promoted for free:
+                   #   1. the number goes in `est_value`, NEVER in the register's own value
+                   #      column - so the balance is PHYSICALLY unable to consume it
+                   #      (`param_value` reads `value`), and "an estimate never closes its
+                   #      question" is structural rather than a promise;
+                   #   2. `basis` says on what grounds, resolving its own SRC-/P-/EQ-/Q-
+                   #      tokens, and may not rest on a source nobody here has read;
+                   #   3. `falsifier` says what observation would show the estimate wrong.
+                   # See ESTIMATE_REGISTERS for where it is legal at all.
 }
 
 #: The controlled vocabulary for `envelopes.endpoint_sourcing` - deliberately a
@@ -172,6 +193,91 @@ PROVENANCE_REGISTERS = (
     ("utilities", "utility_id"),
     ("verdicts", "verdict_id"),
 )
+
+# ---------------------------------------------------------------------------
+# WHERE AN EDUCATED ESTIMATE MAY LIVE, and why the answer is three registers and
+# not eleven.
+#
+# The acceptance panel's second blocker was that the guards for this feature were
+# written against `parameters.csv` while the estimates it exists for land in
+# `buffers.csv` - so the rows the feature was built for escaped every check.
+# Scoping the columns to "wherever this slice happens to put a number" would
+# repeat that defect one slice later, so the line is drawn on a property of the
+# register instead:
+#
+#   AN ESTIMATE MAY LIVE WHERE THE ROW CARRIES A QUANTITY OF ITS OWN - one that
+#   cannot be referenced out to `parameters.csv` without putting a number in two
+#   places.
+#
+# Three registers qualify, and the reason differs in each:
+#   * `parameters` - the register that exists for numbers.
+#   * `buffers`    - a composition is a RECIPE. Splitting `Tris-HCl 50 mM; KCl
+#                    100 mM; MgCl2 10 mM; DTT 1 mM` into four parameters would put
+#                    one buffer in four rows and let them drift apart.
+#   * `scenarios`  - a scenario's demand and campaign count ARE the scenario;
+#                    `gen/balance.py:132-133` reads them off the row directly.
+#
+# The other eight provenance-carrying registers state no quantity of their own -
+# verified column by column: they carry ids, controlled-vocabulary values and
+# prose, and where they need a number they REFERENCE one (`controls.param_ref`,
+# `infoneeds.satisfied_by`, `envelopes.param_id`). `equipment.turndown` looks like
+# a counter-example and is not: all seven rows state a turndown BASIS in prose with
+# the numeric ratio explicitly pending. An estimate in any of them would be a
+# second home for a number, which is the defect `instruments.csv` has no
+# `control_loop` column in order to avoid. So `judgement` is REFUSED there, by
+# guard, rather than merely unused.
+# ---------------------------------------------------------------------------
+
+#: The provenance value that carries an educated estimate. Named once, because three
+#: modules and two test files have to agree on it.
+ESTIMATE_PROVENANCE = "judgement"
+
+#: The three columns an estimate needs, on every register where one is legal.
+#: `est_value` is deliberately NOT `value`: see the note on ESTIMATE_PROVENANCE's
+#: first obligation.
+ESTIMATE_COLUMNS = ("est_value", "basis", "falsifier")
+
+#: {register: the value columns an estimate may NOT write}. The keys are the registers
+#: where `judgement` is legal; the values are the quantity columns that must stay BLANK
+#: on an estimate row, which is what makes the balance unable to consume one.
+ESTIMATE_REGISTERS = {
+    "parameters": ("value",),
+    "buffers": ("components", "ph"),
+    "scenarios": ("annual_ds_demand_kg_yr", "campaigns_per_yr"),
+}
+
+#: The controlled vocabulary for `questions.status`. Free text until slice 4, which is
+#: why it needs one now: an estimate must name the question it does NOT close, and that
+#: obligation is empty if the question's state cannot be read mechanically.
+QUESTION_STATUS = {
+    "open",                # nobody here has answered it.
+    "partially_resolved",  # part of it is settled and the rest is not. Five rows today.
+    "resolved",            # EMPTY today, and informative rather than an oversight: this
+                           # register has never closed a question. The eighteen ids missing
+                           # from the Q-001..Q-070 sequence were never issued, not retired.
+}
+
+#: Access grades meaning NOBODY HERE HAS READ THE DOCUMENT. An estimate's basis may not
+#: rest on one of these, because "we estimated it on the strength of a paper we did not
+#: read" is the citation defect the source register was built to stop, wearing the new
+#: provenance as cover.
+#:
+#: `redacted` and `partial-text-read` are deliberately NOT here, and the reason is worth
+#: stating: the four `redacted` rows are EPARs and FDA chemistry reviews that WERE read,
+#: with the numbers blacked out. A regulator publishing an assessment with the figure
+#: removed is precisely the condition that makes an estimate necessary, so citing it as a
+#: basis is honest - it is what happened.
+ACCESS_GRADES_UNREAD = frozenset({"abstract-only", "record-only", "not-retrieved"})
+
+
+def question_status_offenders():
+    """Rows of questions.csv whose `status` is outside QUESTION_STATUS."""
+    return [
+        f"questions.csv {r.get('question_id')}: status {(r.get('status') or '').strip()!r} is not "
+        f"in the controlled vocabulary; expected one of {sorted(QUESTION_STATUS)}"
+        for r in load_rows("questions")
+        if (r.get("status") or "").strip() not in QUESTION_STATUS
+    ]
 
 
 def provenance_offenders():

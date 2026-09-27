@@ -840,3 +840,454 @@ def test_mutation_a_buffer_source_key_typo_is_caught(mutate):
     mutate("buffers", "buffer_id", "BUF-LIG", source_key="SRC-ALMAC-2023-TYPO")
     with pytest.raises(AssertionError, match="unknown source_key|source_key"):
         tb.test_all_source_keys_resolve()
+
+
+# ---------------------------------------------------------------------------
+# Slice 4 phase 2: the fourth provenance.
+#
+# `judgement` is a nicer word than `assumption` and it is available for one edit, so the
+# split only improves the register if the new label is HARDER to earn. Every obligation
+# below is therefore proved against a failing case, and two cases prove the LIMITS -
+# a legitimate estimate must pass, and a legitimate estimate must be marked. A guard
+# that refused everything would be as wrong as one that refused nothing.
+#
+# `P-LIG-SEG-CONC` is the fixture throughout, for the reason phase 1 used it: it is the
+# register's most carefully argued deliberate blank, so an estimate landing there is the
+# most tempting shape this defect can take.
+# ---------------------------------------------------------------------------
+
+#: A fully legitimate estimate. Every failing case below is this dict with one thing wrong,
+#: so the failure is attributable to that one thing and not to a second defect further down.
+_GOOD_ESTIMATE = dict(
+    provenance="judgement",
+    value="",
+    est_value="0.5",
+    basis=("Bracketed from the segment concentrations in SRC-ALMAC-2023 against P-LIG-T; "
+           "leaves Q-064 open."),
+    falsifier="A measured segment concentration from a kilogram-scale campaign.",
+)
+
+
+def _estimate(**overrides):
+    return {**_GOOD_ESTIMATE, **overrides}
+
+
+def test_mutation_a_legitimate_estimate_is_accepted(mutate):
+    """The limit of the rule, and the case that matters most.
+
+    Nothing in the repository carries this provenance yet, so every other case here proves the
+    guard can refuse. This one proves it can also ACCEPT - without it the whole feature could be
+    satisfied by a guard that rejects the fourth provenance outright, and the suite would be green.
+    """
+    mutate("parameters", "param_id", "P-LIG-SEG-CONC", **_estimate())
+    _validate()()
+
+
+def test_mutation_an_estimate_that_writes_the_value_column_is_caught(mutate):
+    """THE case the whole design rests on.
+
+    An estimate in `value` is consumable by gen/balance.py, and the moment one is, "an estimate
+    never closes its question" becomes a promise rather than a property. This is also the shape
+    the old vocabulary could not refuse at all: relabelling the red team's fabricated
+    `P-LIG-SEG-CONC` value from `assumption` to `judgement` must not buy it a home.
+    """
+    mutate("parameters", "param_id", "P-LIG-SEG-CONC", **_estimate(value="5"))
+    with pytest.raises(ValueError, match="an estimate wrote value='5'"):
+        _validate()()
+
+
+def test_mutation_the_balance_still_refuses_an_estimate_as_an_input(mutate):
+    """The structural claim, proved by running the balance rather than by reading the code.
+
+    `P-DF-DIAVOL` is `_require`d at gen/balance.py:105. Turn it into a correctly-formed estimate -
+    number moved to `est_value`, basis and falsifier stated, everything the guard asks for - and the
+    balance must still refuse to run. Not because a guard forbids it: because `param_value` reads
+    `value`, finds a blank, and `_require` raises. That is the difference between a rule and a
+    property, and it is the one claim in this phase that no amount of reading the CSV could
+    establish.
+
+    The first draft of this case used `P-LIG-CONV`, which reads like a balance input and is not -
+    `used_by` says `analysis`, and gen/impurity.py is what consumes it. The case passed nothing and
+    proved nothing, and the fix was to pick the fixture off `used_by` rather than off its name.
+    """
+    from gen.balance import run_all
+    mutate("parameters", "param_id", "P-DF-DIAVOL",
+           **_estimate(est_value="7",
+                       basis="Bracketed from the diafiltration data in SRC-ALMAC-2023; leaves "
+                             "Q-020 open.",
+                       falsifier="A measured residual at a stated diavolume count for this duplex."))
+    with pytest.raises(ValueError, match="P-DF-DIAVOL is blank"):
+        run_all()
+
+
+def test_mutation_an_estimate_with_no_basis_is_caught(mutate):
+    """Without the basis, `judgement` and `assumption` are one word again with two spellings."""
+    mutate("parameters", "param_id", "P-LIG-SEG-CONC", **_estimate(basis=""))
+    with pytest.raises(ValueError, match="with a blank basis"):
+        _validate()()
+
+
+def test_mutation_an_estimate_with_no_falsifier_is_caught(mutate):
+    """An estimate no observation could contradict is an opinion wearing a number."""
+    mutate("parameters", "param_id", "P-LIG-SEG-CONC", **_estimate(falsifier=""))
+    with pytest.raises(ValueError, match="with a blank falsifier"):
+        _validate()()
+
+
+def test_mutation_an_estimate_with_no_number_is_caught(mutate):
+    """A basis and a falsifier with nothing between them is a gap, and a gap is registered as one."""
+    mutate("parameters", "param_id", "P-LIG-SEG-CONC", **_estimate(est_value=""))
+    with pytest.raises(ValueError, match="with a blank est_value"):
+        _validate()()
+
+
+def test_mutation_a_basis_citing_a_source_that_does_not_exist_is_caught(mutate):
+    """A defence resting on a reference that resolves to nothing is resting on nothing.
+
+    The same defect class as the fabricated ICH Q11 "s4.3" the acceptance panel found: a citation
+    that looks like one and is not, which passed every gate because nothing resolved it.
+    """
+    mutate("parameters", "param_id", "P-LIG-SEG-CONC",
+           **_estimate(basis="Bracketed from SRC-ALMAC-2023-TYPO; leaves Q-064 open."))
+    with pytest.raises(ValueError, match="basis cites SRC-ALMAC-2023-TYPO, which resolves to "
+                                        "nothing"):
+        _validate()()
+
+
+def test_mutation_a_basis_citing_a_parameter_that_does_not_exist_is_caught(mutate):
+    """A second token shape, because one resolving shape does not prove the other three."""
+    mutate("parameters", "param_id", "P-LIG-SEG-CONC",
+           **_estimate(basis="Bracketed against P-LIG-TEMPERATURE; leaves Q-064 open."))
+    with pytest.raises(ValueError, match="basis cites P-LIG-TEMPERATURE"):
+        _validate()()
+
+
+def test_mutation_a_basis_citing_an_equation_that_does_not_exist_is_caught(mutate):
+    """`EQ-` resolves against the equations page's own headings, via gen/envelope.equation_ids()."""
+    mutate("parameters", "param_id", "P-LIG-SEG-CONC",
+           **_estimate(basis="Bracketed via EQ-SEGMENT; leaves Q-064 open."))
+    with pytest.raises(ValueError, match="basis cites EQ-SEGMENT"):
+        _validate()()
+
+
+def test_mutation_an_estimate_resting_on_an_unread_document_is_caught(mutate):
+    """The laundering case, and the reason this guard exists at all.
+
+    "Estimated on the strength of" a paper nobody here opened is the 2026-09-17 citation defect
+    with a better label on it. `SRC-ISO-10628-1` is `not-retrieved` - paywalled, never obtained -
+    so it cannot support anything.
+    """
+    mutate("parameters", "param_id", "P-LIG-SEG-CONC",
+           **_estimate(basis="Bracketed from SRC-ISO-10628-1; leaves Q-064 open."))
+    with pytest.raises(ValueError, match="graded 'not-retrieved' - nobody here has read it"):
+        _validate()()
+
+
+def test_mutation_an_estimate_may_rest_on_a_redacted_document(mutate):
+    """The deliberate carve-out, which is a limit and not an oversight.
+
+    The four `redacted` sources are EPARs and FDA chemistry reviews that WERE read with the numbers
+    blacked out. A regulator publishing an assessment with the figure removed is precisely what
+    makes an estimate necessary, so citing it is honest - it is what happened. Refusing it would
+    push the true basis into free text where nothing resolves it.
+    """
+    mutate("parameters", "param_id", "P-LIG-SEG-CONC",
+           **_estimate(basis="Bracketed from SRC-FDA-OXLUMO-CHEMR; leaves Q-064 open."))
+    _validate()()
+
+
+def test_mutation_an_estimate_naming_no_open_question_is_caught(mutate):
+    """An estimate that names no question reads as having closed one."""
+    mutate("parameters", "param_id", "P-LIG-SEG-CONC",
+           **_estimate(basis="Bracketed from SRC-ALMAC-2023 against P-LIG-T."))
+    with pytest.raises(ValueError, match="basis names no Q- question"):
+        _validate()()
+
+
+def test_mutation_an_estimate_naming_a_closed_question_is_caught(mutate):
+    """`Q-017` is `partially_resolved`, so it is the fixture no test has to invent.
+
+    Either the estimate closed the question - in which case it is not an estimate - or the question
+    register is wrong. Both are defects and the guard does not have to choose between them.
+    """
+    mutate("parameters", "param_id", "P-LIG-SEG-CONC",
+           **_estimate(basis="Bracketed from SRC-ALMAC-2023; leaves Q-017 open."))
+    with pytest.raises(ValueError, match="status is 'partially_resolved'"):
+        _validate()()
+
+
+def test_mutation_the_fourth_provenance_outside_its_registers_is_caught(mutate):
+    """`judgement` is refused where the row states no quantity of its own.
+
+    `utilities` is the fixture: it carries `provenance` and its columns are `driven_by` and
+    `scenario_dependent` - nothing numeric. An estimate there would have no `est_value` to live in
+    and no basis column to defend it, so the label would promise a defence that has nowhere to go.
+    """
+    mutate("utilities", "utility_id", "UT-WFI", provenance="judgement")
+    with pytest.raises(ValueError, match="is not legal in this register"):
+        _validate()()
+
+
+def test_mutation_an_estimate_column_on_a_row_that_is_not_an_estimate_is_caught(mutate):
+    """The converse direction: a number with the label's benefits and none of its obligations.
+
+    Same reasoning as `infoneeds.point_argument`, which may not be populated on a row carrying no
+    point value - an argument attached to the wrong thing will be read as justifying it.
+    """
+    mutate("parameters", "param_id", "P-LIG-T", est_value="37")
+    with pytest.raises(ValueError, match="est_value is populated on a 'assumption' row"):
+        _validate()()
+
+
+def test_mutation_a_basis_on_a_row_that_is_not_an_estimate_is_caught(mutate):
+    """A second column of the three, because one proved column does not prove the other two."""
+    mutate("parameters", "param_id", "P-LIG-T",
+           basis="Bracketed from SRC-ALMAC-2023; leaves Q-010 open.")
+    with pytest.raises(ValueError, match="basis is populated on a 'assumption' row"):
+        _validate()()
+
+
+def test_mutation_an_estimate_in_buffers_may_not_touch_the_composition(mutate):
+    """`buffers` is the register the feature exists for, so the rule is proved there too.
+
+    The panel's second blocker was that phase 2's guards covered `parameters.csv` while the
+    estimates land here - the rows the feature was built for escaped every check. A buffer's
+    quantity columns are `components` and `ph`, and an estimate may write neither.
+    """
+    mutate("buffers", "buffer_id", "BUF-DF", provenance="judgement", ph="7.0",
+           est_value="Tris 20 mM", basis="From SRC-ALMAC-2023; leaves Q-038 open.",
+           falsifier="A vendor-stated or measured composition for this step.")
+    with pytest.raises(ValueError, match="an estimate wrote ph='7.0'"):
+        _validate()()
+
+
+def test_mutation_an_estimate_in_scenarios_may_not_touch_the_demand(mutate):
+    """The third estimate register, and the one whose numbers gen/balance.py reads off the row.
+
+    `annual_ds_demand_kg_yr` and `campaigns_per_yr` are read at gen/balance.py:132-133 rather than
+    through `param_value`, so this is a second path by which an estimate could reach a computed
+    figure, and it needs its own case.
+    """
+    mutate("scenarios", "scenario_id", "S1", provenance="judgement", est_value="250",
+           basis="From SRC-ALMAC-2023; leaves Q-002 open.",
+           falsifier="A published or commercially confirmed annual demand.")
+    with pytest.raises(ValueError, match="an estimate wrote annual_ds_demand_kg_yr"):
+        _validate()()
+
+
+def test_mutation_a_question_status_typo_is_caught(mutate):
+    """`questions.status` was free text until this slice made it load-bearing.
+
+    An estimate must name a question that is still `open`, and that check is worth nothing if
+    `opne` validates - the status would simply never equal `open` and every estimate would be
+    refused for the wrong reason.
+    """
+    mutate("questions", "question_id", "Q-064", status="opne")
+    with pytest.raises(ValueError, match="Q-064: status 'opne'"):
+        _validate()()
+
+
+# --- Visibility: the cell marker and the census ------------------------------
+#
+# These read gen/build.py and docs/ rather than only the CSVs, so two of them monkeypatch the
+# derived value instead of redirecting DATA_DIR - the idiom the nav and legend cases use above.
+
+def test_mutation_a_legitimate_estimate_is_marked_in_its_cell(mutate):
+    """The positive case, and without it the marker guard is vacuous.
+
+    No row carries this provenance today, so `test_an_estimate_is_marked_in_the_cell_where_the
+    _number_is_read` currently iterates nothing and passes. This case supplies the row and asserts
+    the marker really appears - the panel's first blocker was invisibility, and a green suite over
+    zero rows is exactly how invisibility survives.
+    """
+    import gen.test_balance as tb
+    from gen.build import _with_provenance_markers, ESTIMATE_CELL_MARKER, VALUE_CELL_MARKER
+    from gen.dataio import load_rows
+    mutate("parameters", "param_id", "P-LIG-SEG-CONC", **_estimate())
+    raw = {r["param_id"]: r for r in load_rows("parameters")}
+    marked = {r["param_id"]: r
+              for r in _with_provenance_markers(load_rows("parameters"), "parameters")}
+    row = marked["P-LIG-SEG-CONC"]
+    assert row["est_value"] == f"0.5 {ESTIMATE_CELL_MARKER}", row["est_value"]
+    assert row["value"] == VALUE_CELL_MARKER, row["value"]
+    # Every other row must come through untouched, compared against the register rather than
+    # against a value typed here. The first draft of this case asserted `P-LIG-T` equals "37";
+    # it is 25, so the case failed for a reason that had nothing to do with the transform. That
+    # is harness rule 2 - anchor on a row id, never on a field value - and it applies to the
+    # assertion as much as to the mutation.
+    untouched = {pid: r for pid, r in marked.items() if pid != "P-LIG-SEG-CONC"}
+    assert all(r["value"] == raw[pid]["value"] for pid, r in untouched.items()), (
+        "the transform changed a row that is not an estimate")
+    tb.test_an_estimate_is_marked_in_the_cell_where_the_number_is_read()
+
+
+def test_mutation_an_estimate_rendering_as_a_bare_blank_is_caught(mutate):
+    """The defect the marker exists to stop, reached through the data.
+
+    A `judgement` row whose value column is populated cannot be marked - the transform will not
+    overwrite a number - so the guard must see it. That is the same row state
+    `test_mutation_an_estimate_that_writes_the_value_column_is_caught` refuses at validate time;
+    proving BOTH guards see it is the point, because the visibility guard has to hold even if the
+    validator is ever relaxed.
+    """
+    import gen.test_balance as tb
+    mutate("parameters", "param_id", "P-LIG-SEG-CONC", **_estimate(value="5"))
+    with pytest.raises(AssertionError, match="must not render as an unfilled gap"):
+        tb.test_an_estimate_is_marked_in_the_cell_where_the_number_is_read()
+
+
+def test_mutation_an_estimate_marker_on_a_row_that_is_not_one_is_caught(mutate):
+    """The other direction: a marker claiming a defence nobody wrote.
+
+    Reached by planting the marker text in the CSV itself, which is the faithful mutation - the
+    marker is Markdown, so nothing stops a register row from containing it verbatim.
+    """
+    import gen.test_balance as tb
+    from gen.build import VALUE_CELL_MARKER
+    mutate("parameters", "param_id", "P-LIG-T", value=VALUE_CELL_MARKER)
+    with pytest.raises(AssertionError, match="carries an estimate marker on a 'assumption' row"):
+        tb.test_an_estimate_is_marked_in_the_cell_where_the_number_is_read()
+
+
+def test_mutation_an_estimate_register_rendered_without_the_transform_is_caught(monkeypatch,
+                                                                               tmp_path):
+    """A transform nothing calls is dead code a guard can still prove correct.
+
+    Mutates gen/build.py's SOURCE, because that is what the wiring guard reads - and it reads the
+    source rather than the built page for the reason the publication guard does: the pages are
+    gitignored and CI runs pytest first.
+    """
+    import gen.test_balance as tb
+    src = open(os.path.join(ROOT, "gen", "build.py"), encoding="utf-8").read()
+    doctored = src.replace("        if name in ESTIMATE_REGISTERS:\n"
+                           "            rows = _with_provenance_markers(rows, name)\n", "")
+    assert doctored != src, "the wiring this case removes is no longer in gen/build.py"
+    (tmp_path / "gen").mkdir()
+    (tmp_path / "gen" / "build.py").write_text(doctored, encoding="utf-8")
+    monkeypatch.setattr(tb, "ROOT", str(tmp_path))
+    with pytest.raises(AssertionError, match="must apply _with_provenance_markers"):
+        tb.test_the_marker_transform_is_wired_into_every_estimate_register()
+
+
+def test_mutation_a_numeric_reader_that_falls_back_to_the_estimate_is_caught(monkeypatch,
+                                                                            tmp_path):
+    """The structural property, checked from the other side, and in the place it would really break.
+
+    `test_mutation_the_balance_still_refuses_an_estimate_as_an_input` proves the numeric path refuses
+    an estimate TODAY. This proves the guard would notice somebody making it read one - and the
+    mutation is written against `param_value` in gen/dataio.py rather than against gen/balance.py,
+    because that is the accessor every consumer goes through. A one-line fallback there hands an
+    estimate to the balance, the impurity overlay and the envelope page at once while balance.py
+    itself still reads `value`, which is exactly the hole a balance-only guard would have left.
+    """
+    import gen.test_balance as tb
+    (tmp_path / "gen").mkdir()
+    for name in tb._NUMERIC_READERS:
+        src = open(os.path.join(ROOT, "gen", name), encoding="utf-8").read()
+        if name == "dataio.py":
+            doctored = src.replace(
+                '    raw = (row.get("value") or "").strip()\n',
+                '    raw = (row.get("value") or "").strip()\n'
+                '    raw = raw or (row.get("est_value") or "").strip()\n')
+            assert doctored != src, "param_value no longer has the line this case mutates"
+            src = doctored
+        (tmp_path / "gen" / name).write_text(src, encoding="utf-8")
+    monkeypatch.setattr(tb, "ROOT", str(tmp_path))
+    with pytest.raises(AssertionError, match="gen/dataio.py reads est_value"):
+        tb.test_no_numeric_reader_consumes_an_estimate()
+
+
+def test_mutation_an_estimate_reaches_the_census_page(mutate):
+    """The census claims to list every estimate in the repository, so a real one must appear.
+
+    Vacuous today for the same reason the marker guard is - no row carries the provenance - and this
+    case is what makes it real. It asserts the RENDERED page carries the basis and the falsifier,
+    not merely that a census row exists: for a `scenarios` estimate this page is the only place a
+    reader could ever see either, since that register has no register page at all.
+    """
+    import gen.test_balance as tb
+    from gen.build import render_estimates
+    mutate("parameters", "param_id", "P-LIG-SEG-CONC", **_estimate())
+    page = render_estimates()
+    assert "P-LIG-SEG-CONC" in page
+    assert "leaves Q-064 open" in page
+    assert "kilogram-scale campaign" in page
+    assert "_No rows._" not in page
+    tb.test_every_estimate_reaches_the_census()
+
+
+def test_mutation_a_provenance_value_absent_from_the_legend_is_caught(monkeypatch):
+    """Exactly the defect this phase found: a vocabulary the legend does not explain.
+
+    The `prov-*` chips were hand-written prose and the vocabulary was a Python constant, with
+    nothing relating the two - so the legend had gone three values deep and would have stayed there.
+    """
+    import gen.test_balance as tb
+    monkeypatch.setattr(tb, "PROVENANCE_VOCAB", set(tb.PROVENANCE_VOCAB) | {"hunch"})
+    with pytest.raises(AssertionError, match="absent from the docs/index.md legend"):
+        tb.test_the_provenance_legend_covers_the_whole_vocabulary()
+
+
+def test_mutation_a_legend_chip_outside_the_vocabulary_is_caught(monkeypatch):
+    """The other direction: a legend entry left behind after a value was retired."""
+    import gen.test_balance as tb
+    monkeypatch.setattr(tb, "PROVENANCE_VOCAB",
+                        {v for v in tb.PROVENANCE_VOCAB if v != "judgement"})
+    with pytest.raises(AssertionError, match="not in PROVENANCE_VOCAB"):
+        tb.test_the_provenance_legend_covers_the_whole_vocabulary()
+
+
+def test_mutation_an_estimated_quantity_with_no_parameter_named_is_caught(monkeypatch, tmp_path):
+    """The rule the plan asked for: the chip does not satisfy `_CITATION` on its own.
+
+    Writes a page making exactly the claim the rule refuses - a quantity labelled as an educated
+    estimate with nothing naming the row that carries its basis - and proves the guard sees it.
+
+    THE FIXTURE USES `mM` AND NOT A PERCENTAGE, and the reason is a defect in the guard this one
+    rides on rather than a stylistic choice. `_QUANTITY` ends its unit alternation with `\b`, and a
+    word boundary after `%` requires a WORD character next - so `0.5%`, `0.5 %.` and `0.5% of` all
+    fail to match, and `test_numeric_claims_in_prose_carry_a_citation` has never policed a
+    percentage at all. Measured, not reasoned: seven prose lines across four pages are quantities
+    under a corrected regex, carry no citation in their window, and pass today. That is a
+    pre-existing hole in a different guard and correcting it is not this phase's work, so it is
+    REGISTERED here rather than fixed silently - and this case is written so that it does not
+    depend on the bug either way.
+    """
+    import gen.test_balance as tb
+    page = tmp_path / "estimated.md"
+    page.write_text(
+        "# A page\n\n"
+        "The wash runs at <span class=\"prov-judgement\">judgement</span> 125 mM caustic.\n",
+        encoding="utf-8")
+    monkeypatch.setattr(tb, "_doc_files", lambda: [str(page)])
+    with pytest.raises(AssertionError, match="flagged as an educated estimate with no parameter"):
+        tb.test_an_estimated_quantity_in_prose_names_the_parameter_it_estimates()
+
+
+def test_mutation_an_estimated_quantity_naming_its_parameter_passes(monkeypatch, tmp_path):
+    """And the limit: the same claim, traceable, must pass.
+
+    Without this the guard could be satisfied by refusing the chip in prose altogether, which would
+    make the feature invisible in exactly the place the panel objected to.
+    """
+    import gen.test_balance as tb
+    page = tmp_path / "estimated.md"
+    page.write_text(
+        "# A page\n\n"
+        "`P-CIP-NAOH` is <span class=\"prov-judgement\">judgement</span> at 125 mM.\n",
+        encoding="utf-8")
+    monkeypatch.setattr(tb, "_doc_files", lambda: [str(page)])
+    tb.test_an_estimated_quantity_in_prose_names_the_parameter_it_estimates()
+
+
+def test_mutation_a_generated_page_left_out_of_gitignore_is_caught(monkeypatch):
+    """The defect walked into while building the census page, reproduced.
+
+    A page correctly generated, navigated and linked, and tracked by git - so every build would
+    show it as a diff and the data change that caused it would be reviewed without being read.
+    """
+    import gen.test_balance as tb
+    real = tb._generated_pages()
+    monkeypatch.setattr(tb, "_generated_pages", lambda: real | {"registers/not-ignored.md"})
+    with pytest.raises(AssertionError, match="not listed in .gitignore"):
+        tb.test_every_generated_page_is_gitignored()

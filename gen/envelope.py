@@ -34,7 +34,8 @@ import re
 from .dataio import (
     load_rows, load_params, RANGE_KINDS, RANGE_KINDS_ICH,
     BRACKET_VERDICTS, BRACKET_VERDICTS_RANGEABLE, DISPOSITIONS,
-    ENDPOINT_SOURCING, provenance_offenders,
+    ENDPOINT_SOURCING, provenance_offenders, question_status_offenders,
+    ESTIMATE_PROVENANCE, ESTIMATE_COLUMNS, ESTIMATE_REGISTERS, ACCESS_GRADES_UNREAD,
 )
 from .tables import md_table
 
@@ -128,6 +129,191 @@ def satisfied_universe():
                       ("impurities", "impurity_id"), ("risks", "risk_id")):
         out |= {r[col] for r in load_rows(name)}
     return out
+
+
+#: Token shapes an estimate's `basis` must be able to resolve, each with the universe it
+#: resolves against. SRC- is matched and REMOVED FIRST, because a source key legitimately
+#: contains hyphenated words that the P-/EQ-/Q- shapes would otherwise pick out of the
+#: middle of it - the resolver would then report a dangling reference that was never written.
+_BASIS_TOKENS = (
+    ("SRC-", re.compile(r"SRC-[A-Z0-9-]+")),
+    ("P-", re.compile(r"\bP-[A-Z0-9-]{3,}")),
+    ("EQ-", re.compile(r"\bEQ-[A-Z]+")),
+    ("Q-", re.compile(r"\bQ-\d{3}")),
+)
+
+
+def equation_ids():
+    """Every equation id the equations page defines, taken from its own headings.
+
+    The universe for `EQ-` references, and it lives beside drives_universe() for the same
+    reason: computed from the thing that defines it, never listed. gen/test_balance.py had
+    its own copy of this function; it now calls this one, so a reference resolved by the
+    control register and a reference resolved by an estimate's basis cannot start disagreeing
+    about which equations exist.
+    """
+    import os
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    text = open(os.path.join(root, "docs", "equations", "index.md"), encoding="utf-8").read()
+    return set(re.findall(r"^##\s*(EQ-[A-Z]+)", text, re.M))
+
+
+def estimate_offenders():
+    """Every way an educated estimate can fail to be one, across every register.
+
+    `judgement` is the fourth provenance value and the only one that carries a number nobody
+    has published. Three things therefore have to be true of it, and none of them is true by
+    construction - which is why this function exists rather than a note in a docstring:
+
+    1. THE NUMBER IS NOT IN THE REGISTER'S VALUE COLUMN. An estimate goes in `est_value`, and
+       the row's own quantity columns stay blank. That is not tidiness: `param_value` reads
+       `value`, so a blank there makes gen/balance.py PHYSICALLY unable to consume an estimate,
+       and "an estimate never closes its question" stops being a promise. The converse is
+       guarded too - `est_value` on a row that is not an estimate is a number with no
+       obligations attached.
+
+    2. THE BASIS RESOLVES, AND WAS READ. Every SRC-/P-/EQ-/Q- token in `basis` must resolve,
+       and no cited source may be graded `abstract-only`, `record-only` or `not-retrieved`.
+       This is the guard that stops the new provenance becoming a laundry: "estimated on the
+       strength of" a document nobody here opened is the exact citation defect of 2026-09-17
+       with a better label on it. And at least one `Q-` token is required, because the
+       question an estimate does NOT close is part of what makes it an estimate - a row that
+       names no open question is claiming to have settled something.
+
+    3. THE QUESTION IS STILL OPEN. A `partially_resolved` or `resolved` question cited as the
+       thing an estimate leaves open is a contradiction: either the estimate closed it, in
+       which case it is not an estimate, or the register is wrong about the question.
+
+    Plus the register-level rule: `judgement` is REFUSED outside ESTIMATE_REGISTERS. A number
+    in any of the other eight registers belongs in `parameters.csv` and gets referenced, so an
+    estimate there would be a second home for one figure.
+    """
+    problems = []
+    sources = {r["source_key"]: r for r in load_rows("sources")}
+    questions = {r["question_id"]: r for r in load_rows("questions")}
+    params = load_params()
+    equations = equation_ids()
+    universes = {"SRC-": sources, "P-": params, "EQ-": equations, "Q-": questions}
+
+    from .dataio import PROVENANCE_REGISTERS
+    for name, id_col in PROVENANCE_REGISTERS:
+        rows = load_rows(name)
+        if not rows:
+            continue
+        header = set(rows[0].keys())
+        value_cols = ESTIMATE_REGISTERS.get(name)
+        if value_cols is None:
+            # Not an estimate register. `judgement` is refused, and so is a stray estimate
+            # column - the columns and the legality have to travel together or the refusal
+            # becomes a naming convention.
+            for r in rows:
+                if (r.get("provenance") or "").strip() == ESTIMATE_PROVENANCE:
+                    problems.append(
+                        f"{name}.csv {r.get(id_col)}: provenance {ESTIMATE_PROVENANCE!r} is not "
+                        f"legal in this register. It states no quantity of its own; register the "
+                        f"number in parameters.csv and reference it, or a figure ends up with two "
+                        f"homes. Legal in: {sorted(ESTIMATE_REGISTERS)}")
+            stray = sorted(header & set(ESTIMATE_COLUMNS))
+            if stray:
+                problems.append(
+                    f"{name}.csv carries estimate column(s) {stray} but is not an estimate "
+                    f"register; add it to ESTIMATE_REGISTERS with its quantity columns, or drop "
+                    f"the columns")
+            continue
+
+        missing = [c for c in ESTIMATE_COLUMNS if c not in header]
+        if missing:
+            problems.append(
+                f"{name}.csv is an estimate register but has no {missing} column(s); an estimate "
+                f"with nowhere to state its basis is an unlabelled placeholder")
+            continue
+        absent = [c for c in value_cols if c not in header]
+        if absent:
+            problems.append(
+                f"{name}.csv: ESTIMATE_REGISTERS names quantity column(s) {absent} that the "
+                f"register does not have, so nothing is being kept blank")
+            continue
+
+        for r in rows:
+            rid = r.get(id_col)
+            prov = (r.get("provenance") or "").strip()
+            est = (r.get("est_value") or "").strip()
+            basis = (r.get("basis") or "").strip()
+            fals = (r.get("falsifier") or "").strip()
+
+            if prov != ESTIMATE_PROVENANCE:
+                # An estimate's three columns describe an estimate. Populated on a row that is
+                # not one, they will be read as justifying something that is not there - the
+                # same defect `infoneeds.point_argument` is guarded against.
+                for col, val in (("est_value", est), ("basis", basis), ("falsifier", fals)):
+                    if val:
+                        problems.append(
+                            f"{name}.csv {rid}: {col} is populated on a {prov!r} row. Those three "
+                            f"columns belong to a {ESTIMATE_PROVENANCE!r} row; here they attach an "
+                            f"estimate's defence to a number that is not one")
+                continue
+
+            if not est:
+                problems.append(
+                    f"{name}.csv {rid}: provenance {ESTIMATE_PROVENANCE!r} with a blank est_value. "
+                    f"An estimate with no number is a gap, and a gap is registered as one")
+            for col in value_cols:
+                written = (r.get(col) or "").strip()
+                if written:
+                    problems.append(
+                        f"{name}.csv {rid}: an estimate wrote {col}={written!r}. The number goes "
+                        f"in est_value and {col} stays blank - that is what makes the balance "
+                        f"unable to consume an estimate, and it is the whole structural claim of "
+                        f"the fourth provenance")
+            if not basis:
+                problems.append(
+                    f"{name}.csv {rid}: provenance {ESTIMATE_PROVENANCE!r} with a blank basis. "
+                    f"The basis is what distinguishes an educated estimate from a placeholder; "
+                    f"without it the two are one word again")
+            if not fals:
+                problems.append(
+                    f"{name}.csv {rid}: provenance {ESTIMATE_PROVENANCE!r} with a blank falsifier. "
+                    f"An estimate that no observation could contradict is not an estimate, it is "
+                    f"an opinion")
+
+            # The basis has to resolve. SRC- first, then the remaining shapes over what is left.
+            residue = basis
+            found = {}
+            for prefix, pat in _BASIS_TOKENS:
+                hits = pat.findall(residue)
+                found[prefix] = hits
+                residue = pat.sub(" ", residue)
+                for tok in hits:
+                    if tok not in universes[prefix]:
+                        problems.append(
+                            f"{name}.csv {rid}: basis cites {tok}, which resolves to nothing. An "
+                            f"estimate defended by a reference that does not exist is defended by "
+                            f"nothing")
+            for tok in found["SRC-"]:
+                src = sources.get(tok)
+                if src is None:
+                    continue
+                grade = (src.get("access") or "").strip()
+                if grade in ACCESS_GRADES_UNREAD:
+                    problems.append(
+                        f"{name}.csv {rid}: basis rests on {tok}, graded {grade!r} - nobody here "
+                        f"has read it. An estimate may cite a document whose NUMBER is redacted; "
+                        f"it may not cite one whose TEXT was never obtained")
+            if not found["Q-"]:
+                problems.append(
+                    f"{name}.csv {rid}: basis names no Q- question. An estimate must say which "
+                    f"question it leaves open, or it reads as having closed one")
+            for tok in found["Q-"]:
+                q = questions.get(tok)
+                if q is None:
+                    continue
+                status = (q.get("status") or "").strip()
+                if status != "open":
+                    problems.append(
+                        f"{name}.csv {rid}: basis names {tok}, whose status is {status!r} and not "
+                        f"'open'. Either the estimate closed the question - in which case it is "
+                        f"not an estimate - or the question register is wrong")
+    return problems
 
 
 def validate():
@@ -313,6 +499,15 @@ def validate():
     # files - but it is CALLED from here because this is the one validator the build runs, and a
     # vocabulary only a test knows cannot stop `python -m gen.build` from publishing a typo.
     problems += provenance_offenders()
+
+    # The fourth provenance, and the `questions.status` vocabulary it depends on. Both run at
+    # BUILD time and not only under pytest, for the reason phase 0 gave: a vocabulary that only
+    # a test knows cannot stop `python -m gen.build` from publishing a typo. The estimate guard
+    # is the one that matters most here - an estimate is the only provenance whose obligations
+    # (a basis that resolves, a falsifier, a question left open) cannot be read off the row by
+    # eye, so an unchecked one publishes as a defended number with nothing behind it.
+    problems += question_status_offenders()
+    problems += estimate_offenders()
 
     if problems:
         raise ValueError("envelope register problem(s): " + "; ".join(problems))
