@@ -32,7 +32,7 @@ Report at the end of each phase what you verified by execution versus what you t
 | 1 — refuse a fabricated value; resolve buffer references | **done** | `35ec908` |
 | 2 — the vocabulary, the fields, the visibility | **done** | `25c831b` |
 | 3 — the corrections the audits forced | **done** | `55c75d2` |
-| 4 — buffers | **done** | (this commit) |
+| 4 — buffers | **done** | `83a7da0` |
 | 5 — sizing, and the citable cleaning criteria | **next** | — |
 
 **Baseline is now 215 tests, not 147.** Phase 0 took it to 155, phase 1 to 163, phase 2 to 202, phase 3 to 205,
@@ -294,6 +294,57 @@ from every other unit operation.
 nowhere: `equip_id`, free-text `equipment.unit_op`, and `RISK_UNIT_OPS` where `Ligation` ≠
 `Enzymatic ligation` and `Utilities` is absent entirely. Phase 0 relocated that constant but did not
 reconcile it. Fix the key first, then guard on `equip_id`.
+
+### Phase 5 — verified state, 2026-09-27. THE LAST PHASE.
+
+**Baseline 215 tests.** Phase 4 produced six buffer rows — `BUF-LIG` and `BUF-MEMBRANE-CLEAN` as
+`fact`, `BUF-QUENCH` as `fact` scoped to *"Terminating a WITHDRAWN ALIQUOT"* (the analytical-scale
+caveat carried in the data, not a note), and **three `judgement` rows**: `BUF-DF`, `BUF-FINAL`,
+`BUF-CIP`. The machinery is in use.
+
+**Two sources phase 5 needs are NOT registered, and one is a trap.** The citable carryover criteria
+live in **PIC/S PI 006-3 §7.11.3** (docview **3447**, not 3436, which is a newsletter) and **WHO TRS
+1019 Annex 3 §11.6 and §11.9–11.10**. Neither is in `sources.csv`. **`SRC-WHO-TRS1044` is a
+DIFFERENT document** — TRS 1044, not TRS 1019 — so do not cite it for these criteria. Both give
+*"no more than 10 ppm"* and *"no more than 0.1% of the normal therapeutic dose"*, WHO explicitly *"in
+rinse water as ppm"*, and WHO mandates *"the most stringent of three options"*. These are `evidence`,
+not `judgement`.
+
+**`P-HBEL-DS` stays blank and this is not an oversight.** The criteria above and a PDE are
+**different quantities**. MACO and the swab limit are a division by one number, so a bracket is
+useless for that duty — a 10× band gives a 10× swab-limit band straddling the TOC/HPLC LOQ, which
+cannot select an analytical method. Its research beat also failed on a safeguard false positive and
+was never done. `P-ENZ-CLEARANCE-LRV` likewise stays blank: it forks on `Q-050`, and the ligase
+(~38 kDa) is larger than the product duplex (~14 kDa), so size-based clearance runs the wrong way.
+
+**Cleaning demand is still zero litres in the balance.** `gen/balance.py:171` reads
+`wfi = df_buffer + lig_vol  # dominant clean-water demand (buffer prep + DF)` — that is the figure
+sizing `U00-BUF` and `UT-WFI`, and `U06-CIP` contributes nothing to it. **Re-locate that line rather
+than trusting the number; `gen/balance.py` moved in phase 2.** Now that `BUF-CIP` exists as a
+registered recipe, its volume per cycle and cycles per campaign are what make the estimate buy
+something.
+
+**The range-to-steel numbers, computed in-process via the `_excipient_sensitivity` deep-copy idiom
+(nothing written) — re-run them, do not paste them:** `P-CONC-LIG` 5 / 15 / 20 g/L gives Mid-scenario
+ligation volumes of **33,340 / 11,002 / 8,229 L**; `P-DF-DIAVOL` 4 / 7 / 20 gives DF buffer
+**3,023 / 5,291 / 15,117 L** and WFI **13,727 / 16,293 / 27,527 L**. The finding that matters: at the
+bottom of the concentration envelope the Mid scenario needs a **33,340 L** ligation vessel, which is
+not a buildable single vessel — so the bracket decides whether the plant exists, not merely how big a
+tank is.
+
+**Other phase 5 items.** `P-UFDF-HOLDUP-LOSS` = 0.10 and `P-DF-DIAVOL` = 7, both `assumption`: the
+hold-up loss against a 227 L retentate implies ~23 L, and at 1–2 L/m² that is 11–23 m² of membrane —
+hold-up and area are **not independent**, so a consistency guard is the deliverable, not a number.
+The phosphorylation→ligation fill requirement is **2 mM or 5 mM to 1 mM** (V to 2–5V in one vessel);
+**state the published contradiction, do not resolve it** — phase 3 registered it.
+
+**End-of-slice obligations, since this is the last phase.** A final report saying what was verified
+**by execution** versus reasoned about, and for every estimate: its basis, its falsifier, the question
+it did **not** close, and why a range was or was not given. Then re-read `TIER3-SLICE4-PLAN.md`
+against what actually landed and correct anything phases 3–5 moved.
+
+**And the standing recommendation, now stronger: there are 10 commits and no PR.** Phases 0–5 have
+never been reviewed. Land them.
 
 ## Working order
 
