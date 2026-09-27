@@ -742,3 +742,101 @@ def test_mutation_a_bad_risk_unit_op_is_caught_against_the_imported_vocabulary(m
     import gen.test_balance as tb
     with pytest.raises(AssertionError, match="outside the vocabulary"):
         tb.test_risk_unit_op_and_category_are_a_controlled_vocabulary()
+
+
+# ---------------------------------------------------------------------------
+# test_a_refused_bracket_is_not_written_as_a_value_either
+#
+# This is the one mutation in the file that reproduces a defect found by exploiting it
+# rather than by reading the code. A red team set P-LIG-SEG-CONC.value = 5 with its
+# provenance untouched and the whole suite stayed green (155 passed at the time) while
+# `python -m gen.build` published the fabricated number on the register page. The three
+# cases below pin the fix and, just as importantly, pin its LIMITS - the rule deliberately
+# still permits a sourced single point, so a guard that rejected everything would be wrong.
+# ---------------------------------------------------------------------------
+
+def test_mutation_a_fabricated_value_on_a_refused_bracket_is_caught(mutate):
+    """The red team's exact reproduction. It must now fail.
+
+    `P-LIG-SEG-CONC` is blank because ENV-006 rules its span `not_a_range`: the low end is a
+    demonstrated success and the high end a reported failure, so no width between them is a
+    window of operation. An `assumption` value here is a plausible-looking number in the one
+    place the register has argued at length that no number is available.
+    """
+    import gen.test_balance as tb
+    mutate("parameters", "param_id", "P-LIG-SEG-CONC", value="5")
+    with pytest.raises(AssertionError, match="rules the span not_a_range"):
+        tb.test_a_refused_bracket_is_not_written_as_a_value_either()
+
+
+def test_mutation_a_sourced_single_point_on_a_refused_bracket_is_allowed(mutate):
+    """The limit of the rule, which matters as much as the rule.
+
+    The policy `range_written_where_refused` states allows "a blank or a clearly-labelled single
+    point". So a value that someone has actually measured or derived, and that cites where it came
+    from, must PASS - otherwise the guard would forbid the register from ever recording that the
+    question got answered.
+    """
+    import gen.test_balance as tb
+    mutate("parameters", "param_id", "P-LIG-SEG-CONC",
+           value="5", provenance="fact", source_key="SRC-ALMAC-2023")
+    tb.test_a_refused_bracket_is_not_written_as_a_value_either()
+
+
+def test_mutation_a_sourceless_fact_on_a_refused_bracket_is_caught(mutate):
+    """`fact` alone does not buy a value - the source is what makes the point checkable.
+
+    Without this case the guard could be satisfied by relabelling a fabricated number `fact`,
+    which is a one-word edit.
+    """
+    import gen.test_balance as tb
+    mutate("parameters", "param_id", "P-LIG-SEG-CONC",
+           value="5", provenance="fact", source_key="")
+    with pytest.raises(AssertionError, match="with no source"):
+        tb.test_a_refused_bracket_is_not_written_as_a_value_either()
+
+
+# ---------------------------------------------------------------------------
+# test_every_buffer_reference_resolves_and_every_buffer_is_referenced
+#
+# First mutation coverage of buffers.csv in the file's history - the harness had none,
+# which is why three separate buffer guards could be absent without anyone noticing.
+# ---------------------------------------------------------------------------
+
+def test_mutation_a_dangling_buffer_reference_is_caught(mutate):
+    """A typo'd buffer id renders as a confident cross-reference to nothing."""
+    import gen.test_balance as tb
+    mutate("impurities", "impurity_id", "IMP-DIVALENT",
+           notes="Enters with the ligation buffer, which carries MgCl2 (BUF-LIGG).")
+    with pytest.raises(AssertionError, match="undefined buffer"):
+        tb.test_every_buffer_reference_resolves_and_every_buffer_is_referenced()
+
+
+def test_mutation_a_buffer_nothing_references_is_caught(mutate):
+    """The other direction: a solution registered for a process that does not use it.
+
+    Reaching this limb takes care, and the first attempt at this case was wrong in a way the guard
+    itself caught. Renaming the buffer id looks like the faithful mutation, but it trips the
+    DANGLING limb first - every citing register still names the old id - and the guard asserts
+    dangling before orphan, so the orphan branch never ran. The mutation has to create an orphan
+    WITHOUT creating a dangling token, which means silencing the citation rather than renaming the
+    row. `BUF-DF` is cited exactly once in the whole data layer, by `streams.csv` S06, which makes
+    it the only buffer this case can be built on.
+    """
+    import gen.test_balance as tb
+    mutate("streams", "stream_id", "S06",
+           notes="Final DV must exchange into a spray-dryable matrix (excipient choice is Q-038).")
+    with pytest.raises(AssertionError, match="no other register names"):
+        tb.test_every_buffer_reference_resolves_and_every_buffer_is_referenced()
+
+
+def test_mutation_a_buffer_source_key_typo_is_caught(mutate):
+    """buffers was absent from the source-key sweep until slice 4.
+
+    Nothing in CI resolved it; the only guard that would have reads the RENDERED page, which CI
+    never builds before pytest.
+    """
+    import gen.test_balance as tb
+    mutate("buffers", "buffer_id", "BUF-LIG", source_key="SRC-ALMAC-2023-TYPO")
+    with pytest.raises(AssertionError, match="unknown source_key|source_key"):
+        tb.test_all_source_keys_resolve()

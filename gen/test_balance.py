@@ -11,7 +11,10 @@ from gen.balance import run_all, purity_floor
 def test_all_source_keys_resolve():
     sources = {r["source_key"] for r in load_rows("sources")}
     # parameters, risks, impurities, controls and instruments reference source_key; blanks allowed
-    for name in ("parameters", "risks", "impurities", "controls", "instruments"):
+    # buffers was absent until slice 4, so a typo'd source_key in a buffer row resolved
+    # against nothing in CI - the only thing that would have caught it reads the RENDERED
+    # page, which CI never builds before pytest.
+    for name in ("parameters", "risks", "impurities", "controls", "instruments", "buffers"):
         for r in load_rows(name):
             key = (r.get("source_key") or "").strip()
             if key:
@@ -2034,6 +2037,27 @@ def test_a_refused_bracket_is_not_written_as_a_range():
     )
 
 
+def test_a_refused_bracket_is_not_written_as_a_value_either():
+    """The other half of the standing rule, and the half that was missing.
+
+    Its sibling above polices the BAND. Nothing policed the POINT, so the register's most carefully
+    argued deliberate blank - `P-LIG-SEG-CONC`, whose own note says "Value deliberately BLANK and
+    DELIBERATELY NO RANGE" because its low end is a demonstrated success and its high end a reported
+    failure - could be filled with a fabricated number and every gate stayed green. That was proved
+    by reproduction rather than argued: see the mutation case of the same name.
+
+    `P-HBEL-DS` (:840) and `P-LIG-ENZ-LOAD`/`P-ENZ-CLEARANCE-LRV` (:1473) each already have a guard
+    naming them and asserting a blank value. This one is derived from the envelope register instead,
+    so it covers any future refused bracket without anyone remembering to add a row to a list.
+    """
+    from gen.envelope import value_written_where_refused
+    offenders = value_written_where_refused()
+    assert not offenders, (
+        "parameter(s) carrying a value where envelopes.csv rules the span is not a range; blank it "
+        "and leave the question registered: " + "; ".join(offenders)
+    )
+
+
 def test_every_band_has_an_endpoint_audit():
     """A number a reader can use must say whether its two ends are two claims or one.
 
@@ -2290,3 +2314,42 @@ def test_the_access_legend_covers_the_whole_vocabulary():
     assert not (legend - expected), (
         "the reading-list legend explains labels that are not in ACCESS_VOCAB, so it describes a "
         "vocabulary the register does not use: " + ", ".join(sorted(legend - expected)))
+
+
+_BUFFER_TOKEN = re.compile(r"\bBUF-[A-Z0-9][A-Z0-9-]*\b")
+
+
+def test_every_buffer_reference_resolves_and_every_buffer_is_referenced():
+    """Buffer ids were named across nine registers and resolved by nothing.
+
+    Eighteen mentions, in `notes`, `mitigation`, `intro_stream`, `scope_reviewed` and
+    `satisfied_by`, and the referential sweep at :1313 resolves `unit_op`, `equation_ref`,
+    `risk_ref`, `instrument_ref` and `gap_ref` - never buffers. So a typo'd buffer id rendered as
+    a confident cross-reference to nothing.
+
+    Swept out of prose rather than moved into a `buffer_ref` column, which is the idiom this repo
+    already uses for exactly this: `test_every_question_reference_exists_in_every_csv` resolves
+    `Q-\\d{3}` the same way. A column would also have duplicated `infoneeds.satisfied_by`, whose
+    three buffer references are already structured and already resolved by `satisfied_universe()`
+    in gen/envelope.py. Carrying the reference twice is how two registers start disagreeing.
+
+    Both directions, because each fails differently. An unresolved token is a dangling
+    cross-reference. A buffer nothing references is a solution registered for a process that does
+    not use it - the same defect as a generated page no page links to, which shipped once already.
+    """
+    ids = {r["buffer_id"] for r in load_rows("buffers")}
+    dangling, referenced = [], set()
+    for path in sorted(glob.glob(os.path.join(ROOT, "data", "*.csv"))):
+        name = os.path.basename(path)[:-4]
+        for r in load_rows(name):
+            for tok in _BUFFER_TOKEN.findall(" ".join(str(v or "") for v in r.values())):
+                if tok not in ids:
+                    dangling.append(f"{name}.csv: {tok}")
+                elif name != "buffers":
+                    referenced.add(tok)
+    assert not dangling, (
+        "reference(s) to undefined buffer(s): " + "; ".join(sorted(set(dangling))))
+    orphans = sorted(ids - referenced)
+    assert not orphans, (
+        "buffer(s) no other register names, so nothing in the process uses them: "
+        + ", ".join(orphans))

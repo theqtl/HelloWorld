@@ -346,6 +346,52 @@ def range_written_where_refused():
     return offenders
 
 
+def value_written_where_refused():
+    """param_ids whose envelope rules the span `not_a_range` while parameters.csv writes a VALUE.
+
+    The sibling of range_written_where_refused, and the hole it left. That function reads
+    `range_low`, `range_high` and `range_kind`; `value` never appears in it. So the refusal was
+    enforced against the band and not against a point, and a fabricated point value passed every
+    guard in the suite - verified by reproduction, not by reading: setting
+    `P-LIG-SEG-CONC.value = 5` with its provenance untouched left 155 tests green and the build
+    published the number on the register page.
+
+    The rule is NOT "a not_a_range row may carry no value". That would contradict the policy
+    range_written_where_refused states, which allows "a blank or a clearly-labelled single point".
+    A point is legitimate here when someone has finally measured or derived one - so it must be
+    `fact` or `inference` AND carry a source_key. What is refused is an `assumption` value: an
+    illustrative placeholder standing where the register has argued at length that the evidence
+    defines no value at all. That is the "plausible-looking number" docs/index.md promises never to
+    write, and it is the one shape of this defect that no other guard can see.
+
+    Deliberately keyed on `not_a_range` ALONE, not on `single_point`. `single_point` is one
+    legitimate endpoint (ENV-007/008/009 carry `endpoint_sourcing=fact` with low == high), and
+    treating the two verdicts alike would forbid a correctly sourced loading.
+    """
+    params = load_params()
+    offenders = []
+    for r in load_rows("envelopes"):
+        if r["bracket_verdict"] != "not_a_range":
+            continue
+        p = params.get(r["param_id"])
+        if not p:
+            continue
+        value = (p.get("value") or "").strip()
+        if not value:
+            continue
+        prov = (p.get("provenance") or "").strip()
+        source = (p.get("source_key") or "").strip()
+        if prov in ("fact", "inference") and source:
+            continue
+        offenders.append(
+            f"{r['param_id']}: envelopes.csv {r['envelope_id']} rules the span not_a_range, but "
+            f"parameters.csv writes value {value!r} on provenance {prov!r}"
+            + (f" citing {source}" if source else " with no source")
+            + "; a refused bracket keeps a blank, or a single point that is measured or derived "
+              "and cites where it came from")
+    return offenders
+
+
 def envelope_by_param():
     """{(param_id, range_kind): row} for every audited band."""
     return {(r["param_id"], r["range_kind"]): r for r in load_rows("envelopes")}
