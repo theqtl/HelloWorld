@@ -1,266 +1,262 @@
-# Plan: let this repo carry engineering judgement, labelled and guarded
+# Tier-3 slice 4 — engineering judgement as a labelled provenance
 
-`theqtl/HelloWorld`. Branch `claude/sirna-evidence-research-k8btv0`, restarted from `origin/main`
-(`git fetch origin main && git checkout -B claude/sirna-evidence-research-k8btv0 origin/main`).
-**Never push to `main`** — the site deploys from it. Plan first; do not start editing.
+## Context
 
-## The ask, in one sentence
+The register refuses any number not in a retrieved document. Good discipline, and it produced 47
+parameters of which **35 are `assumption`** — one word covering two unlike things: an *illustrative
+placeholder* the balance needs to run (`P-EVAP-T-BOIL` = 50 °C) and an *educated estimate*
+(`P-EPS-260` = 20–25 mL/mg/cm, bracketed from A260 conversions plus hypochromicity, no source either
+end).
 
-This register currently refuses any number that is not in a retrieved document. Make it able to
-carry **educated engineering estimates** — values from general process/chemistry knowledge rather
-than a citation — in a way that is **unmistakable on sight** and **impossible to confuse with a
-sourced fact or with an illustrative placeholder**. Then use it to fill the gaps worth filling:
-the **buffer register first** (three rows, one of them real, behind a six-instrument buffer-prep
-suite and a four-instrument CIP system with no registered cleaning solution), then the ligation
-parameter gaps.
+The ask: carry educated estimates so it is **clear what is inferred when you look**, without letting
+them pass as sourced facts.
 
-The user's words: *"It would be clear what is inferred when I look but it would be nice to make
-some educated assumptions."*
+**Three audit rounds ran before this was written.** Four role reviewers each returned **REJECT**, for
+four different reasons. A red team attacked my four planning findings: two refuted, one's reasoning
+refuted, one confirmed by reproduction. Then a second-order audit re-retrieved the documents behind
+the red team's and the research beat's claims, and **refuted the plan's own headline research result**.
+The corrections below are the most valuable content here.
 
-Two follow-up exchanges shaped this, both recorded below rather than summarised away: the user
-chose the fourth-provenance-value option over reusing `assumption` or building a separate register,
-and then asked *"Do you think there is only one type of buffer that use ever used or?"* — which is
-what surfaced the buffer register as the real hole.
+## Decisions taken with the user
 
-## Two decisions already taken — do not re-open them
+- A fourth `provenance` value **plus a mandatory guarded basis**, but **fix the polysemy first**.
+- **Rename `envelopes.provenance`** (to `endpoint_sourcing` or similar) rather than reconciling data:
+  the two columns answer different questions.
+- **Marker in the cell + a generated census page**, not a CSS chip alone.
+- **A falsifier field, guarded.**
+- **Both** the buffer compositions *and* the sizing work.
 
-1. **A fourth `provenance` value, plus a mandatory guarded basis field.** Not "reuse `assumption`",
-   not "a separate estimates register". The reason is in the numbers below: `assumption` already
-   covers two unlike things across 35 rows, and adding to it makes that worse.
-2. **Scope: `buffers.csv` first, then the ligation parameter gaps.** Not a retro-fit audit of all 35
-   `assumption` rows (that is a later slice, and worth registering as a question), not "just do it
-   ad hoc". The scope was originally stated as the ligation parameter gaps alone; it was widened
-   after the buffer register was measured — see **The buffer register is the real hole** below. The
-   buffers are the *better* first test of the new provenance value, because a T4 PNK reaction buffer
-   and a caustic CIP recipe are among the most standardised solutions in the industry, so a labelled
-   estimate with a stated basis is genuinely strong there. `P-HBEL-DS` by contrast needs compound
-   tox data that recall cannot supply.
+## Audit round 1 — the red team on my claims
 
-## Why this is a schema change and not just permission
+**REFUTED — "the only retrieved quench is thermal, so a chemical quench would invent a route."** Four
+registered sources name a chemical stop, including the one my claim rested on. `SRC-WO2025262452`'s
+register quote is **truncated one sentence early**: *"diluted 400-fold in **10 mM EDTA pH 7.0**"*.
+`SRC-NEB-WO2023173098` names a *"2x Quench Solution (20 mM EDTA, 2% SDS)"*. `SRC-PBCV1-2014` a
+*"stop solution containing 50 mM EDTA and 10 mM Tris–HCl at pH 7.5"*. And `SRC-ALMAC-2023` quenches
+with **methanol** — a sentence the register already cites, **for its percent sign**, to support a claim
+that the text contains exactly one `%`. It had the quench in hand and read it for punctuation. So
+`Q-059`'s *"the only retrieved quench is thermal"* is false of the documents (true only of the CSVs),
+and a quench row is **supportable**. Caveats that must travel: every chemical stop is at an
+**analytical sampling point**, not a process unit operation; and the paper's two methanol quenches are
+almost certainly **one operation described twice** (1 volume ≈ 100% v/v), not two data points.
 
-`provenance` has three values. Across the 47 parameter rows: **6 `fact`, 6 `inference`, 35
-`assumption`**. That one word currently covers two things with different reliability and different
-consequences if wrong:
+**REASONING REFUTED, conclusion survives — "no separate phosphorylation buffer, because one-pot."**
+"One-pot" means the two blockmers phosphorylated *together*, not kinase and ligase sharing a vessel.
+The conclusion holds for a better reason: SI **Tables S1 and S2 are identical component-for-component
+including pH** — verified independently with two PDF extractors to rule out a dropped row — so a PNK
+composition row would duplicate `BUF-LIG`. But a real process step is missing from the register:
+*"heat treated at 75 °C for 10 min (initial) or 30 min (crude), then **centrifuged to pellet any
+precipitated material and supernatant used for ligations**"* — a thermal hold, a **solids rejection**
+and a supernatant transfer. And `SRC-NEB-WO2023173098` names a **distinct** kinase buffer with its own
+vessel change.
 
-| Row | What it actually is |
-|---|---|
-| `P-EVAP-T-BOIL` = 50 °C, band 40–60 | an **illustrative placeholder** — the balance needs a number to run; no claim it is right |
-| `P-EPS-260` = blank, band 20–25 mL/mg/cm | an **educated estimate** — bracketed from standard A260 conversions plus duplex hypochromicity, `range_kind=argued`, no source at either end |
+**CONFIRMED by reproduction — the deliberate-blank hole.** The red team set
+`P-LIG-SEG-CONC.value = 5` keeping `provenance = assumption` in a throwaway copy: **147 passed**, and
+`gen.build` published the fabricated value. I verified the cause statically —
+`range_written_where_refused()` (`gen/envelope.py:352`) reads `range_low`, `range_high`, `range_kind`
+and **`value` never appears in the function**. The only accidental tripwire is
+`test_no_value_without_provenance` policing the vocabulary — **exactly what this slice removes.**
 
-Same label, same amber colour, same guard. `P-EPS-260` is the **working template** for what the
-user wants and it already passes all 147 guards — so the capability exists; what is missing is the
-label that distinguishes it, and the discipline that makes it safe.
+## Audit round 2 — the second-order audit, which refuted my headline
 
-## The rules this deliberately relaxes, and how far
+**The 5 mM withdrawal rested on a contested number.** I withdrew a planning claim because the SI says
+*"Phosphorylation of the 5′-OH blockmers at **2 mM** concentration was telescoped into the ligation
+reaction at **1 mM** concentration"*. That quote is exact. But the **main text describes the same
+experiment** — same one-pot phosphorylation of 1.2/1.3, same ligation of 1.4 then 1.1, same Figure S5
+reference — and says **5 mM**. The published record is **internally inconsistent**, and *"2 mM"* never
+appears standalone in the main text. So neither the original claim nor my withdrawal is safe. What is
+registrable is **the contradiction itself**, as a new question: a peer-reviewed paper and its own SI
+give two different charge concentrations for one experiment. Standalone-token counts, measured: `5 mM`
+appears once in the main text and never in the SI (the other hits are inside `0.5 mM`).
 
-The original slice prompt said, verbatim: *"Retrieve documents; do not recall them"*, *"Never
-invent, round or extrapolate"*, *"A gap stays blank and becomes a registered question."* Those were
-applied absolutely, which is why the ligation slice produced Q-057…Q-070 instead of estimates.
+**REFUTED — "the membrane numbers are evidence with both ends independently sourced across two
+vendors."** They are **one inherited industry convention**, not two measurements:
 
-The relaxation is **narrow and conditional**, and every condition is a guard:
+- The identical bracket — 0.1–0.5 N, 30–60 min, ~25/30–50 °C — recurs across **two vendors, three
+  product lines and at least three polymers**, with unit drift (N / M / N) that is itself a tell of
+  copied legacy text.
+- **Millipore publishes one NaOH bracket for both Ultracel (regenerated cellulose) and Biomax
+  (polyethersulfone)** — internal proof the numbers are not chemistry-specific measurements.
+- **The ends conflict rather than corroborate.** Millipore permits 25 °C; Cytiva's HF handbook says
+  20 °C is *"not recommended"* and prefers 50 °C; Cytiva's own CFF table then prescribes 20 °C for a
+  hypochlorite/NaOH blend. Two Cytiva documents disagree.
+- **Millipore's cited row is chemically self-contradictory**: 0.1–0.5 N NaOH is pH 13–13.7, not the
+  *"pH 10–11"* printed beside it — that looks carried over from the adjacent hypochlorite row, and
+  Cytiva independently says **pH 13**. Citing "0.1–0.5 N NaOH, pH 10–11" **propagates a typo**.
+- Millipore also **discourages the very endpoint being cited**: *"There is an initial NWP decline …
+  after initial exposure to 0.5N NaOH. Better membrane life has been observed at lower
+  concentrations."* And it carries a **100-hour cumulative exposure budget** with no Cytiva
+  counterpart, which merging the sources silently discards. Cytiva explicitly disclaims
+  transferability.
 
-- a recalled value must be labelled with the new provenance value — never `fact`, never `inference`
-  (which means *our arithmetic on sourced numbers*), never `assumption`;
-- it must carry its **basis** — the reasoning, in a dedicated field, guarded non-blank. An estimate
-  with no stated basis is indistinguishable from an invented number, and the thing that makes
-  `P-EPS-260` trustworthy is that you can *attack* its stated reasoning;
-- it must **still reference its open question**. An estimate does not close a gap. This is the
-  single most important property: `Q-0xx` stays `open` and the row points at it, so filling the
-  number never quietly retires the need for real data;
-- prefer a **range over a point**. A range shows the uncertainty a point value hides. Where a point
-  is given, the basis must say why the variable's spread does not matter;
-- *"Never invent, round or extrapolate"* still holds for anything presented as sourced. And the ISA
-  prohibition is untouched: no ISA clause text, letter tables or symbol tables, nothing
-  reconstructed from memory; `SRC-ISA-5-1-2024` and `SRC-ISA-TR5-1-02-2024` stay `not-retrieved`
-  and Q-053 stays open.
+So the membrane row is `one_source_both_ends` at convention level — **not** `two_independent` — its
+access grade must be **downgraded off `full-text-read`** (the only reachable copy is a third-party
+reseller mirror, frozen 2016, Merck's own hosts 403, currency unverifiable), the pH figure must be
+dropped, and the 100-hour budget carried.
 
-## Why the caution is not theatre — this repo is its own evidence
+**PARTLY WRONG — the alkaline-resistance claim.** The mechanism half is supported and now better
+evidenced: the product has **zero 2′-OH** (both strands tokenised from the SI — 21 and 23 residues, all
+2′-OMe or 2′-F), and Egli & Manoharan (*NAR* 2023, open access) state *"Modification also affords
+chemical stability in that it precludes 2′-OH-mediated strand cleavage."* But *"alkaline"* appears
+**zero times** in that review, no primary source exposed a fully 2′-modified siRNA to caustic cleaning
+conditions, and *"resists"* ≠ *"is inert"* — the backbone and the GalNAc amides remain. **The "so" is a
+non sequitur**: cleaning validation nowhere requires the residue to be chemically degraded; Annex 15,
+PIC/S, WHO and ICH Q7 all set **removal limits measured analytically**. Keep the mechanism, drop the
+inference.
 
-Read `docs/sources/ligation-evidence.md` first. Its four **withdrawn** claims were all
-recall-shaped and all *looked right*:
+**PARTLY REFUTED, and this one is a gain — "the regulatory record has no numeric cleaning value at
+all."** True for **caustic concentration, temperature and contact time** (genuinely absent from all
+five documents). **False for residue-acceptance criteria**, which are citable and mandatory in phrasing:
+PIC/S PI 006-3 §7.11.3 and WHO TRS 1019 Annex 3 §11.9–11.10 both give *"no more than 10 ppm"* and
+*"no more than 0.1% of the normal therapeutic dose"*, WHO explicitly *"in rinse water as ppm"* (§11.6)
+and *"the most stringent of three options should be used"* (§11.10). **This changes the `P-HBEL-DS`
+decision** — see phase 5.
 
-- the 45–75 °C inactivation bracket, whose lower endpoint was a recalled figure that one pass
-  called a melting temperature and another an activity midpoint, with no retrievable document to
-  settle it;
-- a 2.7-log endotoxin comparison that silently merged two different proteins from two different
-  tables and converted a host-strain difference into a purified-vs-crude one;
-- a yield claim that **inverted its source's polarity** (71% of yield lost vs. ~3% gained);
-- a block-count "sign error" that was not one.
+**CONFIRMED, and weaker than I framed it — the ISPE 1%.** The word *"Assume"* is there, and the figure
+sits inside a list headed *"Assumptions"*, used only to convert 720,000 L of water into 7,200 L of
+chemical in a waste-arithmetic example. It is a **bookkeeping placeholder, not a process parameter.**
 
-None was caught by reading it. All were caught by re-retrieval. **Recalled numbers fail quietly.**
-That is an argument for labelling them loudly, not for refusing them.
+## Audit round 3 — in-repo claims, verified by my own execution
 
-## Verified state of the tree (measured, 2026-09-26 — do not re-derive, but do re-confirm before editing)
+- **The polysemy is 11 rows, not the 2 the panel found.** Every envelope row naming a parameter
+  disagrees with `parameters.csv`, systematically and in one direction: `ENV-001/002/003/007/008/009/
+  010/012/014/015/016` say `fact` (8) or `inference` (2) where `parameters` says `assumption`.
+- `ENV-007/008/009` are `single_point`, `provenance=fact`, `low==high` (0.4, 1, 20) — so merging
+  `single_point` into the blank-value guard **would have forbidden phase 5's own estimate**.
+- **12 blank-value parameter rows**, provenance unpoliced, because `test_no_value_without_provenance`
+  fires only when `value` is non-blank.
+- Blank-value guards exist for `P-HBEL-DS` (`:843-846`), `P-LIG-ENZ-LOAD` and `P-ENZ-CLEARANCE-LRV`
+  (`:1473`). **`P-LIG-SEG-CONC` has none.**
+- `wfi = df_buffer + lig_vol` — **cleaning demand is zero litres** in the number sizing `U00-BUF` and
+  `UT-WFI`.
+- **The sizing numbers are exact**, re-run in memory via the `_excipient_sensitivity` deep-copy idiom:
 
-- Head `2ab632c`, working tree clean, `python -m pytest gen -q` → **147 passed**.
-- `PROVENANCE_VOCAB = {"fact", "inference", "assumption"}` at `gen/test_balance.py:1249`, consumed
-  at `:1342` and `:1350` (the referential-integrity sweep over `controls` and `instruments`).
-- **`test_no_value_without_provenance` (`gen/test_balance.py:~36`) re-lists the three values inline**
-  instead of importing the constant. That is the anti-pattern this repo names explicitly; fix it as
-  part of the change, or the fourth value will be legal in one guard and illegal in another.
-- `test_assumption_params_reference_a_question` (`:~26`) requires `"Q-" in notes` for every
-  `assumption`. The new value needs the same requirement — see the honesty rule above.
-- `parameters.csv`: 13 columns, header ends `...,range_low,range_high,range_kind`, **CRLF**, 47 rows.
-  A 14th field appends cleanly: `csv.writer(quoting=QUOTE_MINIMAL, lineterminator='\r\n')`
-  round-trips it so every data line becomes exactly `<old line>,` — verified byte-wise. Ten CSVs are
-  CRLF; `streams.csv` and `scenarios.csv` are LF. Quoting differs per file.
-- **Twelve CSVs carry a `provenance` column**: buffers, controls, couplings, envelopes, equipment,
-  impurities, infoneeds, instruments, parameters, scenarios, utilities, verdicts. Decide and state
-  whether the new value is legal in all of them or only in `parameters` — the sweep at `:1342`
-  currently polices `controls` and `instruments` against the same constant.
-- `range_kind` counts: 10 `evidence`, 1 `argued` (`P-EPS-260`), 1 `design_intent`
-  (`P-EVAP-T-BOIL`), 35 blank. `proven_acceptable_range` and `design_space` are deliberately empty
-  ICH terms with a guard that no row claims them.
-- **CSS**: `docs/stylesheets/extra.css:13-15` defines `.prov-fact` `#2e7d32`, `.prov-inference`
-  `#1565c0`, `.prov-assumption` `#b26a00`. **There is no dark-mode block in the file at all** — check
-  the chosen colour against both Material themes rather than assuming.
-- **Two legends list the three values and will go stale**: the generated parameters-register intro
-  in `gen/build.py` (the `("parameters", "registers/parameters.md", ...)` spec) and the
-  hand-written **"Provenance discipline"** section of `docs/index.md`, which uses the
-  `<span class="prov-…">` chips.
-- **Copy the pattern that already exists for exactly this problem**:
-  `test_the_access_legend_covers_the_whole_vocabulary` checks the reading-list legend against
-  `ACCESS_VOCAB` **both ways** — every vocabulary value appears, and the legend explains nothing
-  outside the vocabulary — never against a re-typed list. Do the same for provenance, and for both
-  legends, or this change ships its own staleness.
+  | `P-CONC-LIG` | Low | Mid | High |
+  | --- | --- | --- | --- |
+  | 5 g/L | 10,002 L | **33,340 L** | 40,008 L |
+  | 15 g/L (registered) | 3,301 L | 11,002 L | 13,202 L |
+  | 20 g/L | 2,469 L | **8,229 L** | 9,875 L |
 
-## The buffer register is the real hole (measured 2026-09-26)
+  `P-DF-DIAVOL` 4 → 7 → 20 moves DF buffer 3,023 → 5,291 → 15,117 L and WFI 13,727 → 16,293 →
+  27,527 L. **A finding in its own right: at the bottom of the concentration envelope the Mid scenario
+  needs a 33,340 L ligation vessel, which is not a buildable single vessel.** The bracket decides
+  whether the plant exists.
 
-This was missed when the scope was first written. `data/buffers.csv` has **three rows, and one of
-them is real**:
+## The panel's four blockers
 
-| Row | State |
-|---|---|
-| `BUF-LIG` | genuine - `provenance=fact`, pH 7.5, four components quoted verbatim from `SRC-ALMAC-2023` |
-| `BUF-DF` | *"Exchange from reaction salts toward final matrix - composition TBD"*, **pH blank**, `assumption` |
-| `BUF-FINAL` | *"Glass-forming excipient (trehalose/sucrose?) + minimal/volatile buffer - TBD"*, **pH blank**, `assumption` |
+- **The feature is invisible where numbers are read.** `prov-*` chips exist **only in hand-written
+  prose**. My line *"adding a value requires no rendering change"* was the defect stated as comfort.
+  Fix precedent already exists: `_with_bracket_verdicts` (`gen/build.py:145`) **already injects
+  `**no audit**` markup into a cell.**
+- **Phase 2's guards covered `parameters.csv` only while the estimates land in `buffers.csv`** (nine
+  fields, no `basis`). The rows the feature exists for escaped every guard.
+- **No estimate reached a sizing number** — `param_value` reads `value` only.
+- My own errors: *"`SRC-WHO-TRS1044` anchors the CIP requirement"* (naming a gap is not evidence for a
+  concentration) and *"`BUF-FINAL` is closer to `evidence`"* (`evidence` is a `range_kind`, not a
+  provenance — I conflated the two axes the slice exists to separate).
 
-Meanwhile `equipment.csv` carries **`U00-BUF` "Buffer preparation & hold suite"** with **six
-instruments** on it, sized on *"Total buffer volume/campaign (DF diavolumes dominate)"* - a whole
-unit operation devoted to preparing three buffers, two of which have no composition. And
-**`U06-CIP` "CIP/SIP system"** carries four instruments with **no registered cleaning solution at
-all**: `NaOH`/`sodium hydroxide` appears only in `impurities.csv`, `risks.csv` and `sources.csv`,
-never as a buffer row with a concentration, a temperature and a contact time. `P-HBEL-DS`, the
-cleaning *acceptance limit*, is also blank - so neither the agent nor the criterion is registered.
+## Approach — six phases, each leaving all three gates green
 
-### Solutions the repo's own content implies, with no row at all
+### Phase 0 — separate the two axes
+Rename `envelopes.provenance` → `endpoint_sourcing`, so the 11 disagreements stop being contradictions
+and the new value lands in one column with one meaning. Move `PROVENANCE_VOCAB` from
+`gen/test_balance.py:1249` to `gen/dataio.py` beside `RANGE_KINDS`, enforce it across **all twelve**
+provenance-carrying CSVs, and replace the four inline re-listings with imports. Relocate
+`BRACKET_VERDICTS`/`DISPOSITIONS` out of the renderer and `RISK_UNIT_OPS` out of the test file.
 
-1. **The phosphorylation / kinase (PNK) solution.** The structural one. `SRC-ALMAC-2023` runs a
-   kinase step with a 75 degC heat treatment between it and ligation; `S01`/`S02` already assert the
-   blockmers arrive 5'-phosphorylated; `ENV-008` is a PNK envelope row and a PNK risk row exists.
-   An entire enzymatic reaction step with **no solution registered and no unit operation**. Check
-   whether adding a unit operation ripples into an eighth PFD SVG and a `flowsheet.UNIT_LABELS`
-   entry before committing to it.
-2. **The quench solution.** `Q-059` is open on what terminates the reaction. `BUF-LIG`'s own note
-   already reasons that chelating its 10 mM Mg2+ at the quench would form net-negative Mg-EDTA and
-   point it the *right* way through the membrane (`C-014`). The register contains reasoning *about* a
-   quench solution and no row for one.
-3. **CIP/SIP solutions** - see above. Caustic concentration, temperature, contact time, acid step if
-   any, and the final rinse. Standardised enough to estimate; state the basis.
-4. **UF/DF membrane flush and storage solutions.** Absent.
-5. **IMAC equilibration / wash / elution buffers.** Absent, and **legitimately conditional on
-   `Q-050`** - do not add these while the enzyme-form fork is open. Note that the nickel-leaching
-   envelope bracket already carries the flag that both its endpoints are *elution* conditions while
-   the process never elutes.
+### Phase 1 — make the deliberate-blank refusal real
+Extend the refusal from ranges to **values**, keyed on **`not_a_range` alone** (never `single_point`),
+and **provenance-independently** — `P-LIG-SEG-CONC` is `assumption`, so a new-value-only guard closes
+nothing. Mutation case = the red team's exact reproduction. Also close the `buffers.csv` holes:
+`buffers` missing from `test_all_source_keys_resolve` (`:9`), no `buffers.provenance` validation, no
+`buffer_ref` column (17 free-text mentions across nine registers), zero buffer mutation coverage.
 
-### Two structural defects, not just missing rows
+### Phase 2 — the vocabulary, the fields, the visibility
+Fourth value; **`est_value`, `basis`, `falsifier` on every register where it is legal**, not
+`parameters` only. **An estimate never touches `value`** (guard), so the balance is *physically unable*
+to consume one and "never closes its question" becomes structural. `basis` must resolve its
+`SRC-`/`P-`/`EQ-`/`Q-` tokens and **must not rest on a source graded `abstract-only`, `record-only` or
+`not-retrieved`**. Add `QUESTION_STATUS` as a vocabulary (free text today) and guard that an estimate's
+question is **`open`**. Visibility: a `_with_provenance_markers(rows)` transform beside
+`_with_bracket_verdicts`, guarded over the **transform's return value**, never the gitignored page.
+`_CITATION` must require the chip **and** a `P-` id. Rewrite `docs/index.md:30-31`, plus the stale
+enumerations at `gen/build.py:43-45` and `:219`, `gen/impurity.py:85`, `gen/__init__.py:2`,
+`docs/balance/index.md:10`, `docs/techtransfer/index.md:24`, `README.md:43-44` and `:67`.
 
-- **No guard relates a unit operation to the solutions it runs in.** Plenty of guards check that a
-  buffer row is *well formed*; nothing checks that a reaction step *names its solution*. This is the
-  same shape as the reachability defect fixed in PR #8 - there the pair was *data reaches a page* vs
-  *a page reaches a reader*; here it is *a buffer row is valid* vs *a unit operation has the
-  solutions it needs*. `test_a_control_that_acts_names_the_instrument_that_enforces_it` is the
-  idiom to follow. Decide the domain carefully: `equipment.csv` has seven unit operations
-  (`U00-BUF`, `U01-LIG`, `U02-CF`, `U03-UFDF`, `U04-EVAP`, `U05-SD`, `U06-CIP`), and not all of them
-  consume a solution, so an honest guard needs a declared set of *solution-consuming* operations
-  rather than a blanket rule - and that set must be derived or defended, not hand-waved.
-- **There is no `buffer_ref` column anywhere.** Buffer ids are mentioned **17 times** across
-  `streams`, `controls`, `instruments`, `risks`, `questions`, `impurities`, `couplings`, `infoneeds`
-  and `verdicts` - and every one of those mentions is **free text inside another field**, so none is
-  referentially checked. The reference sweep at `gen/test_balance.py:~1335` resolves `unit_op`,
-  `equation_ref`, `risk_ref`, `instrument_ref` and `gap_ref`; `buffer_ref` is not among them. A
-  typo'd buffer id is invisible today. `buffers.csv` is **CRLF**, 3 data rows, 9 columns.
+### Phase 3 — the corrections, owed regardless
+Register the **2 mM vs 5 mM published contradiction** as a question; neither number is settled. Qualify
+`P-LIG-SEG-CONC` and `Q-064`: the *"6.7× void"* is basis-dependent — the 1.5 mM low end is per-segment
+across three segments plus **0.55 mM of tri-template hub** the register never mentions, ≈5.05 mM total,
+making the void ~2.0× on a total basis. Correct `Q-059`. Register the **75 °C hold plus centrifugal
+solids rejection**. Record in `docs/sources/ligation-evidence.md` that the register read Almac's
+methanol-quench sentence for its percent sign.
 
-`buffers.csv` is the only register that never received a slice: parameters gained `range_kind` and
-the envelope, controls gained a matrix, instruments gained per-unit PFDs, sources gained an access
-vocabulary and a reading-list census. Buffers still has its seeded shape.
+### Phase 4 — buffers, with the audited split
+`BUF-MEMBRANE-CLEAN` as a **convention-level `one_source_both_ends`** row, access downgraded, **pH
+figure dropped**, 100-hour budget carried, Millipore's own "lower concentrations" caveat in the notes,
+and the Ultracel-vs-PES non-differentiation recorded. `BUF-CIP` stainless caustic as the **judgement**
+case, its basis naming the ISPE "Assume" bookkeeping placeholder, the zero-2′-OH mechanism **without**
+the degradation inference, and the brewery study that measured no benefit from hot caustic as the
+counterweight. A **quench** row with the analytical-scale caveat. `BUF-DF`/`BUF-FINAL` compositions.
+**Not added:** a PNK composition row (duplicates `BUF-LIG`), IMAC buffers (conditional on `Q-050`).
+Two CIP rows minimum — TFF chemistry differs from every other unit operation.
 
-## The ligation parameter gaps, with what actually blocks each
+The **unit-operation → solution guard** needs a prerequisite: three unit-op vocabularies resolve to
+each other nowhere — `equip_id`, free-text `equipment.unit_op`, and hardcoded `RISK_UNIT_OPS` where
+`Ligation` ≠ `Enzymatic ligation` and `Utilities` is absent. Fix the key, then guard on `equip_id`.
 
-The second half of the scope. Blank-valued and band-less today. **`BUF-LIG` is NOT on this list** — it was filled during the last
-slice from a verified `SRC-ALMAC-2023` quote (50 mM Tris-HCl pH 7.5 / 100 mM KCl / 10 mM MgCl₂ /
-1 mM DTT) and is `provenance=fact`. Do not re-open it.
+### Phase 5 — the sizing work, and the HBEL reversal
+**The carryover criteria are citable** — register 10 ppm, 0.1% of therapeutic dose, no visible residue,
+and the most-stringent-of-three rule from PIC/S PI 006-3 §7.11.3 and WHO TRS 1019 Annex 3 §11.6/§11.9–
+11.10, as **`evidence`**. `P-HBEL-DS` itself (the PDE) **stays blank**: MACO is a division by one
+number, a 10× band gives a 10× swab-limit band straddling the TOC/HPLC LOQ so it cannot select the
+analytical method, and its research beat **failed on a safeguard false positive** and was never done.
+The criteria and the PDE are different quantities — carry the first, keep the second a gap.
 
-| Parameter | Registered blocker | Honest prospect for an estimate |
-|---|---|---|
-| `P-LIG-SEG-CONC` | blockmer charge concentration; 1 mM works and 10 mM is "slow and failed to go to completion", with **no datapoint between 1.5 and 10 mM** (Q-064) | plausible — the *mechanism* of the 10 mM failure (substrate/product inhibition, duplex aggregation, viscosity limiting mixing and heat transfer) supports an argued ceiling. Endpoints will be soft; say so |
-| `P-HBEL-DS` | health-based exposure limit for cleaning limits | plausible — the **framework** is standard and citable in outline (PDE via adjustment factors; the older 1/1000-dose and 10 ppm criteria; the default-of-last-resort band used when no compound tox data exists). State the framework, bracket the default, and **do not invent a NOAEL** |
-| `P-LIG-ENZ-LOAD` | candidate loadings are in **mutually inconvertible units** and the bridging quantities are absent from every source read | partly — a mass-basis figure already exists in the register's own evidence (0.4 mg/mL in `SRC-CN119265174` Example 12). An estimate can bridge to a mass basis per branch; it cannot invent the U→mg conversion. **`test_enzyme_parameters_stay_registered_gaps` deliberately holds `value` blank and requires the Q-050 back-reference and that the envelope rows not collapse to one branch — read that guard before touching this row** |
-| `P-ENZ-CLEARANCE-LRV` | no achieved clearance figure for **either** enzyme branch (Q-032) | weak — the answer depends on the unresolved soluble-vs-immobilised fork (Q-050) *and* on the fact that the ligase (~38 kDa) is **larger** than the product duplex (~14 kDa), so size-based clearance runs the wrong way. A branch-conditional estimate is possible; a single number is not. **Consider leaving this blank and saying why** — that is a legitimate planning outcome |
+**CIP water and steam into the balance.** **The phosphorylation→ligation dilution as a vessel fill
+requirement** — 2 mM *or* 5 mM to 1 mM, so V to 2–5V in one vessel, with the published contradiction
+stated rather than resolved; testable against `SRC-PALL-US9248420`'s 13:1, plus a jacket check for the
+65 °C anneal at the top fill. **UF/DF area from the registered hold-up loss** (0.10 × 227 L ≈ 23 L; at
+1–2 L/m², 11–23 m²) with a consistency guard, since hold-up and area are not independent. **The
+range-to-steel table** above, published from the model so it cannot drift.
+`P-ENZ-CLEARANCE-LRV` stays blank: it forks on `Q-050` and the ligase (~38 kDa) is larger than the
+duplex (~14 kDa), so size-based clearance runs the wrong way.
 
-**Say plainly in the plan which of these your knowledge cannot honestly fill.** A plan that promises
-four estimates and delivers two vague ones is worse than one that promises two and names the other
-two as genuinely not-knowable-by-recall. The four-way split in `data/infoneeds.csv`
-(`bracketed_evidence` / `bracketed_argument` / `point_justified` / `not_knowable`) already exists —
-use it, and check whether these rows need their `disposition` updated.
+## Retrieval hazards to carry into the source rows
 
-## House conventions that silently corrupt a diff
+`fda.gov/media/74033/download` returns a **mis-filed document** (an unrelated IVD package insert), not
+the cleaning guide — use the HTML inspection-guide URL. `picscheme.org/docview/3436` is a **newsletter**;
+PI 006-3 is **3447**. Merck's own hosts 403. The Almac SI uses **U+2019, not a prime (U+2032)**, so a
+quote written with a prime will not string-match. Two FDA chemistry-review PDFs 404 — the best
+remaining lead for forced-degradation data on a marketed fully-2′-modified siRNA.
 
-- **Gates, judged by exit code, never piped through `tail`** (the pipe reports `tail`'s status):
-  `python -m pytest gen -q ; python -m gen.build ; mkdocs build --strict`. Run pytest with the
-  generated pages deleted first (`git clean -fXd docs`) — CI runs pytest **before** the build, and a
-  guard that reads a built page passed locally and failed CI once already.
-- Baseline **147 tests**. Every new guard must be **mutation-tested against a failing case** in
-  `gen/test_mutations.py`, which copies `data/` to a tmp dir and monkeypatches `gen.dataio.DATA_DIR`
-  so the working tree is never written. Anchor every mutation on a **row id**, never a field value.
-  Assert the guard **raises**.
-- Controlled vocabularies are module constants with a runtime `raise` in the consumer **and** a guard
-  that **imports the constant** rather than re-listing it.
-- `mkdocs` prints a red "Warning from the Material for MkDocs team" line and still exits 0 — that is
-  not a failure.
-- `docs/diagrams/bfd.svg` and the seven PFD SVGs are generated **and committed** with byte-drift
-  tests. They must be byte-unchanged unless stream data deliberately changed.
-- `balance._require` raises on a blank, so a blank `value` is only safe for parameters no balance
-  path reads — check `used_by` (matched by bare substring over the whole text of `gen/balance.py`,
-  comments included).
-- Every generated page must be in the `mkdocs.yml` nav **and** linked from a hand-written page —
-  both are now guarded.
-- Next free ids: check by `max` rather than assuming; `questions` is at **Q-070**. Ids append at the
-  end, not in numeric order.
+## Also register, do not fix here
 
-## What the plan must decide and state
+`gen/flowsheet.py:32` `VIEW_W = 1160` has **30 px of slack**; any unit inserted into the product spine
+clips the last box, with **no test catching it**. The line-ending guard's docstring says *"ten of the
+twelve CSVs"* when it is **14 CRLF and 2 LF across 16 files**.
 
-1. The **name** of the fourth provenance value. It has to read unambiguously in a table cell next to
-   `fact`/`inference`/`assumption`. Candidates: `judgement`, `estimate`, `engineering_estimate`,
-   `recalled`. Argue the choice; the word is a permanent API.
-2. The **name and semantics of the basis field**, and whether it is **exclusive** to the new value
-   (recommended: a bidirectional guard, so `basis` non-blank ⟺ provenance is the new value, which
-   stops it becoming a free-text dumping ground) — versus also allowed on `inference`.
-3. Whether the new value is legal in all twelve provenance-carrying CSVs or only `parameters`.
-4. The **colour**, checked in light and dark.
-5. Whether the generated `ligation-envelope.md` page needs a section that lists the estimates
-   together, so a reader sees every recalled number in one place rather than scattered through a
-   47-row table.
-6. Which of the four gaps get estimates, which stay blank, and the question id each keeps.
-7. Whether to register a question for the **deferred** retro-fit of the 35 existing `assumption`
-   rows into placeholder-vs-estimate.
-8. Whether `buffers.csv` gains a `basis` column too, or whether the basis for a buffer lives in its
-   `notes` - and if the former, whether the guard is shared with `parameters.csv` or duplicated.
-9. Whether to add a **`buffer_ref` column** to the registers that already mention buffer ids in free
-   text, and wire it into the reference sweep. This is worth doing independently of the estimates and
-   may deserve to be its own phase, since it is a referential-integrity fix rather than a knowledge
-   question.
-10. Which solution-consuming unit operations the new guard covers, and how that set is defended.
-11. Whether the phosphorylation step becomes a real unit operation (with its PFD/`UNIT_LABELS`/BFD
-    ripple) or stays a supplier-side telescoped charge with a registered question.
+## Out of scope
 
-## Deliverable
+The retro-fit audit of the 35 `assumption` rows (register it as a question). Anything downstream of
+S05. **No new unit operation for phosphorylation** — `pfd.UNITS` is derived from `equipment.csv` so a
+PFD cannot be opted out of, and a product stream would force the `VIEW_W` fix plus an SVG re-baseline.
+No ISA clause text, letter tables or symbol tables; `SRC-ISA-5-1-2024` and `SRC-ISA-TR5-1-02-2024` stay
+`not-retrieved`, `Q-053` stays open.
 
-A phased plan where **each phase leaves all three gates green**, with the data-model phase landing
-independently of any estimate — so the machinery is reviewable before any recalled number rests on
-it. Land via a **new PR**; do not create one until asked. Report at the end what was verified **by
-execution** versus only reasoned about.
+## Verification
 
-One more lesson from this session, worth carrying: if a file you expect is missing, run
-`find / -name '<file>'` before concluding anything. A scratchpad path changed mid-session and the
-wrong conclusion drawn from its absence was that an entire research phase had been fabricated.
+```
+git clean -fXd docs ; python -m pytest gen -q ; python -m gen.build ; mkdocs build --strict
+```
+
+Judged by **exit code**, never piped through `tail`; generated pages deleted first because CI runs
+pytest **before** the build. Baseline **147**. Every new guard mutation-tested against a failing case
+in `gen/test_mutations.py` — starting with the red team's reproduction, which must now fail. A column
+addition touches the header **and every row** together or the field-count guard fires on all of them;
+`buffers.csv` writes **no `""` for empties**, unlike `streams.csv`; keep rows single-line or the CR/LF
+count guard trips. Eight SVGs byte-unchanged. CRLF verified per file.
+
+The final report states what was verified **by execution** versus reasoned about, and for every
+estimate: its basis, its falsifier, the question it did **not** close, and why a range was or was not
+given. Also correct `TIER3-SLICE4-PLAN.md`, committed with claims this audit has since refuted.
