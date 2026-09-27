@@ -30,7 +30,7 @@ Report at the end of each phase what you verified by execution versus what you t
 | --- | --- | --- |
 | 0 — separate the two axes | **done** | `bd9b91e` |
 | 1 — refuse a fabricated value; resolve buffer references | **done** | `35ec908` |
-| 2 — the vocabulary, the fields, the visibility | **done** | — |
+| 2 — the vocabulary, the fields, the visibility | **done** | `25c831b` |
 | 3 — the corrections the audits forced | **next** | — |
 | 4 — buffers | open | — |
 | 5 — sizing, and the citable cleaning criteria | open | — |
@@ -121,6 +121,47 @@ three-value enumerations were in `docs/index.md`, `README.md` (3 places), `gen/b
 enumerations. The `prov-*` chips existed only in hand-written prose; `prov-judgement` now exists in
 the CSS and the legend is guarded against the vocabulary. The marker precedent phase 2 needed was
 `_with_bracket_verdicts` at `gen/build.py:152`, which injects `**no audit**` into a cell at `:174`.
+
+### Phase 3 — verified state, 2026-09-27
+
+**Baseline is 202 tests** (phase 2 took it from 163). Next free question id is **Q-071**; there are
+52 question rows.
+
+**`Q-059` and `Q-064` already exist and already carry long notes. EDIT them, do not raise new
+questions for the same ground.**
+
+**Do not conflate two different contradictions.** `Q-059`'s notes already record one - inside
+`SRC-CN119265174`, where Example 7 heat-kills an immobilised enzyme at 80 °C/5 min, Example 12 at
+85 °C/15 min, and Examples 3, 5, 6 and 8 remove it centrifugally at 3000 rpm for 2 min with no
+thermal step at all. That is about **enzyme inactivation**. The contradiction phase 3 must register
+is a **different one**: Almac's paper says phosphorylation at **5 mM** while its own SI says **2 mM**
+for the same telescoped experiment (same one-pot phosphorylation of 1.2/1.3, same ligation of 1.4
+then 1.1, same Figure S5). Keep them apart or the register will read as if one document had both
+problems.
+
+**The Almac solids rejection is genuinely unregistered - checked.** Every existing `centrifug*`
+mention in `data/` (C-014, ENV-005, U02-CF, IMP-LIGASE, IN-017, P-LIG-INACT-T, Q-059) is about
+`SRC-CN119265174` removing an **immobilised enzyme**. None is about Almac's *"heat treated at 75 °C
+for 10 min (initial reactions) or 30 min (crude reactions), then centrifuged to pellet any
+precipitated material and supernatant used for ligations"*, which sits **between kinase and
+ligation** and is a solids-rejection step the flowsheet does not have. `docs/sources/ligation-evidence.md`
+contains **zero** mentions of centrifugation.
+
+**The evidence page is hand-written and IS swept for uncited numbers.**
+`test_numeric_claims_in_prose_carry_a_citation` exempts only `/registers/`, `balance/results.md` and
+`process/streams.md` - **not `docs/sources/`**. So every quantity added there (75 °C, 10 min, 30 min,
+2 mM, 5 mM, 0.55 mM, 1.5 mM) needs a `SRC-`/`P-`/`Q-`/`EQ-`/`R-` token within ±3 lines. Phase 2 may
+have widened `_CITATION`; check what it accepts now before assuming.
+
+**The basis-crossing correction for `P-LIG-SEG-CONC` and `Q-064`, with the arithmetic:** the 1.5 mM
+low endpoint is **per segment across three segments** (4.5 mM) **plus 0.55 mM of tri-template hub**,
+so ≈**5.05 mM total oligonucleotide** - which makes the "6.7× void" ≈**2.0×** on a total basis. The
+hub is a ~24 kDa covalently-supported construct with **no counterpart in our route**, and the
+register has never mentioned it. The high end (*"blockmer concentrations as high as 10 mM"*) does not
+state whether it is per blockmer or total, so the void's width is basis-dependent at both ends.
+
+**A retrieval trap for any re-verification:** the Almac SI uses **U+2019**, not a prime (U+2032), so
+a quote written with a prime will not string-match.
 
 ## Working order
 
