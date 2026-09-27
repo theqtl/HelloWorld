@@ -24,6 +24,49 @@ own corrections, so treat every number in it as a claim with a name on it rather
 Report at the end of each phase what you verified by execution versus what you took from the plan.
 ```
 
+## Progress — read this before starting
+
+| Phase | State | Commit |
+| --- | --- | --- |
+| 0 — separate the two axes | **done** | `bd9b91e` |
+| 1 — refuse a fabricated value; resolve buffer references | **done** | `35ec908` |
+| 2 — the vocabulary, the fields, the visibility | **next** | — |
+| 3 — the corrections the audits forced | open | — |
+| 4 — buffers | open | — |
+| 5 — sizing, and the citable cleaning criteria | open | — |
+
+**Baseline is now 163 tests, not 147.** Phase 0 took it to 155, phase 1 to 163.
+
+**What phase 0 delivered**, so phase 2 does not redo it: `envelopes.provenance` renamed to
+`endpoint_sourcing` with its own `ENDPOINT_SOURCING` constant kept deliberately separate from
+`PROVENANCE_VOCAB`; `PROVENANCE_VOCAB` moved into `gen/dataio.py`; `provenance_offenders()` there
+now validates **every** register carrying the column via `PROVENANCE_REGISTERS`, which **already
+includes `buffers`** — one of the three buffer holes phase 1 was scoped to close was closed here;
+`BRACKET_VERDICTS`, `DISPOSITIONS` and `RISK_UNIT_OPS` relocated out of the renderer and the test
+file; the four inline re-listings replaced with imports.
+
+**What phase 1 delivered.** `value_written_where_refused()` in `gen/envelope.py`, guarded by
+`test_a_refused_bracket_is_not_written_as_a_value_either`. The rule is **not** "a `not_a_range` row
+may carry no value" — that would contradict the policy its sibling states, which allows "a blank or
+a clearly-labelled single point". A value is legitimate as `fact`/`inference` **with a source**; an
+`assumption` value is refused. **Keyed on `not_a_range` alone**, never `single_point`. Plus a
+bidirectional buffer-reference sweep, `buffers` added to the source-key sweep, and the first buffer
+mutation coverage in the harness's history.
+
+**A deviation from the plan, made deliberately.** The plan called for a structured `buffer_ref`
+column. Phase 1 swept prose instead, for two reasons: three of the eighteen mentions
+(`infoneeds.satisfied_by`) are **already** structured and **already** resolved by
+`satisfied_universe()`, so a column would have carried the same reference twice — which is how two
+registers start disagreeing — and prose sweeping is the idiom this repo already uses for the same
+problem (`Q-\d{3}`). The structured column is still worth having for rendering links; it is a
+feature, not an integrity fix, and it is **not** done.
+
+**Still true and unfixed, verified at `35ec908`:** the stale three-value enumerations remain in
+`docs/index.md`, `README.md` (3 places), `gen/build.py` (4), `gen/__init__.py` and
+`gen/impurity.py`. The `prov-*` chips still exist only in hand-written prose. The marker precedent
+phase 2 needs is `_with_bracket_verdicts` at `gen/build.py:152`, which injects `**no audit**` into a
+cell at `:174`.
+
 ## Working order
 
 Each phase leaves all three gates green and is independently landable. Phases 0–2 are the machinery;
